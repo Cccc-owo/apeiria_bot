@@ -1,0 +1,93 @@
+"""Plugin sync hook — sync loaded plugins to PluginInfo table on startup."""
+
+from __future__ import annotations
+
+import nonebot
+from nonebot import get_driver
+from nonebot.log import logger
+
+from apeiria.core.configs.models import PluginExtraData
+
+
+@get_driver().on_startup
+async def sync_plugins() -> None:
+    """Iterate all loaded plugins, parse metadata, upsert into PluginInfo table."""
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import select
+
+    from apeiria.core.models.plugin_info import PluginInfo
+
+    # Ensure tables exist (dev convenience — production uses Alembic)
+    async with get_session() as session:
+        conn = await session.connection()
+
+        def _check(sync_conn):  # noqa: ANN001
+            return sa_inspect(sync_conn).has_table("plugin_info")
+
+        exists = await conn.run_sync(_check)
+        if not exists:
+            logger.warning("Tables not found, creating all ORM tables...")
+            from nonebot_plugin_orm import Model
+
+            from apeiria.core.models import (  # noqa: F401
+                BanConsole,
+                CommandStatistics,
+                GroupConsole,
+                LevelUser,
+                UserConsole,
+            )
+
+            await conn.run_sync(Model.metadata.create_all)
+            await session.commit()
+            logger.info("Tables created successfully")
+
+    plugins = nonebot.get_loaded_plugins()
+    logger.info("Syncing {} loaded plugins to database...", len(plugins))
+
+    async with get_session() as session:
+        for plugin in plugins:
+            module_name = plugin.module_name
+            meta = plugin.metadata
+
+            extra: PluginExtraData | None = None
+            if meta and meta.extra:
+                extra = PluginExtraData.from_extra(meta.extra)
+
+            name = meta.name if meta else plugin.name
+            description = meta.description if meta else None
+            usage = meta.usage if meta else None
+            plugin_type = extra.plugin_type.value if extra else "normal"
+            admin_level = extra.admin_level if extra else 0
+            author = extra.author if extra else None
+            version = extra.version if extra else None
+
+            result = await session.execute(
+                select(PluginInfo).where(PluginInfo.module_name == module_name)
+            )
+            record = result.scalar_one_or_none()
+            if record:
+                record.name = name
+                record.description = description
+                record.usage = usage
+                record.plugin_type = plugin_type
+                record.admin_level = admin_level
+                record.author = author
+                record.version = version
+            else:
+                session.add(
+                    PluginInfo(
+                        module_name=module_name,
+                        name=name,
+                        description=description,
+                        usage=usage,
+                        plugin_type=plugin_type,
+                        admin_level=admin_level,
+                        author=author,
+                        version=version,
+                    )
+                )
+
+        await session.commit()
+
+    logger.info("Plugin sync complete: {} plugins registered", len(plugins))
