@@ -1,0 +1,39 @@
+admin:
+  ban:
+    success: "Banned user {target}, duration: {duration}"
+    success_reason: "Banned user {target}, duration: {duration}, reason: {reason}"
+    negative_duration: "Ban duration cannot be negative"
+    not_banned: "User {target} is not banned"
+    unbanned: "Unbanned user {target}"
+  mute:
+    success: "Muted {target}, duration: {duration}"
+    zero_duration: "Mute duration must be greater than 0 minutes"
+    failed: "Mute failed, Bot may lack admin permissions"
+    unmuted: "Unmuted {target}"
+    unmute_failed: "Unmute failed, Bot may lack admin permissions"
+  kick:
+    success: "Removed {target} from group"
+    failed: "Kick failed, Bot may lack admin permissions"
+  plugin:
+    enabled: "Plugin {name} enabled"
+    disabled: "Plugin {name} disabled"
+  level:
+    self_modify: "Cannot modify your own permission level"
+    superuser_modify: "Cannot modify superuser permission level"
+    range_error: "Permission level range is 0-4 (5=Admin, 6=Owner are auto-detected)"
+    updated: "Updated {target} permission level from Lv.{old} to Lv.{new}"
+  bot:
+    "on": "Bot enabled"
+    "off": "Bot disabled, use /boton to re-enable"
+  validate:
+    self_action: "Cannot perform {action} on yourself"
+    superuser_action: "Cannot perform {action} on superusers"
+  banlist:
+    title: "📋 Ban List"
+    empty: "No active bans"
+    item: "• {user} | {duration} | {reason}"
+    no_reason: "N/A"
+  pluginlist:
+    title: "📋 Plugin Status (this group)"
+    item_on: "✅ {name}"
+    item_off: "❌ {name}"
