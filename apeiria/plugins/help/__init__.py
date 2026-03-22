@@ -20,6 +20,7 @@ __plugin_meta__ = PluginMetadata(
         plugin_type=PluginType.NORMAL,
         admin_level=0,
         commands=["help"],
+        required_plugins=["nonebot_plugin_alconna", "nonebot_plugin_htmlkit"],
     ).to_dict(),
 )
 

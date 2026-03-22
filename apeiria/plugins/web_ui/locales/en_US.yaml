@@ -1,0 +1,45 @@
+web_ui:
+  auth:
+    token_expired: "Login expired. Please sign in again."
+    token_invalid: "Invalid login state. Please sign in again."
+    wrong_password: "Incorrect password"
+  chat:
+    asset_not_found: "Asset not found"
+    asset_file_missing: "Asset file missing"
+    auth_required: "Please authenticate first."
+    auth_connected: "WebUI chat connected. Create a session before sending messages."
+    session_closed: "Chat session closed."
+    unsupported_frame: "Unsupported frame type: {type}"
+    invalid_frame: "Invalid frame payload"
+    internal_error: "Internal chat service error"
+    websocket_close_reason: "Internal error"
+  data:
+    table_not_found: "Table not found"
+    record_not_found: "Record not found"
+    fields_not_editable: "Fields not editable: {fields}"
+    table_users: "Users"
+    table_groups: "Groups"
+    table_levels: "Levels"
+    table_bans: "Bans"
+    table_plugins: "Plugins"
+    table_statistics: "Statistics"
+  groups:
+    not_found: "Group not found"
+    protected_plugins: "These plugins cannot be disabled: {plugins}"
+  permissions:
+    group_id_required: "group_id is required"
+    ban_not_found: "Ban record not found"
+  plugins:
+    not_found: "Plugin not found"
+    protected: "This plugin cannot be disabled: {reason}"
+  sessions:
+    owner_mismatch: "Session owner mismatch"
+    not_found: "Chat session not found"
+  secrets:
+    generated: "Generated new Web UI secrets"
+  startup:
+    no_package_manager: "No pnpm/npm found, cannot auto-build frontend"
+    build_failed: "Frontend build failed:\n{stderr}"
+    build_success: "Frontend built successfully"
+    ready: "Web UI ready at {url}"
+    password: "Web UI password: {password}"

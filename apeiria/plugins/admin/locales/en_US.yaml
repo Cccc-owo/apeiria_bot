@@ -17,6 +17,7 @@ admin:
   plugin:
     enabled: "Plugin {name} enabled"
     disabled: "Plugin {name} disabled"
+    protected: "Plugin {name} is required by the system and cannot be disabled"
   level:
     self_modify: "Cannot modify your own permission level"
     superuser_modify: "Cannot modify superuser permission level"
@@ -37,3 +38,4 @@ admin:
     title: "📋 Plugin Status (this group)"
     item_on: "✅ {name}"
     item_off: "❌ {name}"
+    item_locked: "🔒 {name}"

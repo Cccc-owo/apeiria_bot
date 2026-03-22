@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 from nonebot.log import logger
 
+from apeiria.core.i18n import t
+
 if TYPE_CHECKING:
     from loguru import Record
 
@@ -81,4 +83,4 @@ def setup_logging(
         level="INFO",
     )
 
-    logger.info("Logging service initialized, log_dir={}", log_dir)
+    logger.info("{}", t("logging.initialized", log_dir=log_dir))

@@ -7,7 +7,7 @@ from nonebot.adapters import Event
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.helpers import get_plugin_name
+from apeiria.core.utils.helpers import get_plugin_name, is_plugin_protected
 from apeiria.core.utils.rules import admin_check, ensure_group
 
 from .utils import extract_group_id
@@ -61,7 +61,9 @@ async def handle_pluginlist(event: Event) -> None:
 
         name = get_plugin_name(plugin)
         is_disabled = plugin.module_name in disabled
-        if is_disabled:
+        if is_plugin_protected(plugin.module_name):
+            lines.append(t("admin.pluginlist.item_locked", name=name))
+        elif is_disabled:
             lines.append(t("admin.pluginlist.item_off", name=name))
         else:
             lines.append(t("admin.pluginlist.item_on", name=name))

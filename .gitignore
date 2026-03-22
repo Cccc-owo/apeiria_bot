@@ -139,3 +139,11 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Bot runtime data
+data/
+
+# Frontend artifacts
+web/dist/
+web/node_modules/
+web/.vite/
