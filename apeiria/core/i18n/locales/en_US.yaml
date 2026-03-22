@@ -1,0 +1,19 @@
+common:
+  group_only: "This command is only available in groups"
+  error: "An error occurred, please try again later"
+  plugin_not_found: "Plugin not found: {name}"
+
+auth:
+  banned: "You have been banned and cannot use this feature"
+  plugin_disabled: "This feature is disabled in this group"
+  permission_denied: "Insufficient permission, requires {need}"
+  level_admin: "Admin"
+  level_owner: "Owner"
+
+duration:
+  permanent: "permanent"
+  day: "d"
+  hour: "h"
+  minute: "m"
+  second: "s"
+  zero: "0s"

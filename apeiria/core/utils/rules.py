@@ -1,13 +1,7 @@
 """NoneBot2 Rule factories for permission checks."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
+from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
-
-if TYPE_CHECKING:
-    from nonebot.adapters import Bot, Event
 
 
 def admin_check(level: int = 5) -> Rule:

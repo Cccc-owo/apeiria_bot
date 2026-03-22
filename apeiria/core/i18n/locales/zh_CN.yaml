@@ -1,0 +1,19 @@
+common:
+  group_only: "该命令仅在群聊中可用"
+  error: "出错了，请稍后重试"
+  plugin_not_found: "未找到插件: {name}"
+
+auth:
+  banned: "你已被封禁，无法使用此功能"
+  plugin_disabled: "该功能在本群已被禁用"
+  permission_denied: "权限不足，需要{need}权限"
+  level_admin: "管理员"
+  level_owner: "群主"
+
+duration:
+  permanent: "永久"
+  day: "天"
+  hour: "小时"
+  minute: "分钟"
+  second: "秒"
+  zero: "0秒"

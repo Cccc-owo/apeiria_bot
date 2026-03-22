@@ -11,10 +11,7 @@ from apeiria.core.configs.models import PluginExtraData
 
 
 def get_plugin_extra(plugin: Plugin) -> PluginExtraData | None:
-    """Extract PluginExtraData from a loaded plugin.
-
-    Returns None for third-party plugins without our metadata format.
-    """
+    """Extract PluginExtraData from a loaded plugin."""
     if plugin.metadata and plugin.metadata.extra:
         return PluginExtraData.from_extra(plugin.metadata.extra)
     return None
@@ -29,21 +26,23 @@ def get_plugin_name(plugin: Plugin) -> str:
 
 def format_duration(seconds: int) -> str:
     """Format seconds into human-readable duration string."""
+    from apeiria.core.i18n import t
+
     if seconds <= 0:
-        return "永久"
+        return t("duration.permanent")
     parts: list[str] = []
     days, seconds = divmod(seconds, 86400)
     hours, seconds = divmod(seconds, 3600)
     minutes, seconds = divmod(seconds, 60)
     if days:
-        parts.append(f"{days}天")
+        parts.append(f"{days}{t('duration.day')}")
     if hours:
-        parts.append(f"{hours}小时")
+        parts.append(f"{hours}{t('duration.hour')}")
     if minutes:
-        parts.append(f"{minutes}分钟")
+        parts.append(f"{minutes}{t('duration.minute')}")
     if seconds:
-        parts.append(f"{seconds}秒")
-    return "".join(parts) or "0秒"
+        parts.append(f"{seconds}{t('duration.second')}")
+    return "".join(parts) or t("duration.zero")
 
 
 def safe_json_loads(text: str | None, default: Any = None) -> Any:

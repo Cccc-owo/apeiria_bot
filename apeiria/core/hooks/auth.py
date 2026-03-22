@@ -1,11 +1,14 @@
 """Auth hook — pre-run permission, ban, and plugin status checks."""
 
+import contextlib
+
 from nonebot.adapters import Bot, Event
 from nonebot.exception import IgnoredException
 from nonebot.log import logger
 from nonebot.matcher import Matcher
 from nonebot.message import run_preprocessor
 
+from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import get_plugin_extra
 
 
@@ -30,14 +33,16 @@ async def auth_hook(matcher: Matcher, event: Event, bot: Bot) -> None:
         return
 
     if group_id:
-        await _check_group_auth(user_id, group_id, plugin.module_name)
+        await _check_group_auth(bot, event, user_id, group_id, plugin.module_name)
     else:
-        await _check_private_auth(user_id)
+        await _check_private_auth(bot, event, user_id)
 
     await _check_plugin_level(bot, event, plugin, user_id, group_id)
 
 
-async def _check_group_auth(user_id: str, group_id: str, module_name: str) -> None:
+async def _check_group_auth(
+    bot: Bot, event: Event, user_id: str, group_id: str, module_name: str
+) -> None:
     """Check bot status, ban, and plugin enabled in group context."""
     from nonebot_plugin_orm import get_session
     from sqlalchemy import select
@@ -55,18 +60,24 @@ async def _check_group_auth(user_id: str, group_id: str, module_name: str) -> No
 
     if await is_banned(user_id, group_id):
         logger.debug("Blocked banned user {} in group {}", user_id, group_id)
+        with contextlib.suppress(Exception):
+            await bot.send(event, t("auth.banned"))
         raise IgnoredException("user_banned")
 
     if not await is_plugin_enabled(group_id, module_name):
+        with contextlib.suppress(Exception):
+            await bot.send(event, t("auth.plugin_disabled"))
         raise IgnoredException("plugin_disabled")
 
 
-async def _check_private_auth(user_id: str) -> None:
+async def _check_private_auth(bot: Bot, event: Event, user_id: str) -> None:
     """Check ban in private context."""
     from apeiria.core.utils.permission import is_banned
 
     if await is_banned(user_id):
         logger.debug("Blocked banned user {} in private", user_id)
+        with contextlib.suppress(Exception):
+            await bot.send(event, t("auth.banned"))
         raise IgnoredException("user_banned")
 
 
@@ -100,6 +111,10 @@ async def _check_plugin_level(
             required_level,
             effective,
         )
+        _level_names = {5: t("auth.level_admin"), 6: t("auth.level_owner")}
+        need = _level_names.get(required_level, f"Lv.{required_level}")
+        with contextlib.suppress(Exception):
+            await bot.send(event, t("auth.permission_denied", need=need))
         raise IgnoredException("insufficient_permission")
 
 

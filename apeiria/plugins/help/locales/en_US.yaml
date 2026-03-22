@@ -1,0 +1,11 @@
+help:
+  list_title: "📋 Command Help"
+  list_footer: "Use /help <plugin> for details"
+  commands_label: "Commands"
+  no_commands: "None"
+  no_usage: "No usage instructions"
+  no_description: "No description"
+  not_found: "Plugin not found: {name}"
+  detail_type: "Type"
+  detail_permission: "Permission"
+  detail_description: "Description"
