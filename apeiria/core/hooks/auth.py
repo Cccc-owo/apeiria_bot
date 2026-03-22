@@ -27,6 +27,12 @@ async def auth_hook(matcher: Matcher, event: Event, bot: Bot) -> None:
     session_id = event.get_session_id()
     group_id = _extract_group_id(session_id, user_id)
 
+    from apeiria.core.utils.permission import is_plugin_globally_enabled
+
+    if not await is_plugin_globally_enabled(plugin.module_name):
+        logger.debug("Blocked globally disabled plugin {}", plugin.module_name)
+        raise IgnoredException("plugin_globally_disabled")
+
     from nonebot import get_driver
 
     if user_id in get_driver().config.superusers:

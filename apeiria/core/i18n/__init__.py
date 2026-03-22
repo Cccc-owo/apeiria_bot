@@ -61,7 +61,7 @@ def load_locales(path: Path) -> None:
     import yaml
 
     if not path.is_dir():
-        logger.warning("Locales directory not found: {}", path)
+        logger.warning("{}", t("i18n.locales_not_found", path=path))
         return
 
     for file in path.glob("*.yaml"):
@@ -106,7 +106,7 @@ def _ensure_initialized() -> None:
     except Exception:  # noqa: BLE001
         pass
 
-    logger.info("i18n ready: active locale: {}", _current_locale)
+    logger.info("{}", t("i18n.ready", locale=_current_locale))
 
 
 def _resolve(key: str, locale: str) -> str | None:

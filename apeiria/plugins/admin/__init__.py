@@ -46,6 +46,7 @@ __plugin_meta__ = PluginMetadata(
             "banlist",
             "pluginlist",
         ],
+        required_plugins=["nonebot_plugin_alconna", "nonebot_plugin_orm"],
     ).to_dict(),
 )
 

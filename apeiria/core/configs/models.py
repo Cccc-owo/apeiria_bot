@@ -41,6 +41,7 @@ class PluginExtraData:
     admin_level: int = 0
     commands: list[str] = field(default_factory=list)
     configs: list[RegisterConfig] = field(default_factory=list)
+    required_plugins: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dict for PluginMetadata.extra."""
@@ -74,6 +75,7 @@ class PluginExtraData:
                 admin_level=extra.get("admin_level", 0),
                 commands=extra.get("commands", []),
                 configs=configs,
+                required_plugins=extra.get("required_plugins", []),
             )
         except (ValueError, TypeError, KeyError):
             return None

@@ -5,6 +5,8 @@ from __future__ import annotations
 import nonebot
 from pydantic import BaseModel
 
+from apeiria.core.i18n import t
+
 
 class BotConfig(BaseModel):
     """Extended bot configuration.
@@ -14,11 +16,9 @@ class BotConfig(BaseModel):
     """
 
     # Error handling
-    error_message: str = "出错了，请稍后重试"
+    error_message: str = "common.error"
 
     # Web UI
-    web_ui_password: str = "admin"
-    web_ui_token_secret: str = "apeiria_secret_change_me"
     web_ui_token_expire_days: int = 7
 
     # Rate limiting (default: per-user per-command)
@@ -31,3 +31,9 @@ class BotConfig(BaseModel):
 
 
 bot_config = nonebot.get_plugin_config(BotConfig)
+
+
+def get_error_message() -> str:
+    """Resolve configured error message, supporting either i18n key or raw text."""
+    message = bot_config.error_message
+    return t(message) if "." in message else message

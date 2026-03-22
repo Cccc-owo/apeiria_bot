@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
-import nonebot
 from arclet.alconna import Args
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
+from apeiria.core.utils.helpers import (
+    find_loaded_plugin,
+    get_plugin_name,
+    get_plugin_protection_reason,
+)
 from apeiria.core.utils.rules import admin_check, ensure_group
 
 from .utils import extract_group_id
+
+if TYPE_CHECKING:
+    from nonebot.plugin import Plugin
 
 _enable = on_alconna(
     Alconna("enable", Args["plugin_name", str]),
@@ -37,10 +45,11 @@ async def handle_enable(event: Event, plugin_name: Match[str]) -> None:
     group_id = extract_group_id(event)
     if not group_id:
         await _enable.finish(t("common.group_only"))
-    if not _find_plugin(name):
+    plugin = find_loaded_plugin(name)
+    if not plugin:
         await _enable.finish(t("common.plugin_not_found", name=name))
-    await _toggle_plugin(group_id, name, enable=True)
-    await _enable.finish(t("admin.plugin.enabled", name=name))
+    await _toggle_plugin(group_id, plugin.module_name, enable=True)
+    await _enable.finish(t("admin.plugin.enabled", name=get_plugin_name(plugin)))
 
 
 @_disable.handle()
@@ -49,18 +58,18 @@ async def handle_disable(event: Event, plugin_name: Match[str]) -> None:
     group_id = extract_group_id(event)
     if not group_id:
         await _disable.finish(t("common.group_only"))
-    if not _find_plugin(name):
+    plugin = find_loaded_plugin(name)
+    if not plugin:
         await _disable.finish(t("common.plugin_not_found", name=name))
-    await _toggle_plugin(group_id, name, enable=False)
-    await _disable.finish(t("admin.plugin.disabled", name=name))
+    reason = get_plugin_protection_reason(plugin.module_name)
+    if reason:
+        await _disable.finish(t("admin.plugin.protected", name=get_plugin_name(plugin)))
+    await _toggle_plugin(group_id, plugin.module_name, enable=False)
+    await _disable.finish(t("admin.plugin.disabled", name=get_plugin_name(plugin)))
 
-
-def _find_plugin(name: str) -> bool:
-    """Check if a plugin with this module name exists."""
-    return any(
-        p.module_name == name or (p.metadata and p.metadata.name == name)
-        for p in nonebot.get_loaded_plugins()
-    )
+def _find_plugin(name: str) -> Plugin | None:
+    """Backward-compatible plugin resolver."""
+    return find_loaded_plugin(name)
 
 
 async def _toggle_plugin(group_id: str, plugin_name: str, *, enable: bool) -> None:

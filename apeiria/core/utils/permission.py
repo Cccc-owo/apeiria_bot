@@ -92,6 +92,11 @@ async def is_banned(user_id: str, group_id: str | None = None) -> bool:
 
 async def is_plugin_enabled(group_id: str, plugin_module: str) -> bool:
     """Check if a plugin is enabled in a group."""
+    from apeiria.core.utils.helpers import is_plugin_protected
+
+    if is_plugin_protected(plugin_module):
+        return True
+
     cache = get_cache()
     cache_key = f"group_plugin:{group_id}"
 
@@ -118,6 +123,38 @@ async def is_plugin_enabled(group_id: str, plugin_module: str) -> bool:
         await cache.set(cache_key, disabled, ttl=120)
 
     return plugin_module not in disabled
+
+
+async def is_plugin_globally_enabled(plugin_module: str) -> bool:
+    """Check if a plugin is globally enabled."""
+    from apeiria.core.utils.helpers import is_plugin_protected
+
+    if is_plugin_protected(plugin_module):
+        return True
+
+    cache = get_cache()
+    cache_key = f"plugin_global:{plugin_module}"
+
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import select
+
+    from apeiria.core.models.plugin_info import PluginInfo
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(PluginInfo.is_global_enabled).where(
+                PluginInfo.module_name == plugin_module
+            )
+        )
+        enabled = result.scalar_one_or_none()
+
+    value = True if enabled is None else bool(enabled)
+    await cache.set(cache_key, value, ttl=120)
+    return value
 
 
 async def set_user_level(user_id: str, group_id: str, level: int) -> None:

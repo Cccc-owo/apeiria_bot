@@ -2,12 +2,29 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from nonebot.plugin import Plugin
 
+import nonebot
+
 from apeiria.core.configs.models import PluginExtraData
+from apeiria.core.i18n import t
+
+FRAMEWORK_REQUIRED_PLUGIN_MODULES = frozenset(
+    {
+        "web_ui",
+        "nonebot_plugin_orm",
+        "nonebot_plugin_alconna",
+        "nonebot_plugin_localstore",
+        "nonebot_plugin_htmlkit",
+        "nonebot_plugin_apscheduler",
+    }
+)
+OFFICIAL_PLUGIN_ROOT = (Path(__file__).resolve().parents[2] / "plugins").resolve()
+CUSTOM_PLUGIN_ROOT = (Path(__file__).resolve().parents[3] / "local_plugins").resolve()
 
 
 def get_plugin_extra(plugin: Plugin) -> PluginExtraData | None:
@@ -22,6 +39,78 @@ def get_plugin_name(plugin: Plugin) -> str:
     if plugin.metadata and plugin.metadata.name:
         return plugin.metadata.name
     return plugin.name
+
+
+def get_plugin_required_plugins(plugin: Plugin) -> list[str]:
+    """Get declared plugin dependencies from metadata."""
+    extra = get_plugin_extra(plugin)
+    if not extra:
+        return []
+    return [
+        module
+        for module in extra.required_plugins
+        if isinstance(module, str) and module
+    ]
+
+
+def find_loaded_plugin(name: str) -> Plugin | None:
+    """Find loaded plugin by module name or display name."""
+    for plugin in nonebot.get_loaded_plugins():
+        if plugin.module_name == name or get_plugin_name(plugin) == name:
+            return plugin
+    return None
+
+
+def get_plugin_dependents(module_name: str) -> list[str]:
+    """Get loaded plugins that depend on the target plugin."""
+    dependents = {
+        get_plugin_name(plugin)
+        for plugin in nonebot.get_loaded_plugins()
+        if module_name in get_plugin_required_plugins(plugin)
+    }
+    return sorted(dependents)
+
+
+def get_plugin_source(plugin: Plugin) -> str:
+    """Classify plugin source for management UI."""
+    module = getattr(plugin, "module", None)
+    module_file = getattr(module, "__file__", None)
+    if module_file:
+        try:
+            resolved = Path(module_file).resolve()
+        except OSError:
+            resolved = None
+        if resolved:
+            if OFFICIAL_PLUGIN_ROOT in resolved.parents:
+                return "official"
+            if CUSTOM_PLUGIN_ROOT in resolved.parents:
+                return "custom"
+
+    if plugin.module_name.startswith("nonebot_plugin_"):
+        return "framework"
+    if plugin.module_name == "echo":
+        return "builtin"
+    return "external"
+
+
+def get_plugin_protection_reason(module_name: str) -> str | None:
+    """Return human-readable reason when a plugin should not be disabled."""
+    reasons: list[str] = []
+    if module_name in FRAMEWORK_REQUIRED_PLUGIN_MODULES:
+        reasons.append(t("common.framework_required"))
+
+    dependents = get_plugin_dependents(module_name)
+    if dependents:
+        reasons.append(
+            t("common.required_by_plugins", plugins=", ".join(dependents))
+        )
+
+    return "；".join(reasons) if reasons else None
+
+
+def is_plugin_protected(module_name: str) -> bool:
+    """Check whether a plugin is protected from being disabled."""
+    return get_plugin_protection_reason(module_name) is not None
 
 
 def format_duration(seconds: int) -> str:

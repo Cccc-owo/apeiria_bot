@@ -7,6 +7,7 @@ from nonebot import get_driver
 from nonebot.log import logger
 
 from apeiria.core.configs.models import PluginExtraData
+from apeiria.core.i18n import t
 
 
 @get_driver().on_startup
@@ -27,7 +28,7 @@ async def sync_plugins() -> None:
 
         exists = await conn.run_sync(_check)
         if not exists:
-            logger.warning("Tables not found, creating all ORM tables...")
+            logger.warning("{}", t("plugin_sync.tables_missing"))
             from nonebot_plugin_orm import Model
 
             from apeiria.core.models import (  # noqa: F401
@@ -40,10 +41,10 @@ async def sync_plugins() -> None:
 
             await conn.run_sync(Model.metadata.create_all)
             await session.commit()
-            logger.info("Tables created successfully")
+            logger.info("{}", t("plugin_sync.tables_created"))
 
     plugins = nonebot.get_loaded_plugins()
-    logger.info("Syncing {} loaded plugins to database...", len(plugins))
+    logger.info("{}", t("plugin_sync.syncing", count=len(plugins)))
 
     async with get_session() as session:
         for plugin in plugins:
@@ -90,4 +91,4 @@ async def sync_plugins() -> None:
 
         await session.commit()
 
-    logger.info("Plugin sync complete: {} plugins registered", len(plugins))
+    logger.info("{}", t("plugin_sync.complete", count=len(plugins)))

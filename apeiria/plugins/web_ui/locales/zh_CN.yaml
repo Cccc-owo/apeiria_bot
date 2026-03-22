@@ -1,0 +1,45 @@
+web_ui:
+  auth:
+    token_expired: "登录已过期，请重新登录"
+    token_invalid: "登录状态无效，请重新登录"
+    wrong_password: "密码错误"
+  chat:
+    asset_not_found: "资源不存在"
+    asset_file_missing: "资源文件不存在"
+    auth_required: "请先完成登录认证。"
+    auth_connected: "WebUI 聊天已连接。请先创建会话后再发送消息。"
+    session_closed: "聊天会话已关闭。"
+    unsupported_frame: "不支持的消息帧类型：{type}"
+    invalid_frame: "消息帧格式无效"
+    internal_error: "聊天服务内部错误"
+    websocket_close_reason: "内部错误"
+  data:
+    table_not_found: "数据表不存在"
+    record_not_found: "记录不存在"
+    fields_not_editable: "以下字段不可编辑：{fields}"
+    table_users: "用户"
+    table_groups: "群组"
+    table_levels: "权限"
+    table_bans: "封禁"
+    table_plugins: "插件"
+    table_statistics: "统计"
+  groups:
+    not_found: "群组不存在"
+    protected_plugins: "以下插件不可禁用：{plugins}"
+  permissions:
+    group_id_required: "必须提供 group_id"
+    ban_not_found: "封禁记录不存在"
+  plugins:
+    not_found: "插件不存在"
+    protected: "该插件不可禁用：{reason}"
+  sessions:
+    owner_mismatch: "会话所属用户不匹配"
+    not_found: "聊天会话不存在"
+  secrets:
+    generated: "已生成新的 WebUI 密钥"
+  startup:
+    no_package_manager: "未找到 pnpm/npm，无法自动构建前端"
+    build_failed: "前端构建失败：\n{stderr}"
+    build_success: "前端构建成功"
+    ready: "Web UI 已就绪：{url}"
+    password: "Web UI 密码：{password}"

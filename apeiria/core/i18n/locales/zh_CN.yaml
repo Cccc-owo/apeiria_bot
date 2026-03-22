@@ -2,6 +2,8 @@ common:
   group_only: "该命令仅在群聊中可用"
   error: "出错了，请稍后重试"
   plugin_not_found: "未找到插件: {name}"
+  framework_required: "系统运行依赖"
+  required_by_plugins: "被以下插件依赖：{plugins}"
 
 auth:
   banned: "你已被封禁，无法使用此功能"
@@ -17,3 +19,16 @@ duration:
   minute: "分钟"
   second: "秒"
   zero: "0秒"
+
+i18n:
+  locales_not_found: "未找到语言目录: {path}"
+  ready: "i18n 已就绪，当前语言：{locale}"
+
+plugin_sync:
+  tables_missing: "未找到数据表，正在创建所有 ORM 表..."
+  tables_created: "数据表创建完成"
+  syncing: "正在同步 {count} 个已加载插件到数据库..."
+  complete: "插件同步完成：已注册 {count} 个插件"
+
+logging:
+  initialized: "日志服务已初始化，日志目录：{log_dir}"

@@ -17,6 +17,7 @@ admin:
   plugin:
     enabled: "已启用插件 {name}"
     disabled: "已禁用插件 {name}"
+    protected: "插件 {name} 为系统依赖，不能被禁用"
   level:
     self_modify: "不能修改自己的权限等级"
     superuser_modify: "不能修改超级用户的权限等级"
@@ -37,3 +38,4 @@ admin:
     title: "📋 插件状态 (本群)"
     item_on: "✅ {name}"
     item_off: "❌ {name}"
+    item_locked: "🔒 {name}"
