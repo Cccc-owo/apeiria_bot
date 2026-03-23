@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app class="app-root">
     <router-view />
   </v-app>
 </template>
@@ -25,3 +25,9 @@ watchEffect(() => {
   document.documentElement.lang = locale.value === 'zh_CN' ? 'zh-CN' : 'en-US'
 })
 </script>
+
+<style scoped>
+.app-root {
+  background: rgb(var(--v-theme-background));
+}
+</style>

@@ -1,17 +1,17 @@
 <template>
-  <v-container class="fill-height login-view" fluid>
+  <v-container class="fill-height auth-view" fluid>
     <v-row align="center" justify="center">
-      <v-col cols="12" sm="8" md="4">
-        <v-card class="pa-6 login-card" elevation="10">
-          <v-card-title class="text-center text-h5 mb-4">
-            <v-icon size="48" color="primary" class="mr-2">mdi-robot-happy</v-icon>
-            <div>Apeiria Bot</div>
+      <v-col cols="12" sm="8" md="4" lg="3">
+        <v-card class="auth-card">
+          <v-card-title class="auth-card__title">
+            <v-icon size="40" color="primary">mdi-robot-happy</v-icon>
+            <div class="auth-card__brand">
+              <div class="auth-card__name">Apeiria Console</div>
+              <div class="auth-card__subtitle">{{ t('login.description') }}</div>
+            </div>
           </v-card-title>
 
           <v-card-text>
-            <div class="text-medium-emphasis text-center mb-5">
-              {{ t('login.description') }}
-            </div>
             <v-form @submit.prevent="handleLogin">
               <v-text-field
                 v-model="password"
@@ -69,15 +69,4 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.login-view {
-  background:
-    radial-gradient(circle at top center, rgba(var(--v-theme-primary), 0.14), transparent 32%),
-    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.42), rgba(var(--v-theme-background), 0.92));
-}
-
-.login-card {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
-  background: rgba(var(--v-theme-surface), 0.92);
-  backdrop-filter: blur(18px);
-}
 </style>

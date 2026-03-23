@@ -1,33 +1,35 @@
 <template>
-  <div class="d-flex flex-column ga-6">
-    <div class="d-flex align-center justify-space-between flex-wrap ga-3">
-      <h1 class="text-h4">{{ t('groups.title') }}</h1>
-      <v-btn variant="tonal" :loading="loading" @click="loadGroups">{{ t('common.refresh') }}</v-btn>
+  <div class="page-view">
+    <div class="page-header">
+      <h1 class="page-title">{{ t('groups.title') }}</h1>
+      <div class="page-actions">
+        <v-btn variant="tonal" :loading="loading" @click="loadGroups">{{ t('common.refresh') }}</v-btn>
+      </div>
     </div>
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
       {{ errorMessage }}
     </v-alert>
 
-    <div class="d-flex flex-wrap ga-3">
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('groups.totalCount') }}</div>
-        <div class="text-h5 font-weight-bold">{{ groups.length }}</div>
+    <div class="page-summary-grid">
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('groups.totalCount') }}</div>
+        <div class="summary-card__value">{{ groups.length }}</div>
       </v-sheet>
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('groups.enabledCount') }}</div>
-        <div class="text-h5 font-weight-bold">{{ enabledGroupsCount }}</div>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('groups.enabledCount') }}</div>
+        <div class="summary-card__value">{{ enabledGroupsCount }}</div>
       </v-sheet>
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('groups.customizedCount') }}</div>
-        <div class="text-h5 font-weight-bold">{{ customizedGroupsCount }}</div>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('groups.customizedCount') }}</div>
+        <div class="summary-card__value">{{ customizedGroupsCount }}</div>
       </v-sheet>
     </div>
 
-    <v-card>
-      <v-data-table :headers="headers" :items="groups" :loading="loading" density="comfortable">
+    <v-card class="page-panel">
+      <v-data-table :headers="headers" :items="groups" :loading="loading" density="compact" class="page-table groups-table">
         <template #item.group_name="{ item }">
-          <div class="d-flex flex-column py-2">
+          <div class="groups-table__name">
             <span class="font-weight-medium">{{ item.group_name || t('groups.unnamed') }}</span>
             <span class="text-caption text-medium-emphasis">{{ item.group_id }}</span>
           </div>
@@ -57,15 +59,12 @@
     </v-card>
 
     <v-dialog v-model="pluginDialogVisible" max-width="640">
-      <v-card>
-        <v-card-title>{{ t('groups.dialogTitle') }}</v-card-title>
-        <v-card-text class="d-flex flex-column ga-4">
-          <div class="text-body-2 text-medium-emphasis">
+      <v-card class="page-panel">
+        <v-card-title class="page-panel__title">{{ t('groups.dialogTitle') }}</v-card-title>
+        <v-card-text class="group-dialog">
+          <div class="group-dialog__meta">
             {{ t('groups.currentGroup', { groupId: editingGroup?.group_id ?? '' }) }}
           </div>
-          <v-alert type="info" variant="tonal" density="comfortable">
-            {{ t('groups.protectedInfo') }}
-          </v-alert>
           <v-autocomplete
             v-model="selectedDisabledPlugins"
             :items="pluginOptions"
@@ -75,8 +74,8 @@
             chips
             closable-chips
             multiple
-            variant="outlined"
-            density="comfortable"
+            density="compact"
+            class="group-dialog__field"
           />
         </v-card-text>
         <v-card-actions>
@@ -110,6 +109,12 @@ interface PluginOption {
   disabled?: boolean
 }
 
+interface PluginListItem {
+  module_name: string
+  name: string | null
+  source?: string
+}
+
 const groups = ref<GroupRow[]>([])
 const pluginOptions = ref<PluginOption[]>([])
 const loading = ref(false)
@@ -139,8 +144,8 @@ async function loadGroups() {
     const [groupsResponse, pluginsResponse] = await Promise.all([getGroups(), getPlugins()])
     groups.value = groupsResponse.data
     pluginOptions.value = pluginsResponse.data
-      .filter((item: { is_protected?: boolean }) => !item.is_protected)
-      .map((item: { module_name: string; name: string | null }) => ({
+      .filter((item: PluginListItem) => item.source !== 'framework')
+      .map((item: PluginListItem) => ({
         title: item.name || item.module_name,
         value: item.module_name,
       }))
@@ -207,8 +212,23 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.summary-card {
-  min-width: 168px;
-  padding: 16px 18px;
+.group-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-dialog__meta {
+  color: rgba(var(--v-theme-on-surface), 0.64);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.groups-table__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
 }
 </style>

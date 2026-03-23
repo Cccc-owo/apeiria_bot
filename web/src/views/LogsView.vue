@@ -1,8 +1,8 @@
 <template>
-  <div class="d-flex flex-column ga-6">
-    <div class="d-flex align-center justify-space-between flex-wrap ga-3">
-      <h1 class="text-h4">{{ t('logs.title') }}</h1>
-      <div class="d-flex align-center flex-wrap ga-2">
+  <div class="page-view">
+    <div class="page-header">
+      <h1 class="page-title">{{ t('logs.title') }}</h1>
+      <div class="page-actions">
         <v-chip :color="connected ? 'success' : 'error'" variant="tonal">
           {{ connected ? t('logs.connected') : t('logs.disconnected') }}
         </v-chip>
@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <v-card class="log-card pa-4" style="min-height: 60vh">
+    <v-card class="log-card page-panel">
       <div ref="logContainer" class="log-container">
         <div v-for="(line, i) in logs" :key="i" :class="logClass(line)">
           {{ line }}
@@ -91,18 +91,17 @@ onUnmounted(disconnect)
 
 <style scoped>
 .log-card {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
-  background:
-    linear-gradient(180deg, rgba(var(--v-theme-primary), 0.04), transparent 120px),
-    rgba(var(--v-theme-surface), 0.9);
+  background: rgb(var(--v-theme-surface-container-low));
+  min-height: 60vh;
 }
 
 .log-container {
+  padding: 14px 16px;
   max-height: 70vh;
   overflow-y: auto;
   font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.52;
   color: rgba(var(--v-theme-on-surface), 0.86);
 }
 </style>

@@ -1,15 +1,17 @@
 <template>
-  <div class="d-flex flex-column ga-6">
-    <div class="d-flex align-center justify-space-between flex-wrap ga-3">
-      <h1 class="text-h4">{{ t('plugins.title') }}</h1>
-      <v-btn variant="tonal" :loading="loading" @click="loadPlugins">{{ t('common.refresh') }}</v-btn>
+  <div class="page-view">
+    <div class="page-header">
+      <h1 class="page-title">{{ t('plugins.title') }}</h1>
+      <div class="page-actions">
+        <v-btn variant="tonal" :loading="loading" @click="loadPlugins">{{ t('common.refresh') }}</v-btn>
+      </div>
     </div>
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
       {{ errorMessage }}
     </v-alert>
 
-    <v-card>
+    <v-card class="page-panel">
       <v-tabs v-model="sectionTab" color="primary">
         <v-tab value="plugins">{{ t('plugins.pluginsTab') }}</v-tab>
         <v-tab value="adapters">{{ t('plugins.adaptersTab') }}</v-tab>
@@ -21,24 +23,19 @@
       <v-window v-model="sectionTab">
         <v-window-item value="plugins">
           <v-card-text class="d-flex flex-column ga-5">
-            <div class="d-flex flex-wrap ga-3">
-              <v-sheet class="summary-card" rounded="lg" border>
-                <div class="text-caption text-medium-emphasis">{{ t('plugins.coreProtectedCount') }}</div>
-                <div class="text-h5 font-weight-bold">{{ corePlugins.filter((item) => item.is_protected).length }}</div>
+            <div class="page-summary-grid">
+              <v-sheet class="summary-card" rounded="lg">
+                <div class="summary-card__label">{{ t('plugins.coreProtectedCount') }}</div>
+                <div class="summary-card__value">{{ systemPlugins.length }}</div>
               </v-sheet>
-              <v-sheet class="summary-card" rounded="lg" border>
-                <div class="text-caption text-medium-emphasis">{{ t('plugins.userManagedCount') }}</div>
-                <div class="text-h5 font-weight-bold">{{ userPlugins.length }}</div>
+              <v-sheet class="summary-card" rounded="lg">
+                <div class="summary-card__label">{{ t('plugins.userManagedCount') }}</div>
+                <div class="summary-card__value">{{ nonSystemPlugins.length }}</div>
               </v-sheet>
             </div>
 
-            <div class="d-flex justify-space-between align-center flex-wrap ga-3">
-              <div class="d-flex flex-column ga-1">
-                <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.configTitle') }}</div>
-                <div class="text-body-2 text-medium-emphasis">
-                  {{ t('plugins.configDescription') }}
-                </div>
-              </div>
+            <div class="section-heading">
+              <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.configTitle') }}</div>
               <v-switch
                 v-model="hideSystemPlugins"
                 color="primary"
@@ -52,16 +49,17 @@
               :headers="pluginHeaders"
               :items="visiblePlugins"
               :loading="loading"
-              density="comfortable"
+              density="compact"
+              class="page-table plugins-table"
             >
               <template #item.name="{ item }">
-                <div class="d-flex flex-column py-2">
+                <div class="plugins-table__name">
                   <span class="font-weight-medium">{{ item.name || item.module_name }}</span>
                   <span class="text-caption text-medium-emphasis">{{ item.module_name }}</span>
                 </div>
               </template>
               <template #item.source="{ value }">
-                <v-chip size="small" variant="outlined" :color="sourceColor(value)">
+                <v-chip size="small" variant="tonal" :color="sourceColor(value)">
                   {{ sourceLabel(value) }}
                 </v-chip>
               </template>
@@ -98,27 +96,21 @@
               </template>
             </v-data-table>
 
-            <v-expansion-panels variant="accordion">
+            <v-expansion-panels variant="accordion" class="plugin-config-panels">
               <v-expansion-panel>
                 <v-expansion-panel-title>
                   {{ t('plugins.advancedConfigTitle') }}
                 </v-expansion-panel-title>
                 <v-expansion-panel-text>
-                  <div class="d-flex flex-column ga-5">
-                    <div class="d-flex flex-column ga-3">
-                      <div class="d-flex flex-column ga-1">
-                        <div class="text-subtitle-2 font-weight-medium">{{ t('plugins.moduleSectionTitle') }}</div>
-                        <div class="text-body-2 text-medium-emphasis">
-                          {{ t('plugins.directConfigDescription') }}
-                        </div>
-                      </div>
-                      <div class="d-flex flex-wrap ga-2 align-center">
+                  <div class="plugin-config-stack">
+                    <section class="plugin-config-block">
+                      <div class="plugin-config-block__title">{{ t('plugins.moduleSectionTitle') }}</div>
+                      <div class="plugin-config-block__toolbar">
                         <v-text-field
                           v-model.trim="newModule"
                           :label="t('plugins.moduleInput')"
                           density="comfortable"
                           hide-details
-                          variant="outlined"
                           class="config-input"
                           @keydown.enter.prevent="addModule"
                         />
@@ -149,22 +141,16 @@
                           {{ t('plugins.emptyModules') }}
                         </span>
                       </div>
-                    </div>
+                    </section>
 
-                    <div class="d-flex flex-column ga-3">
-                      <div class="d-flex flex-column ga-1">
-                        <div class="text-subtitle-2 font-weight-medium">{{ t('plugins.dirSectionTitle') }}</div>
-                        <div class="text-body-2 text-medium-emphasis">
-                          {{ t('plugins.configDirDescription') }}
-                        </div>
-                      </div>
-                      <div class="d-flex flex-wrap ga-2 align-center">
+                    <section class="plugin-config-block">
+                      <div class="plugin-config-block__title">{{ t('plugins.dirSectionTitle') }}</div>
+                      <div class="plugin-config-block__toolbar">
                         <v-text-field
                           v-model.trim="newDir"
                           :label="t('plugins.dirInput')"
                           density="comfortable"
                           hide-details
-                          variant="outlined"
                           class="config-input"
                           @keydown.enter.prevent="addDir"
                         />
@@ -195,7 +181,7 @@
                           {{ t('plugins.emptyDirs') }}
                         </span>
                       </div>
-                    </div>
+                    </section>
                   </div>
                 </v-expansion-panel-text>
               </v-expansion-panel>
@@ -206,21 +192,12 @@
         <v-window-item value="adapters">
           <v-card-text class="d-flex flex-column ga-5">
             <div class="d-flex justify-space-between align-center flex-wrap ga-3">
-              <div class="d-flex flex-column ga-1">
-                <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.adaptersTab') }}</div>
-                <div class="text-body-2 text-medium-emphasis">
-                  {{ t('plugins.runtimeReadonlySummary') }}
-                </div>
-              </div>
-              <v-sheet class="summary-card" rounded="lg" border>
-                <div class="text-caption text-medium-emphasis">{{ t('plugins.adapterCount') }}</div>
-                <div class="text-h5 font-weight-bold">{{ adapterModules.length }}</div>
+              <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.adaptersTab') }}</div>
+              <v-sheet class="summary-card" rounded="lg">
+                <div class="summary-card__label">{{ t('plugins.adapterCount') }}</div>
+                <div class="summary-card__value">{{ adapterModules.length }}</div>
               </v-sheet>
             </div>
-
-            <v-alert type="info" variant="tonal" density="comfortable">
-              {{ t('plugins.adapterReadonlyDescription') }}
-            </v-alert>
             <div class="config-chip-row">
               <v-chip
                 v-for="adapterItem in adapterModules"
@@ -243,21 +220,12 @@
         <v-window-item value="drivers">
           <v-card-text class="d-flex flex-column ga-5">
             <div class="d-flex justify-space-between align-center flex-wrap ga-3">
-              <div class="d-flex flex-column ga-1">
-                <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.driversTab') }}</div>
-                <div class="text-body-2 text-medium-emphasis">
-                  {{ t('plugins.runtimeReadonlySummary') }}
-                </div>
-              </div>
-              <v-sheet class="summary-card" rounded="lg" border>
-                <div class="text-caption text-medium-emphasis">{{ t('plugins.driverCount') }}</div>
-                <div class="text-h5 font-weight-bold">{{ driverBuiltin.length }}</div>
+              <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.driversTab') }}</div>
+              <v-sheet class="summary-card" rounded="lg">
+                <div class="summary-card__label">{{ t('plugins.driverCount') }}</div>
+                <div class="summary-card__value">{{ driverBuiltin.length }}</div>
               </v-sheet>
             </div>
-
-            <v-alert type="info" variant="tonal" density="comfortable">
-              {{ t('plugins.driverReadonlyDescription') }}
-            </v-alert>
             <div class="config-chip-row">
               <v-chip
                 v-for="driverItem in driverBuiltin"
@@ -354,16 +322,16 @@ const pluginHeaders = computed(() => [
   { title: t('plugins.enabled'), key: 'is_global_enabled', sortable: false, align: 'end' as const },
 ])
 
-const corePlugins = computed(() =>
-  plugins.value.filter((item) => item.is_protected || ['framework', 'builtin'].includes(item.source)),
+const systemPlugins = computed(() =>
+  plugins.value.filter((item) => item.source === 'framework'),
 )
 
-const userPlugins = computed(() =>
-  plugins.value.filter((item) => !corePlugins.value.some((coreItem) => coreItem.module_name === item.module_name)),
+const nonSystemPlugins = computed(() =>
+  plugins.value.filter((item) => !systemPlugins.value.some((systemItem) => systemItem.module_name === item.module_name)),
 )
 
 const visiblePlugins = computed(() =>
-  hideSystemPlugins.value ? userPlugins.value : plugins.value,
+  hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value,
 )
 
 function sourceColor(source: string) {
@@ -538,23 +506,75 @@ onMounted(() => {
 }
 
 .config-input {
-  flex: 1 1 320px;
-  min-width: 240px;
+  flex: 1 1 300px;
+  min-width: 220px;
 }
 
 .config-chip-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 32px;
 }
 
-.summary-card {
-  min-width: 180px;
-  padding: 16px 18px;
+.plugin-config-panels {
+  margin-top: 2px;
+}
+
+.plugin-config-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
+}
+
+.plugin-config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgb(var(--v-theme-surface-container));
+}
+
+.plugin-config-block__title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.plugin-config-block__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugins-table__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+:deep(.plugins-table .v-selection-control) {
+  justify-content: flex-end;
+}
+
+:deep(.plugins-table .v-selection-control__wrapper) {
+  transform: scale(0.92);
+  transform-origin: center;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .plugin-config-block {
+    padding: 12px;
+  }
 }
 </style>
