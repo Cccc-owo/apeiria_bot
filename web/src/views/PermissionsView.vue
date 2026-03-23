@@ -1,76 +1,84 @@
 <template>
-  <div class="d-flex flex-column ga-6">
-    <div class="d-flex align-center justify-space-between flex-wrap ga-3">
-      <h1 class="text-h4">{{ t('permissions.title') }}</h1>
-      <v-btn variant="tonal" :loading="loading" @click="loadAll">{{ t('common.refresh') }}</v-btn>
+  <div class="page-view">
+    <div class="page-header">
+      <h1 class="page-title">{{ t('permissions.title') }}</h1>
+      <div class="page-actions">
+        <v-btn variant="tonal" :loading="loading" @click="loadAll">{{ t('common.refresh') }}</v-btn>
+      </div>
     </div>
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
       {{ errorMessage }}
     </v-alert>
 
-    <v-tabs v-model="tab">
+    <v-tabs v-model="tab" class="page-tabs">
       <v-tab value="bans">{{ t('permissions.bansTab') }}</v-tab>
       <v-tab value="users">{{ t('permissions.usersTab') }}</v-tab>
     </v-tabs>
 
     <v-tabs-window v-model="tab">
       <v-tabs-window-item value="bans">
-        <div class="d-flex flex-wrap ga-3 mb-4">
-          <v-sheet class="summary-card" rounded="lg" border>
-            <div class="text-caption text-medium-emphasis">{{ t('permissions.totalBans') }}</div>
-            <div class="text-h5 font-weight-bold">{{ bans.length }}</div>
+        <div class="page-summary-grid mb-4">
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.totalBans') }}</div>
+            <div class="summary-card__value">{{ bans.length }}</div>
           </v-sheet>
-          <v-sheet class="summary-card" rounded="lg" border>
-            <div class="text-caption text-medium-emphasis">{{ t('permissions.permanentBans') }}</div>
-            <div class="text-h5 font-weight-bold">{{ permanentBansCount }}</div>
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.permanentBans') }}</div>
+            <div class="summary-card__value">{{ permanentBansCount }}</div>
           </v-sheet>
         </div>
 
-        <v-card class="mb-4">
-          <v-card-title>{{ t('permissions.createBanTitle') }}</v-card-title>
-          <v-card-text class="d-flex flex-wrap ga-3">
-            <v-text-field
-              v-model="banForm.user_id"
-              :label="t('permissions.userId')"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              class="permission-field"
-            />
-            <v-text-field
-              v-model="banForm.group_id"
-              :label="t('permissions.groupId')"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              class="permission-field"
-            />
-            <v-text-field
-              v-model.number="banForm.duration"
-              :label="t('permissions.duration')"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              type="number"
-              class="permission-field"
-            />
-            <v-text-field
-              v-model="banForm.reason"
-              :label="t('permissions.reason')"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              class="permission-field permission-field--wide"
-            />
-            <v-btn color="primary" :loading="creatingBan" @click="handleCreateBan">
-              {{ t('permissions.createBan') }}
-            </v-btn>
+        <v-card class="mb-4 page-panel permission-create-card">
+          <v-card-title class="page-panel__title permission-panel__title">
+            {{ t('permissions.createBanTitle') }}
+          </v-card-title>
+          <v-card-text>
+            <div class="compact-inline-form">
+              <div class="compact-field compact-field--inline permission-field">
+                <label class="compact-field__label" for="permission-user-id">{{ t('permissions.userId') }}</label>
+                <v-text-field
+                  id="permission-user-id"
+                  v-model="banForm.user_id"
+                  hide-details
+                />
+              </div>
+              <div class="compact-field compact-field--inline permission-field">
+                <label class="compact-field__label" for="permission-group-id">{{ t('permissions.groupId') }}</label>
+                <v-text-field
+                  id="permission-group-id"
+                  v-model="banForm.group_id"
+                  hide-details
+                />
+              </div>
+              <div class="compact-field compact-field--inline permission-field">
+                <label class="compact-field__label" for="permission-duration">{{ t('permissions.duration') }}</label>
+                <v-text-field
+                  id="permission-duration"
+                  v-model.number="banForm.duration"
+                  type="number"
+                  hide-details
+                />
+              </div>
+              <div class="compact-field compact-field--inline permission-field permission-field--wide">
+                <label class="compact-field__label" for="permission-reason">{{ t('permissions.reason') }}</label>
+                <v-text-field
+                  id="permission-reason"
+                  v-model="banForm.reason"
+                  hide-details
+                />
+              </div>
+              <div class="compact-inline-form__actions">
+                <v-btn color="primary" :loading="creatingBan" @click="handleCreateBan">
+                  {{ t('permissions.createBan') }}
+                </v-btn>
+              </div>
+            </div>
           </v-card-text>
         </v-card>
 
-        <v-card>
-          <v-data-table :headers="banHeaders" :items="bans" :loading="loading" density="comfortable">
+        <v-card class="page-panel">
+          <v-data-table :headers="banHeaders" :items="bans" :loading="loading" density="compact" class="page-table permission-table">
             <template #item.user_id="{ item }">
               <span>{{ item.user_id || t('common.none') }}</span>
             </template>
@@ -95,22 +103,21 @@
       </v-tabs-window-item>
 
       <v-tabs-window-item value="users">
-        <div class="d-flex flex-wrap ga-3 mb-4">
-          <v-sheet class="summary-card" rounded="lg" border>
-            <div class="text-caption text-medium-emphasis">{{ t('permissions.totalUsers') }}</div>
-            <div class="text-h5 font-weight-bold">{{ users.length }}</div>
+        <div class="page-summary-grid mb-4">
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.totalUsers') }}</div>
+            <div class="summary-card__value">{{ users.length }}</div>
           </v-sheet>
         </div>
 
-        <v-card>
-          <v-data-table :headers="userHeaders" :items="users" :loading="loading" density="comfortable">
+        <v-card class="page-panel">
+          <v-data-table :headers="userHeaders" :items="users" :loading="loading" density="compact" class="page-table permission-table">
             <template #item.level="{ item }">
               <div class="d-flex align-center ga-2">
                 <v-select
                   :model-value="item.level"
                   :items="levelOptions"
                   density="compact"
-                  variant="outlined"
                   hide-details
                   class="level-select"
                   @update:model-value="updateLevel(item, $event)"
@@ -274,22 +281,29 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.permission-field {
-  min-width: 180px;
-  max-width: 240px;
+.permission-panel__title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
-.summary-card {
-  min-width: 168px;
-  padding: 16px 18px;
+.permission-create-card :deep(.v-card-text) {
+  padding-top: 12px !important;
+}
+
+.permission-field {
+  min-width: 0;
 }
 
 .permission-field--wide {
-  min-width: 240px;
-  max-width: 320px;
+  min-width: 0;
 }
 
 .level-select {
   max-width: 110px;
+}
+
+:deep(.permission-table .v-data-table-footer) {
+  padding-top: 8px !important;
 }
 </style>

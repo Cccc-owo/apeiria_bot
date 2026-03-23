@@ -1,44 +1,46 @@
 <template>
-  <div class="d-flex flex-column ga-6">
-    <div class="d-flex align-center flex-wrap ga-3">
-      <h1 class="text-h4">{{ t('data.title') }}</h1>
+  <div class="page-view">
+    <div class="page-header">
+      <h1 class="page-title">{{ t('data.title') }}</h1>
       <v-spacer />
-      <v-btn variant="tonal" :loading="loading" @click="loadRecords">
-        {{ t('common.refresh') }}
-      </v-btn>
-      <v-select
-        v-model="selectedTable"
-        :items="tableOptions"
-        item-title="label"
-        item-value="name"
-        :label="t('data.table')"
-        variant="outlined"
-        density="comfortable"
-        hide-details
-        class="data-table-select"
-      />
+      <div class="page-toolbar-form">
+        <v-btn variant="tonal" :loading="loading" @click="loadRecords">
+          {{ t('common.refresh') }}
+        </v-btn>
+        <div class="compact-field compact-field--toolbar data-table-select">
+          <label class="compact-field__label" for="data-table-select">{{ t('data.table') }}</label>
+          <v-select
+            id="data-table-select"
+            v-model="selectedTable"
+            :items="tableOptions"
+            item-title="label"
+            item-value="name"
+            hide-details
+          />
+        </div>
+      </div>
     </div>
 
     <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
       {{ errorMessage }}
     </v-alert>
 
-    <div class="d-flex flex-wrap ga-3">
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('data.currentTable') }}</div>
-        <div class="text-subtitle-1 font-weight-medium">{{ selectedTableLabel || t('data.notSelected') }}</div>
+    <div class="page-summary-grid">
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('data.currentTable') }}</div>
+        <div class="summary-card__value summary-card__value--text">{{ selectedTableLabel || t('data.notSelected') }}</div>
       </v-sheet>
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('data.total') }}</div>
-        <div class="text-h5 font-weight-bold">{{ total }}</div>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('data.total') }}</div>
+        <div class="summary-card__value">{{ total }}</div>
       </v-sheet>
-      <v-sheet class="summary-card" rounded="lg" border>
-        <div class="text-caption text-medium-emphasis">{{ t('data.pageSize') }}</div>
-        <div class="text-h5 font-weight-bold">{{ pageSize }}</div>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('data.pageSize') }}</div>
+        <div class="summary-card__value">{{ pageSize }}</div>
       </v-sheet>
     </div>
 
-    <v-card>
+    <v-card class="page-panel">
       <v-data-table-server
         v-model:items-per-page="pageSize"
         v-model:page="page"
@@ -46,9 +48,10 @@
         :items="rows"
         :items-length="total"
         :loading="loading"
-        density="comfortable"
+        density="compact"
         :loading-text="t('data.loadingText')"
         :items-per-page-text="t('data.itemsPerPage')"
+        class="page-table data-table"
         @update:options="handleOptionsChange"
       >
         <template #no-data>
@@ -93,8 +96,8 @@
     </v-card>
 
     <v-dialog v-model="recordDialogVisible" max-width="840">
-      <v-card>
-        <v-card-title class="d-flex align-center">
+      <v-card class="page-panel">
+        <v-card-title class="d-flex align-center page-panel__title">
           <span>{{ t('data.detail') }}</span>
           <v-spacer />
           <v-chip v-if="editingRecordId" size="small" variant="tonal">
@@ -126,13 +129,13 @@
                 hide-details
                 inset
                 :readonly="!isEditableField(field)"
+                density="compact"
               />
               <v-text-field
                 v-else-if="fieldType(field) === 'number'"
                 v-model="editForm[field]"
                 :label="field"
-                variant="outlined"
-                density="comfortable"
+                density="compact"
                 type="number"
                 :readonly="!isEditableField(field)"
               />
@@ -140,8 +143,7 @@
                 v-else-if="fieldType(field) === 'json'"
                 v-model="editForm[field]"
                 :label="field"
-                variant="outlined"
-                density="comfortable"
+                density="compact"
                 auto-grow
                 rows="4"
                 :readonly="!isEditableField(field)"
@@ -150,8 +152,7 @@
                 v-else
                 v-model="editForm[field]"
                 :label="field"
-                variant="outlined"
-                density="comfortable"
+                density="compact"
                 :readonly="!isEditableField(field)"
               />
             </template>
@@ -391,13 +392,27 @@ onMounted(async () => {
 
 <style scoped>
 .data-table-select {
-  max-width: 240px;
-  min-width: 220px;
+  width: 180px;
+  min-width: 180px;
 }
 
-.summary-card {
-  min-width: 180px;
-  padding: 16px 18px;
+:deep(.data-table .v-data-table-footer) {
+  padding-top: 8px !important;
+}
+
+:deep(.data-table .v-btn) {
+  min-height: 32px !important;
+}
+
+:deep(.data-table-select .v-field__input) {
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .data-table-select {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .data-cell {
