@@ -172,12 +172,35 @@ async function handleRestart() {
   try {
     const res = await restartBot()
     noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
+    await waitForRestart()
+    window.location.reload()
   } catch (error) {
     const message = error instanceof Error ? error.message : t('dashboard.restartFailed')
     noticeStore.show(message, 'error')
   } finally {
     restarting.value = false
   }
+}
+
+async function waitForRestart() {
+  const maxAttempts = 60
+  const delayMs = 1000
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await sleep(delayMs)
+    try {
+      await getStatus()
+      return
+    } catch {
+      continue
+    }
+  }
+
+  throw new Error(t('dashboard.restartFailed'))
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
 function formatUptime(seconds?: number): string {
