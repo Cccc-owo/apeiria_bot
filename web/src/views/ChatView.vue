@@ -1,169 +1,124 @@
 <template>
-  <div class="d-flex flex-column ga-4" style="height: calc(100vh - 100px)">
-    <div class="d-flex align-center">
-      <h1 class="text-h4">{{ t('chat.title') }}</h1>
-      <v-spacer />
-      <v-chip :color="connected ? 'success' : 'error'" variant="tonal">
-        {{ connected ? t('chat.connected') : t('chat.disconnected') }}
-      </v-chip>
-    </div>
+  <section class="chat-page">
+    <header class="chat-page__header">
+      <div>
+        <h1 class="text-h4">{{ t('chat.title') }}</h1>
+      </div>
+      <div class="chat-page__actions">
+        <v-btn
+          variant="tonal"
+          :disabled="!authenticated"
+          prepend-icon="mdi-plus"
+          @click="startNewSession"
+        >
+          {{ t('chat.newSession') }}
+        </v-btn>
+      </div>
+    </header>
 
-    <v-row class="flex-grow-1" style="min-height: 0">
-      <v-col cols="12" md="4" lg="3">
-        <v-card>
-          <v-card-title>{{ t('chat.sessionConfig') }}</v-card-title>
-          <v-card-text class="d-flex flex-column ga-4">
-            <v-text-field
-              v-model="sessionForm.target_user_id"
-              :label="t('chat.userId')"
-              variant="outlined"
-              density="comfortable"
-              @keydown.enter.prevent="saveSession"
-            />
+    <div class="chat-shell">
+      <aside class="chat-sidebar">
+        <div class="chat-sidebar__header">
+          <div class="text-subtitle-2 text-medium-emphasis">{{ t('chat.recentSessions') }}</div>
+        </div>
 
-            <div class="session-entry-actions">
-              <v-btn
-                color="primary"
-                class="session-entry-actions__primary"
-                :disabled="!connected"
-                @click="saveSession"
-              >
-                {{ t('chat.enterSession') }}
-              </v-btn>
-              <v-btn
-                variant="tonal"
-                class="session-entry-actions__secondary"
-                :disabled="!connected"
-                @click="reconnect"
-              >
-                {{ t('chat.reconnect') }}
-              </v-btn>
-            </div>
-
-            <v-alert
-              v-if="session"
-              type="info"
-              variant="tonal"
-              density="comfortable"
-              :title="t('chat.currentSession')"
+        <div class="chat-sidebar__body">
+          <v-list v-if="recentSessions.length" class="chat-session-list" density="comfortable" lines="two">
+            <v-list-item
+              v-for="recent in recentSessions"
+              :key="recent.session.session_id"
+              :active="session?.session_id === recent.session.session_id"
+              :disabled="!authenticated"
+              rounded="xl"
+              class="chat-session-list__item"
+              @click="switchToSession(recent)"
             >
-              <div>{{ t('chat.currentUser', { userId: session.target_user_id }) }}</div>
-              <div class="mt-2 d-flex ga-2">
+              <template #append>
                 <v-btn
-                  size="small"
-                  variant="text"
-                  color="warning"
-                  @click="clearCurrentSessionHistory"
-                >
-                  {{ t('chat.clearHistory') }}
-                </v-btn>
-                <v-btn
+                  icon="mdi-delete-outline"
                   size="small"
                   variant="text"
                   color="error"
-                  @click="deleteSessionItem({ session, message_count: messages.length })"
-                >
-                  {{ t('chat.deleteSession') }}
-                </v-btn>
-              </div>
-            </v-alert>
+                  :disabled="!authenticated"
+                  @click.stop="deleteSessionItem(recent)"
+                />
+              </template>
 
-            <v-alert
-              v-if="capabilities"
-              type="success"
-              variant="tonal"
-              density="comfortable"
-              :title="t('chat.capabilities')"
-            >
-              {{ t('chat.supportedSegments', { segments: capabilities.segment_types.join(', ') }) }}
-            </v-alert>
+              <v-list-item-title class="chat-session-list__title">
+                {{ formatSessionTitle(recent) }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ formatSessionTime(recent.last_message_at || recent.session.updated_at || recent.session.created_at) || t('chat.justNow') }}
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
 
-            <v-card v-if="recentSessions.length" variant="outlined">
-              <v-card-title class="text-subtitle-1">{{ t('chat.recentSessions') }}</v-card-title>
-              <v-list density="compact" lines="two">
-                <v-list-item
-                  v-for="recent in recentSessions"
-                  :key="recent.session.session_id"
-                  :active="session?.session_id === recent.session.session_id"
-                  rounded="lg"
-                  @click="switchToSession(recent)"
-                >
-                  <template #append>
-                    <div class="d-flex align-center ga-1">
-                      <v-chip
-                        size="x-small"
-                        variant="tonal"
-                        :color="sessionStatusColor(recent.session.status)"
-                      >
-                        {{ recent.session.status }}
-                      </v-chip>
-                      <v-btn
-                        icon="mdi-delete-outline"
-                        size="x-small"
-                        variant="text"
-                        color="error"
-                        @click.stop="deleteSessionItem(recent)"
-                      />
-                    </div>
-                  </template>
-                  <v-list-item-title class="d-flex align-center ga-2">
-                    <span>{{ recent.session.target_user_id }}</span>
-                    <span class="text-caption text-medium-emphasis">
-                      {{ t('chat.messageCount', { count: recent.message_count }) }}
-                    </span>
-                  </v-list-item-title>
-                  <v-list-item-subtitle>
-                    {{
-                      formatSessionTime(
-                        recent.last_message_at || recent.session.updated_at || recent.session.created_at,
-                      ) || t('chat.justNow')
-                    }}
-                  </v-list-item-subtitle>
-                  <v-list-item-subtitle class="session-preview">
-                    {{ summarizeSessionItem(recent) }}
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </v-list>
-            </v-card>
-          </v-card-text>
-        </v-card>
-      </v-col>
+          <div v-else class="chat-sidebar__empty">
+            {{ t('chat.noMessages') }}
+          </div>
+        </div>
+      </aside>
 
-      <v-col cols="12" md="8" lg="9" style="min-height: 0">
-        <v-card class="fill-height d-flex flex-column" style="min-height: 0">
-          <div ref="messagesContainer" class="flex-grow-1 pa-4" style="overflow-y: auto">
-            <div v-for="message in messages" :key="message.message_id + message.timestamp" class="mb-3">
-              <div v-if="message.role === 'system'" class="text-center">
-                <v-chip size="small" color="grey" variant="tonal">
-                  {{ getTextContent(message.segments) }}
-                </v-chip>
-              </div>
+      <main class="chat-panel">
+        <div ref="messagesContainer" class="chat-panel__messages">
+          <div v-if="!messages.length" class="chat-empty">
+            <div class="chat-empty__title">{{ t('chat.newSession') }}</div>
+          </div>
 
-              <div v-else-if="message.role === 'error'" class="d-flex justify-start">
-                <v-card color="error" variant="tonal" class="pa-3" max-width="80%" rounded="lg">
+          <div
+            v-for="message in messages"
+            :key="message.message_id + message.timestamp"
+            class="chat-message"
+            :data-message-id="message.message_id"
+          >
+            <div v-if="message.role === 'system'" class="chat-message-row chat-message-row--system">
+              <v-chip size="small" color="grey" variant="tonal">
+                {{ getTextContent(message.segments) }}
+              </v-chip>
+            </div>
+
+            <div v-else-if="message.role === 'error'" class="chat-message-row chat-message-row--bot">
+              <div class="chat-message-stack chat-message-stack--bot">
+                <v-card color="error" variant="tonal" class="chat-bubble chat-bubble--error" rounded="xl">
                   <template v-for="(segment, index) in message.segments" :key="index">
-                    <div v-if="segment.type === 'text'">{{ segment.text }}</div>
+                    <div v-if="segment.type === 'text'" class="text-body-2">{{ segment.text }}</div>
                   </template>
                 </v-card>
               </div>
+            </div>
 
-              <div v-else :class="message.role === 'user' ? 'd-flex justify-end' : 'd-flex justify-start'">
+            <div v-else :class="message.role === 'user' ? 'chat-message-row chat-message-row--user' : 'chat-message-row chat-message-row--bot'">
+              <div
+                class="chat-message-stack"
+                :class="message.role === 'user' ? 'chat-message-stack--user' : 'chat-message-stack--bot'"
+              >
                 <v-card
+                  class="chat-bubble"
+                  :class="{
+                    'chat-bubble--user': message.role === 'user',
+                    'chat-bubble--bot': message.role === 'bot',
+                    'chat-bubble--image': hasImageSegment(message.segments),
+                  }"
                   :color="message.role === 'user' ? 'primary' : undefined"
-                  :variant="message.role === 'user' ? 'tonal' : 'outlined'"
-                  class="pa-3"
-                  :class="{ 'image-message-card': hasImageSegment(message.segments) }"
-                  :style="getMessageCardStyle(message.segments)"
-                  rounded="lg"
+                  :variant="message.role === 'user' ? 'flat' : 'outlined'"
+                  rounded="xl"
                 >
-                  <div class="d-flex flex-column ga-2">
+                  <div class="chat-bubble__content">
                     <template v-for="(segment, index) in message.segments" :key="index">
                       <div v-if="segment.type === 'reply'" class="reply-segment">
-                        <div class="reply-segment__label">{{ t('chat.replyMessage') }}</div>
-                        <div class="reply-segment__id">#{{ segment.message_id }}</div>
+                        <div class="reply-segment__head">
+                          <div class="reply-segment__label">{{ t('chat.replyMessage') }}</div>
+                          <button
+                            type="button"
+                            class="reply-segment__jump"
+                            @click="scrollToMessage(segment.message_id)"
+                          >
+                            {{ t('chat.viewOriginalMessage') }}
+                          </button>
+                        </div>
                         <div v-if="segment.text" class="reply-segment__text">{{ segment.text }}</div>
                       </div>
-                      <div v-else-if="segment.type === 'text'" class="text-body-2" style="white-space: pre-wrap">
+                      <div v-else-if="segment.type === 'text'" class="text-body-2 chat-segment-text">
                         {{ segment.text }}
                       </div>
                       <v-chip
@@ -182,14 +137,11 @@
                         class="chat-image"
                         @click="openImagePreview(segment)"
                       />
-                      <pre
-                        v-else-if="segment.type === 'raw'"
-                        class="text-body-2"
-                        style="white-space: pre-wrap; margin: 0"
-                      >{{ JSON.stringify(segment.data, null, 2) }}</pre>
+                      <pre v-else-if="segment.type === 'raw'" class="chat-raw">{{ JSON.stringify(segment.data, null, 2) }}</pre>
                     </template>
                   </div>
-                  <div class="d-flex justify-end mt-2">
+
+                  <div class="chat-bubble__actions">
                     <v-btn
                       size="x-small"
                       variant="text"
@@ -203,122 +155,109 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <v-divider />
+        <div class="chat-panel__composer">
+          <div v-if="pendingReply" class="pending-reply">
+            <div class="pending-reply__content">
+              <div class="pending-reply__label">{{ t('chat.replyMessage') }}</div>
+              <div class="pending-reply__text">{{ summarizeReplyMessage(pendingReply) }}</div>
+            </div>
+            <button
+              type="button"
+              class="pending-reply__jump"
+              @click="scrollToMessage(pendingReply.message_id)"
+            >
+              {{ t('chat.viewOriginalMessage') }}
+            </button>
+            <v-btn icon="mdi-close" size="small" variant="text" @click="clearPendingReply" />
+          </div>
 
-          <div class="pa-4 d-flex flex-column ga-3">
-            <div v-if="pendingReply" class="pending-reply">
-              <div class="pending-reply__content">
-                <div class="pending-reply__label">
-                  {{ t('chat.replyingTo', { role: replyRoleLabel(pendingReply.role) }) }}
-                </div>
-                <div class="pending-reply__id">#{{ pendingReply.message_id }}</div>
-                <div class="pending-reply__text">{{ summarizeReplyMessage(pendingReply) }}</div>
+          <div v-if="orderedComposerImages.length" class="composer-attachments">
+            <div
+              v-for="(image, index) in orderedComposerImages"
+              :key="image.id"
+              class="composer-attachment-item"
+              :class="{ 'composer-attachment-item--selected': selectedComposerImageId === image.id }"
+              @click="selectComposerImage(image.id)"
+            >
+              <div class="composer-attachment-index">{{ t('chat.imageIndex', { index: index + 1 }) }}</div>
+              <img
+                :src="image.previewUrl"
+                :alt="image.name"
+                class="composer-attachment-thumb"
+                @click="openImagePreviewFromPending(image)"
+              />
+              <div class="composer-attachment-meta">
+                <div class="composer-attachment-name">{{ image.name }}</div>
+                <div class="composer-attachment-size">{{ formatBytes(image.size) || t('chat.imageFallback') }}</div>
               </div>
+              <v-btn
+                icon="mdi-cursor-move"
+                size="x-small"
+                variant="text"
+                @click.stop="moveComposerImageToCursor(image.id)"
+              />
               <v-btn
                 icon="mdi-close"
-                size="small"
+                size="x-small"
                 variant="text"
-                @click="clearPendingReply"
+                @click.stop="removeComposerImage(image.id)"
               />
             </div>
-
-            <div v-if="orderedComposerImages.length" class="composer-attachments">
-              <div
-                v-for="(image, index) in orderedComposerImages"
-                :key="image.id"
-                class="composer-attachment-item"
-                :class="{ 'composer-attachment-item--selected': selectedComposerImageId === image.id }"
-                @click="selectComposerImage(image.id)"
-              >
-                <div class="composer-attachment-index">{{ t('chat.imageIndex', { index: index + 1 }) }}</div>
-                <img
-                  :src="image.previewUrl"
-                  :alt="image.name"
-                  class="composer-attachment-thumb"
-                  @click="openImagePreviewFromPending(image)"
-                />
-                <div class="composer-attachment-meta">
-                  <div class="composer-attachment-name">{{ image.name }}</div>
-                  <div class="composer-attachment-size">{{ formatBytes(image.size) || t('chat.imageFallback') }}</div>
-                </div>
-                <v-btn
-                  icon="mdi-cursor-move"
-                  size="x-small"
-                  variant="text"
-                  @click="moveComposerImageToCursor(image.id)"
-                />
-                <v-btn
-                  icon="mdi-close"
-                  size="x-small"
-                  variant="text"
-                  @click="removeComposerImage(image.id)"
-                />
-              </div>
-            </div>
-
-            <div
-              ref="composerRef"
-              class="composer"
-              :class="{ 'composer--disabled': !connected || !session }"
-              contenteditable="true"
-              spellcheck="false"
-              :data-placeholder="t('chat.composerPlaceholder')"
-              @input="handleComposerInput"
-              @keydown="handleComposerKeydown"
-              @mouseup="captureComposerSelection"
-              @keyup="captureComposerSelection"
-              @focus="captureComposerSelection"
-              @click="handleComposerClick"
-              @paste="handleComposerPaste"
-            />
-
-            <input
-              ref="imageInputRef"
-              type="file"
-              accept="image/*"
-              multiple
-              class="d-none"
-              @change="handleImageSelection"
-            />
-
-            <div class="d-flex align-center">
-              <div class="text-caption text-grey">
-                {{ principal ? t('chat.currentPrincipal', { username: principal.username }) : t('chat.unauthenticated') }}
-              </div>
-              <v-spacer />
-              <v-btn
-                variant="text"
-                :disabled="!connected || !session"
-                @click="insertMentionForCurrentSession"
-              >
-                {{ t('chat.mentionCurrentUser') }}
-              </v-btn>
-              <v-btn
-                variant="tonal"
-                :disabled="!connected || !session || isPreparingImages"
-                @click="pickImages"
-              >
-                {{ t('chat.pickImage') }}
-              </v-btn>
-              <v-btn
-                color="primary"
-                :loading="isPreparingImages"
-                :disabled="!connected || !session || !composerHasContent"
-                @click="send"
-              >
-                {{ t('common.send') }}
-              </v-btn>
-            </div>
           </div>
-        </v-card>
-      </v-col>
-    </v-row>
+
+          <div
+            ref="composerRef"
+            class="composer"
+            :class="{ 'composer--disabled': !chatReady }"
+            contenteditable="true"
+            spellcheck="false"
+            :data-placeholder="t('chat.composerPlaceholder')"
+            @input="handleComposerInput"
+            @keydown="handleComposerKeydown"
+            @mouseup="captureComposerSelection"
+            @keyup="captureComposerSelection"
+            @focus="captureComposerSelection"
+            @click="handleComposerClick"
+            @paste="handleComposerPaste"
+          />
+
+          <input
+            ref="imageInputRef"
+            type="file"
+            accept="image/*"
+            multiple
+            class="d-none"
+            @change="handleImageSelection"
+          />
+
+          <div class="chat-composer-actions">
+            <v-btn
+              variant="text"
+              :disabled="!chatReady || isPreparingImages || autoCreatingSession"
+              @click="pickImages"
+            >
+              {{ t('chat.pickImage') }}
+            </v-btn>
+            <v-spacer />
+            <v-btn
+              color="primary"
+              :loading="isPreparingImages || autoCreatingSession"
+              :disabled="!chatReady || autoCreatingSession || !composerHasContent"
+              @click="send"
+            >
+              {{ t('common.send') }}
+            </v-btn>
+          </div>
+        </div>
+      </main>
+    </div>
 
     <v-dialog v-model="imagePreviewVisible" max-width="1200">
-      <v-card class="pa-2 preview-card">
-        <div class="d-flex justify-space-between align-center px-2">
-          <div class="text-caption text-grey-lighten-1">
+      <v-card class="preview-card">
+        <div class="preview-card__toolbar">
+          <div class="text-caption text-medium-emphasis">
             {{ t('chat.zoom', { value: Math.round(previewScale * 100) }) }}
           </div>
           <div class="d-flex align-center ga-1">
@@ -326,12 +265,10 @@
             <v-btn icon="mdi-fit-to-screen-outline" variant="text" @click="resetPreviewTransform" />
             <v-btn icon="mdi-magnify-plus-outline" variant="text" @click="zoomInPreview" />
             <v-btn icon="mdi-download-outline" variant="text" @click="downloadPreviewImage" />
-          </div>
-          <div class="d-flex justify-end">
-          <v-btn icon="mdi-close" variant="text" @click="closeImagePreview" />
+            <v-btn icon="mdi-close" variant="text" @click="closeImagePreview" />
           </div>
         </div>
-        <div class="px-4 pb-2 text-caption text-grey-lighten-1 preview-meta">
+        <div class="preview-meta text-caption text-medium-emphasis">
           <span v-if="previewImageNaturalWidth && previewImageNaturalHeight">
             {{ previewImageNaturalWidth }} × {{ previewImageNaturalHeight }}
           </span>
@@ -357,11 +294,11 @@
         </div>
       </v-card>
     </v-dialog>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChatClient } from '@/api/chat'
 import type {
@@ -400,7 +337,8 @@ interface PendingMention {
   display: string
 }
 
-const connected = ref(false)
+const socketConnected = ref(false)
+const authenticated = ref(false)
 const principal = ref<WebUIPrincipal | null>(null)
 const capabilities = ref<ChatCapabilities | null>(null)
 const session = ref<ChatSessionState | null>(null)
@@ -430,12 +368,16 @@ const dragStartX = ref(0)
 const dragStartY = ref(0)
 const dragOriginX = ref(0)
 const dragOriginY = ref(0)
+const autoCreatingSession = ref(false)
+const pendingSessionMessage = ref<{
+  message_id: string
+  segments: ChatSegment[]
+} | null>(null)
 const composerImages = new Map<string, PendingImage>()
 const composerMentions = new Map<string, PendingMention>()
 
-const sessionForm = reactive<SessionCreatePayload>({
-  target_user_id: '10001',
-})
+const connected = computed(() => socketConnected.value && authenticated.value)
+const chatReady = computed(() => connected.value)
 
 function appendMessage(message: MessageReceivePayload) {
   messages.value.push(message)
@@ -455,13 +397,6 @@ function appendSimpleMessage(role: 'system' | 'error', text: string) {
 function summarizeReplyMessage(message: MessageReceivePayload) {
   const text = getTextContent(message.segments).trim()
   return text || t('chat.imageSummary')
-}
-
-function replyRoleLabel(role: MessageRole) {
-  if (role === 'user') return t('chat.yourMessage')
-  if (role === 'bot') return t('chat.botMessage')
-  if (role === 'system') return t('chat.systemMessage')
-  return t('chat.errorMessage')
 }
 
 function startReplyToMessage(message: MessageReceivePayload) {
@@ -486,9 +421,28 @@ function resetActiveSessionState() {
   clearComposer()
 }
 
+function resetConnectionState() {
+  socketConnected.value = false
+  authenticated.value = false
+  autoCreatingSession.value = false
+  pendingSessionMessage.value = null
+  principal.value = null
+  capabilities.value = null
+  resetActiveSessionState()
+}
+
+function startNewSession() {
+  autoCreatingSession.value = false
+  pendingSessionMessage.value = null
+  if (connected.value && session.value) {
+    client.closeSession()
+  }
+  resetActiveSessionState()
+}
+
 function switchToSession(target: SessionListItem) {
+  if (!authenticated.value) return
   if (session.value?.session_id === target.session.session_id) return
-  sessionForm.target_user_id = target.session.target_user_id
   client.updateSession({
     session_id: target.session.session_id,
     target_user_id: target.session.target_user_id,
@@ -496,11 +450,20 @@ function switchToSession(target: SessionListItem) {
 }
 
 function deleteSessionItem(target: SessionListItem) {
-  const confirmed = window.confirm(
-    t('chat.confirmDelete', { userId: target.session.target_user_id }),
-  )
+  if (!authenticated.value) return
+  const confirmed = window.confirm(t('chat.confirmDelete'))
   if (!confirmed) return
   client.deleteSession({ session_id: target.session.session_id })
+}
+
+function formatSessionTitle(item: SessionListItem) {
+  const sessionId = item.session.session_id
+  const shortId = sessionId.slice(-4)
+  return t('chat.sessionLabel', { id: shortId })
+}
+
+function createSessionKey() {
+  return `${Date.now()}`
 }
 
 function formatSessionTime(value?: string | null) {
@@ -508,19 +471,6 @@ function formatSessionTime(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString()
-}
-
-function sessionStatusColor(status: ChatSessionState['status']) {
-  if (status === 'ready') return 'success'
-  if (status === 'closed') return 'grey'
-  return 'error'
-}
-
-function summarizeSessionItem(item: SessionListItem) {
-  const summary = item.last_message?.trim()
-  if (summary) return summary
-  if (item.message_count > 0) return t('chat.existingMessages')
-  return t('chat.noMessages')
 }
 
 const composerHasContent = computed(() => {
@@ -551,17 +501,6 @@ const orderedComposerImages = computed(() => {
 
 function pickImages() {
   imageInputRef.value?.click()
-}
-
-function insertMentionForCurrentSession() {
-  if (!session.value) return
-  const mention: PendingMention = {
-    id: `mention_${session.value.target_user_id}_${Date.now()}`,
-    target: session.value.target_user_id,
-    display: session.value.target_user_id,
-  }
-  composerMentions.set(mention.id, mention)
-  insertMentionIntoComposer(mention)
 }
 
 async function handleImageSelection(event: Event) {
@@ -598,33 +537,6 @@ function getTextContent(segments: ChatSegment[]) {
 
 function hasImageSegment(segments: ChatSegment[]) {
   return segments.some((segment) => segment.type === 'image')
-}
-
-function hasMentionSegment(segments: ChatSegment[]) {
-  return segments.some((segment) => segment.type === 'mention')
-}
-
-function hasReplySegment(segments: ChatSegment[]) {
-  return segments.some((segment) => segment.type === 'reply')
-}
-
-function getMessageCardStyle(segments: ChatSegment[]) {
-  if (hasImageSegment(segments)) {
-    return {
-      width: 'fit-content',
-      maxWidth: 'min(720px, 78vw)',
-    }
-  }
-
-  if (hasReplySegment(segments) || hasMentionSegment(segments)) {
-    return {
-      maxWidth: 'min(80%, 720px)',
-    }
-  }
-
-  return {
-    maxWidth: '80%',
-  }
 }
 
 function resolveImageUrl(segment: ImageSegment) {
@@ -1053,6 +965,10 @@ function handleComposerInput() {
 }
 
 function handleComposerKeydown(event: KeyboardEvent) {
+  if (!chatReady.value && event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    return
+  }
   const selectedId = selectedComposerImageId.value
   if (selectedId) {
     const token = getComposerImageToken(selectedId)
@@ -1097,10 +1013,15 @@ function handleComposerClick(event: MouseEvent) {
     removeComposerMention(removeMentionButton.dataset.mentionId)
     return
   }
-  const token = target.closest<HTMLElement>('[data-kind="image-token"][data-image-id]')
-  if (token?.dataset.imageId) {
+  const imageToken = target.closest<HTMLElement>('[data-kind="image-token"][data-image-id]')
+  if (imageToken?.dataset.imageId) {
     event.preventDefault()
-    selectComposerImage(token.dataset.imageId)
+    selectComposerImage(imageToken.dataset.imageId)
+    return
+  }
+  const mentionToken = target.closest<HTMLElement>('[data-kind="mention-token"][data-mention-id]')
+  if (mentionToken) {
+    event.preventDefault()
     return
   }
   selectComposerImage(null)
@@ -1242,9 +1163,10 @@ function handleWindowKeydown(event: KeyboardEvent) {
 function handleEnvelope(event: ChatEnvelope) {
   switch (event.type) {
     case 'auth.ok':
+      authenticated.value = true
       principal.value = (event.payload as { principal: WebUIPrincipal }).principal
       client.requestCapabilities()
-      appendSimpleMessage('system', t('chat.authOk'))
+      client.listSessions()
       break
     case 'capabilities.response':
       capabilities.value = (event.payload as CapabilitiesResponsePayload).capabilities
@@ -1259,18 +1181,23 @@ function handleEnvelope(event: ChatEnvelope) {
       )
       if (session.value?.session_id === payload.session_id) {
         resetActiveSessionState()
-        appendSimpleMessage('system', t('chat.sessionDeleted'))
       }
       break
     }
     case 'session.state': {
       const payload = event.payload as SessionStatePayload
-      const hadSession = Boolean(session.value)
+      autoCreatingSession.value = false
       session.value = payload.session
-      sessionForm.target_user_id = payload.session.target_user_id
       messages.value = payload.history
-      if (!hadSession && payload.history.length === 0) {
-        appendSimpleMessage('system', t('chat.sessionReady'))
+      scrollToBottom()
+      if (pendingSessionMessage.value) {
+        const pending = pendingSessionMessage.value
+        pendingSessionMessage.value = null
+        client.sendMessage({
+          session_id: payload.session.session_id,
+          message_id: pending.message_id,
+          segments: pending.segments,
+        })
       }
       break
     }
@@ -1279,6 +1206,7 @@ function handleEnvelope(event: ChatEnvelope) {
       session.value = payload.session
       messages.value = payload.history
       clearPendingReply()
+      scrollToBottom()
       break
     }
     case 'message.receive':
@@ -1293,8 +1221,6 @@ function handleEnvelope(event: ChatEnvelope) {
     }
     case 'system.info':
     case 'system.warning': {
-      const payload = event.payload as { message?: string }
-      appendSimpleMessage('system', payload.message || t('chat.systemFallback'))
       break
     }
   }
@@ -1304,22 +1230,16 @@ function connect() {
   client.connect()
 }
 
-function reconnect() {
-  client.disconnect()
-  resetActiveSessionState()
-  connect()
-}
-
 function saveSession() {
-  if (!connected.value) return
+  if (!authenticated.value) return
   const payload: SessionCreatePayload = {
-    target_user_id: sessionForm.target_user_id,
+    target_user_id: createSessionKey(),
   }
   client.createSession(payload)
 }
 
 function send() {
-  if (!session.value) return
+  if (!chatReady.value) return
   const segments = buildComposerSegments()
   if (pendingReply.value) {
     segments.unshift({
@@ -1329,41 +1249,66 @@ function send() {
     })
   }
   if (!segments.length) return
-  client.sendMessage({
-    session_id: session.value.session_id,
-    message_id: `cli_${Date.now()}`,
-    segments,
-  })
+  const messageId = `cli_${Date.now()}`
+  if (session.value) {
+    client.sendMessage({
+      session_id: session.value.session_id,
+      message_id: messageId,
+      segments,
+    })
+  } else {
+    autoCreatingSession.value = true
+    pendingSessionMessage.value = {
+      message_id: messageId,
+      segments,
+    }
+    saveSession()
+  }
   clearComposer()
   clearPendingReply()
 }
 
+function scrollToMessage(messageId: string) {
+  const container = messagesContainer.value
+  if (!container) return
+
+  const target = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+  if (!target) return
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  target.classList.add('chat-message--flash')
+  window.setTimeout(() => {
+    target.classList.remove('chat-message--flash')
+  }, 1600)
+}
+
 function scrollToBottom() {
   nextTick(() => {
-    messagesContainer.value?.scrollTo(0, messagesContainer.value.scrollHeight)
+    messagesContainer.value?.scrollTo({
+      top: messagesContainer.value.scrollHeight,
+      behavior: 'smooth',
+    })
   })
 }
 
 const unsubscribeMessage = client.onMessage(handleEnvelope)
 const unsubscribeOpen = client.onOpen(() => {
-  connected.value = true
+  socketConnected.value = true
   const token = localStorage.getItem('token')
   if (!token) {
-    appendSimpleMessage('error', t('chat.tokenMissing'))
     return
   }
   client.authenticate(token)
-  client.listSessions()
 })
 const unsubscribeClose = client.onClose(() => {
-  connected.value = false
-  appendSimpleMessage('system', t('chat.connectionClosed'))
+  resetConnectionState()
 })
 
 onMounted(() => {
   connect()
   window.addEventListener('keydown', handleWindowKeydown)
 })
+
 onUnmounted(() => {
   if (connected.value && session.value) {
     client.closeSession()
@@ -1379,31 +1324,345 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.reply-segment {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border-left: 3px solid rgba(var(--v-theme-primary), 0.55);
-  background: rgba(var(--v-theme-on-surface), 0.06);
+.chat-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: calc(100dvh - 48px);
+  min-height: 680px;
+  overflow: hidden;
 }
 
-.session-entry-actions {
+.chat-page__header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chat-page__actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.session-entry-actions__primary {
-  flex: 1 1 auto;
-  min-width: 0;
+.chat-shell {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
 }
 
-.session-entry-actions__secondary {
-  flex: 0 0 auto;
+.chat-sidebar,
+.chat-panel {
+  min-height: 0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgba(var(--v-theme-surface), 0.88);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
-.session-preview {
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.chat-sidebar__header {
+  padding: 20px 20px 12px;
+}
+
+.chat-sidebar__body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0 16px 16px;
+}
+
+.chat-sidebar__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  color: rgba(var(--v-theme-on-surface), 0.56);
+  text-align: center;
+  padding: 16px;
+}
+
+.chat-session-list {
+  padding: 0;
+  background: transparent;
+}
+
+.chat-session-list__item {
+  margin-bottom: 8px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgba(var(--v-theme-surface), 0.72);
+}
+
+:deep(.chat-session-list__item .v-list-item__content) {
+  padding-right: 6px;
+}
+
+:deep(.chat-session-list__item .v-list-item__append) {
+  margin-inline-start: 6px;
+  align-self: center;
+}
+
+:deep(.chat-session-list__item .v-list-item__append .v-btn) {
+  margin-inline-end: -4px;
+}
+
+.chat-session-list__title,
+.chat-session-list__meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+:deep(.chat-session-list__item.v-list-item--active) {
+  border-color: rgba(var(--v-theme-primary), 0.18);
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.chat-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+.chat-panel__messages {
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-panel__composer {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgba(var(--v-theme-surface), 0.94);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-empty {
+  margin: auto;
+  max-width: 420px;
+  text-align: center;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+}
+
+.chat-empty__title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.chat-empty__text {
+  line-height: 1.6;
+}
+
+.chat-message-row {
+  display: flex;
+  width: 100%;
+}
+
+.chat-message {
+  width: 100%;
+  border-radius: 18px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-message--flash {
+  background: rgba(var(--v-theme-primary), 0.08);
+  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.12);
+}
+
+.chat-message-row--user {
+  justify-content: flex-end;
+}
+
+.chat-message-row--bot {
+  justify-content: flex-start;
+}
+
+.chat-message-row--system {
+  justify-content: center;
+}
+
+.chat-message-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: min(78%, 760px);
+}
+
+.chat-message-stack--user {
+  align-items: flex-end;
+}
+
+.chat-message-stack--bot {
+  align-items: flex-start;
+}
+
+.chat-bubble {
+  padding: 14px 16px 10px;
+  border-width: 1px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+}
+
+.chat-bubble--image {
+  max-width: min(78vw, 720px);
+}
+
+.chat-bubble--user {
+  border-top-right-radius: 10px !important;
+  color: rgb(var(--v-theme-on-primary));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    rgb(var(--v-theme-primary)) !important;
+}
+
+.chat-bubble--bot {
+  border-top-left-radius: 10px !important;
+  background: rgba(var(--v-theme-surface), 0.9);
+}
+
+.chat-bubble--error {
+  border-top-left-radius: 10px !important;
+}
+
+.chat-bubble__content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-bubble__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+:deep(.chat-bubble--user .v-btn) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+:deep(.chat-bubble__actions .v-btn) {
+  min-width: 0;
+  padding-inline: 4px;
+  font-size: 0.74rem;
+  opacity: 0.58;
+  letter-spacing: 0;
+}
+
+:deep(.chat-bubble__actions .v-btn .v-btn__prepend) {
+  margin-inline-end: 2px;
+}
+
+:deep(.chat-bubble__actions .v-btn:hover) {
+  opacity: 0.9;
+}
+
+.chat-segment-text {
+  white-space: pre-wrap;
+}
+
+.chat-raw {
+  white-space: pre-wrap;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.chat-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(52vh, 560px);
+  border-radius: 16px;
+  cursor: zoom-in;
+}
+
+.reply-segment {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border-left: 2px solid rgba(var(--v-theme-primary), 0.32);
+  background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+.chat-bubble--user .reply-segment {
+  border-left-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-bubble--bot .reply-segment,
+.chat-bubble--error .reply-segment {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.reply-segment__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.reply-segment__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  opacity: 0.82;
+}
+
+.reply-segment__text {
+  font-size: 0.8rem;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+}
+
+.chat-bubble--user .reply-segment__label,
+.chat-bubble--user .reply-segment__text {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.chat-bubble--bot .reply-segment__label,
+.chat-bubble--error .reply-segment__label {
+  color: rgba(var(--v-theme-on-surface), 0.88);
+}
+
+.chat-bubble--bot .reply-segment__text,
+.chat-bubble--error .reply-segment__text {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+}
+
+.reply-segment__jump {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: rgba(var(--v-theme-primary), 0.68);
+  font-size: 0.74rem;
+  cursor: pointer;
+  opacity: 0.76;
+}
+
+.chat-bubble--user .reply-segment__jump {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.chat-bubble--bot .reply-segment__jump,
+.chat-bubble--error .reply-segment__jump {
+  color: rgba(var(--v-theme-primary), 0.82);
+}
+
+.reply-segment__jump:hover {
+  text-decoration: underline;
+  opacity: 1;
 }
 
 .pending-reply {
@@ -1413,275 +1672,228 @@ onUnmounted(() => {
   padding: 10px 12px;
   border: 1px solid rgba(var(--v-theme-primary), 0.18);
   border-left: 3px solid rgba(var(--v-theme-primary), 0.6);
-  border-radius: 12px;
+  border-radius: 14px;
   background: rgba(var(--v-theme-primary), 0.08);
 }
 
 .pending-reply__content {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
 }
 
 .pending-reply__label {
-  font-size: 12px;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: rgba(var(--v-theme-primary), 0.95);
-}
-
-.pending-reply__id {
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(var(--v-theme-on-surface), 0.62);
 }
 
 .pending-reply__text {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(var(--v-theme-on-surface), 0.82);
-  white-space: nowrap;
+  color: rgba(var(--v-theme-on-surface), 0.7);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.reply-segment__label {
-  font-size: 12px;
-  line-height: 1.2;
-  color: rgba(var(--v-theme-on-surface), 0.62);
+.pending-reply__jump {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(var(--v-theme-primary), 0.76);
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.reply-segment__id {
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.reply-segment__text {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(var(--v-theme-on-surface), 0.86);
-  white-space: pre-wrap;
-}
-
-.composer {
-  min-height: 104px;
-  max-height: 240px;
-  overflow-y: auto;
-  padding: 12px 14px;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
-  border-radius: 14px;
-  background: rgba(var(--v-theme-surface), 0.78);
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-word;
-  outline: none;
+.pending-reply__jump:hover {
+  text-decoration: underline;
 }
 
 .composer-attachments {
   display: flex;
-  flex-wrap: wrap;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .composer-attachment-item {
-  display: flex;
+  flex: 0 0 220px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  max-width: min(320px, 100%);
-  padding: 8px 10px;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
-  border-radius: 12px;
-  background: rgba(var(--v-theme-on-surface), 0.04);
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 16px;
+  background: rgba(var(--v-theme-surface), 0.72);
 }
 
 .composer-attachment-item--selected {
-  border-color: rgba(var(--v-theme-primary), 0.45);
-  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.1);
+  border-color: rgba(var(--v-theme-primary), 0.28);
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 
 .composer-attachment-index {
-  min-width: 48px;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(var(--v-theme-on-surface), 0.72);
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  color: rgba(var(--v-theme-on-surface), 0.56);
 }
 
 .composer-attachment-thumb {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: zoom-in;
-  flex-shrink: 0;
 }
 
 .composer-attachment-meta {
   min-width: 0;
-  flex: 1;
 }
 
-.composer-attachment-name {
+.composer-attachment-name,
+.composer-attachment-size {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+}
+
+.composer-attachment-name {
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
 .composer-attachment-size {
-  margin-top: 2px;
-  font-size: 11px;
-  color: rgba(var(--v-theme-on-surface), 0.58);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.8rem;
+}
+
+.composer {
+  min-height: 120px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 18px;
+  background: rgba(var(--v-theme-background), 0.76);
+  line-height: 1.65;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.composer--disabled {
+  opacity: 0.6;
 }
 
 .composer:empty::before {
   content: attr(data-placeholder);
-  color: rgba(var(--v-theme-on-surface), 0.48);
+  color: rgba(var(--v-theme-on-surface), 0.42);
 }
 
-.composer:focus {
-  border-color: rgba(var(--v-theme-primary), 0.62);
-  box-shadow: 0 0 0 3px rgba(var(--v-theme-primary), 0.1);
-}
-
-.composer--disabled {
-  pointer-events: none;
-  opacity: 0.65;
-}
-
-:deep(.composer-image-token) {
-  display: inline-flex;
+.chat-composer-actions {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  max-width: 112px;
-  min-height: 24px;
-  margin: 0 4px;
-  padding: 1px 7px;
-  border: 1px solid rgba(var(--v-theme-primary), 0.32);
-  border-radius: 8px;
-  background: rgba(var(--v-theme-primary), 0.12);
-  vertical-align: baseline;
-  box-shadow:
-    inset 0 0 0 1px rgba(var(--v-theme-surface), 0.35),
-    0 1px 2px rgb(0 0 0 / 18%);
+  gap: 8px;
 }
 
-:deep(.composer-image-token--selected) {
-  border-color: rgba(var(--v-theme-primary), 0.62);
-  background: rgba(var(--v-theme-primary), 0.22);
-  box-shadow:
-    inset 0 0 0 1px rgba(var(--v-theme-surface), 0.45),
-    0 0 0 2px rgba(var(--v-theme-primary), 0.14);
-}
-
-:deep(.composer-image-token__label) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: rgba(var(--v-theme-primary), 0.96);
-}
-
-:deep(.composer-image-token__remove) {
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
-  flex-shrink: 0;
-  color: rgba(var(--v-theme-on-surface), 0.76);
-}
-
+:deep(.composer-image-token),
 :deep(.composer-mention-token) {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  max-width: 140px;
-  min-height: 24px;
-  margin: 0 4px;
-  padding: 1px 7px;
-  border: 1px solid rgba(var(--v-theme-secondary), 0.28);
+  gap: 4px;
+  margin: 2px 4px 2px 0;
+  padding: 2px 6px 2px 8px;
   border-radius: 999px;
-  background: rgba(var(--v-theme-secondary), 0.12);
-  vertical-align: baseline;
+  vertical-align: middle;
+  border: 1px solid rgba(var(--v-theme-primary), 0.18);
+  background: rgba(var(--v-theme-primary), 0.08);
 }
 
+:deep(.composer-image-token--selected) {
+  border-color: rgba(var(--v-theme-primary), 0.46);
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.12);
+}
+
+:deep(.composer-image-token__label),
 :deep(.composer-mention-token__label) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: rgba(var(--v-theme-secondary), 0.96);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
+:deep(.composer-image-token__remove),
 :deep(.composer-mention-token__remove) {
-  width: 16px;
-  height: 16px;
-  padding: 0;
   border: 0;
+  padding: 0;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: rgba(var(--v-theme-on-surface), 0.08);
+  background: transparent;
+  color: inherit;
   cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
-  flex-shrink: 0;
-  color: rgba(var(--v-theme-on-surface), 0.76);
-}
-
-.chat-image {
-  display: block;
-  max-width: min(680px, 72vw);
-  width: auto;
-  height: auto;
-  border-radius: 8px;
-  object-fit: contain;
-  cursor: zoom-in;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
-}
-
-.image-message-card {
-  display: inline-block;
-  background: rgba(var(--v-theme-on-surface), 0.04);
 }
 
 .preview-card {
-  background: rgba(var(--v-theme-surface), 0.96);
+  padding: 8px;
 }
 
-.preview-image-wrap {
+.preview-card__toolbar {
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: min(96vw, 1200px);
-  height: min(82vh, 900px);
-  overflow: hidden;
-  padding: 24px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 0;
 }
 
 .preview-meta {
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  padding: 0 16px 8px;
+}
+
+.preview-image-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: min(78vh, 860px);
+  overflow: hidden;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .preview-image {
-  display: block;
-  max-width: min(92vw, 1120px);
-  max-height: min(76vh, 820px);
-  width: auto;
-  height: auto;
-  border-radius: 12px;
-  transition: transform 0.08s ease-out;
+  max-width: 100%;
+  max-height: 100%;
   user-select: none;
+}
+
+@media (max-width: 1100px) {
+  .chat-shell {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .chat-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .chat-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .chat-sidebar {
+    max-height: 280px;
+  }
+
+  .chat-panel {
+    min-height: 70vh;
+  }
+
+  .chat-bubble {
+    max-width: 100%;
+  }
 }
 </style>
