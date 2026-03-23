@@ -35,6 +35,9 @@ from apeiria.core.services.web_chat.protocol import (
 )
 
 __all__ = [
+    "AdapterConfigItem",
+    "AdapterConfigRequest",
+    "AdapterConfigResponse",
     "AuthHelloPayload",
     "AuthOkPayload",
     "BanCreateRequest",
@@ -44,6 +47,9 @@ __all__ = [
     "ChatEnvelope",
     "ChatSegment",
     "ChatSessionState",
+    "DriverConfigItem",
+    "DriverConfigRequest",
+    "DriverConfigResponse",
     "EnvelopeVersion",
     "ErrorPayload",
     "GroupItem",
@@ -54,6 +60,11 @@ __all__ = [
     "MessageAckPayload",
     "MessageReceivePayload",
     "MessageSendPayload",
+    "OperationStatusResponse",
+    "PluginConfigDirItem",
+    "PluginConfigModuleItem",
+    "PluginConfigRequest",
+    "PluginConfigResponse",
     "PluginItem",
     "RawSegment",
     "ReplySegment",
@@ -98,12 +109,63 @@ class PluginItem(BaseModel):
     name: str | None
     description: str | None
     source: str
-    plugin_type: str
-    admin_level: int
     is_global_enabled: bool
-    version: str | None
     is_protected: bool = False
     protected_reason: str | None = None
+
+
+class OperationStatusResponse(BaseModel):
+    status: str = "ok"
+    detail: str | None = None
+
+
+class PluginConfigResponse(BaseModel):
+    modules: list["PluginConfigModuleItem"]
+    dirs: list["PluginConfigDirItem"]
+
+
+class PluginConfigRequest(BaseModel):
+    modules: list[str]
+    dirs: list[str]
+
+
+class AdapterConfigItem(BaseModel):
+    name: str
+    is_loaded: bool
+    is_importable: bool
+
+
+class AdapterConfigResponse(BaseModel):
+    modules: list[AdapterConfigItem]
+
+
+class AdapterConfigRequest(BaseModel):
+    modules: list[str]
+
+
+class PluginConfigModuleItem(BaseModel):
+    name: str
+    is_loaded: bool
+    is_importable: bool
+
+
+class PluginConfigDirItem(BaseModel):
+    path: str
+    exists: bool
+    is_loaded: bool
+
+
+class DriverConfigItem(BaseModel):
+    name: str
+    is_active: bool
+
+
+class DriverConfigResponse(BaseModel):
+    builtin: list[DriverConfigItem]
+
+
+class DriverConfigRequest(BaseModel):
+    builtin: list[str]
 
 
 class BanItem(BaseModel):

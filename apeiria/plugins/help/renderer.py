@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,6 +12,14 @@ if TYPE_CHECKING:
     from .generator import PluginHelpInfo
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
+_RENDER_TIMEOUT = 3.0
+
+
+async def _html_to_pic_with_timeout(html: str, *, max_width: int) -> bytes:
+    return await asyncio.wait_for(
+        html_to_pic(html, max_width=max_width),
+        timeout=_RENDER_TIMEOUT,
+    )
 
 
 async def render_help_list(plugins: list[PluginHelpInfo]) -> bytes:
@@ -34,7 +43,7 @@ async def render_help_list(plugins: list[PluginHelpInfo]) -> bytes:
         )
 
     html = template.replace("{{rows}}", rows).replace("{{count}}", str(len(plugins)))
-    return await html_to_pic(html, max_width=700)
+    return await _html_to_pic_with_timeout(html, max_width=700)
 
 
 async def render_plugin_detail(plugin: PluginHelpInfo) -> bytes:
@@ -57,4 +66,4 @@ async def render_plugin_detail(plugin: PluginHelpInfo) -> bytes:
         .replace("{{type}}", plugin.plugin_type)
         .replace("{{level}}", str(plugin.admin_level))
     )
-    return await html_to_pic(html, max_width=600)
+    return await _html_to_pic_with_timeout(html, max_width=600)

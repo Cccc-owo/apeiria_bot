@@ -1,15 +1,27 @@
 <template>
-  <div>
-    <div class="d-flex align-center mb-6">
+  <div class="d-flex flex-column ga-6">
+    <div class="d-flex align-center justify-space-between flex-wrap ga-3">
       <h1 class="text-h4">{{ t('logs.title') }}</h1>
-      <v-spacer />
-      <v-btn
-        :icon="connected ? 'mdi-connection' : 'mdi-lan-disconnect'"
-        :color="connected ? 'success' : 'error'"
-        variant="text"
-        @click="toggleConnection"
-      />
-      <v-btn icon="mdi-delete-sweep" variant="text" @click="logs = []" />
+      <div class="d-flex align-center flex-wrap ga-2">
+        <v-chip :color="connected ? 'success' : 'error'" variant="tonal">
+          {{ connected ? t('logs.connected') : t('logs.disconnected') }}
+        </v-chip>
+        <v-btn
+          :prepend-icon="connected ? 'mdi-lan-disconnect' : 'mdi-connection'"
+          variant="tonal"
+          @click="toggleConnection"
+        >
+          {{ connected ? t('logs.disconnect') : t('logs.connect') }}
+        </v-btn>
+        <v-btn
+          prepend-icon="mdi-delete-sweep"
+          variant="text"
+          :disabled="logs.length === 0"
+          @click="logs = []"
+        >
+          {{ t('logs.clear') }}
+        </v-btn>
+      </div>
     </div>
 
     <v-card class="log-card pa-4" style="min-height: 60vh">

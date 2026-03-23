@@ -1,0 +1,1233 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import click
+
+from apeiria.cli_i18n import _
+from apeiria.cli_nb import (
+    find_exact_store_package,
+    format_store_packages,
+    install_package,
+    prompt_select_store_package,
+    prompt_select_text,
+    search_store_packages,
+    uninstall_package,
+    update_package,
+)
+from apeiria.core.plugin_policy import is_framework_protected_plugin_module
+from apeiria.user_adapters import (
+    add_project_adapter_module,
+    bind_project_adapter_package,
+    ensure_project_adapter_config,
+    get_project_adapter_package_modules,
+    read_project_adapter_config,
+    remove_project_adapter_module,
+    unbind_project_adapter_package,
+)
+from apeiria.user_adapters import (
+    default_config_path as default_adapter_config_path,
+)
+from apeiria.user_drivers import (
+    add_project_driver_builtin,
+    bind_project_driver_package,
+    ensure_project_driver_config,
+    get_project_driver_kwargs,
+    get_project_driver_package_builtin,
+    read_project_driver_config,
+    remove_project_driver_builtin,
+    unbind_project_driver_package,
+)
+from apeiria.user_drivers import (
+    default_config_path as default_driver_config_path,
+)
+from apeiria.user_plugins import (
+    add_project_plugin_dir,
+    add_project_plugin_module,
+    bind_project_plugin_package,
+    ensure_project_plugin_config,
+    get_project_plugin_package_modules,
+    read_project_plugin_config,
+    remove_project_plugin_dir,
+    remove_project_plugin_module,
+    unbind_project_plugin_package,
+)
+from apeiria.user_plugins import (
+    default_config_path as default_plugin_config_path,
+)
+
+
+def _config_path(path: str | None) -> Path | None:
+    return Path(path).expanduser().resolve() if path else None
+
+
+def _current_config_path(config_path: Path | None, default_path: Path) -> Path:
+    return default_path if config_path is None else config_path
+
+
+def _normalize_module_name(name: str) -> str:
+    base = name.split("[", 1)[0].strip()
+    return base.replace("-", "_")
+
+
+def _echo_config(config_path: Path | None) -> None:
+    config = read_project_plugin_config(config_path)
+    current_path = _current_config_path(config_path, default_plugin_config_path())
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("modules:"))
+    for module in config["modules"]:
+        click.echo(f"  - {module}")
+    click.echo(_("dirs:"))
+    for directory in config["dirs"]:
+        click.echo(f"  - {directory}")
+
+
+def _echo_installed_plugins(query: str | None = None) -> None:
+    config = read_project_plugin_config()
+    packages = sorted(config["packages"].items())
+    if query:
+        needle = query.lower()
+        packages = [
+            item
+            for item in packages
+            if needle in item[0].lower()
+            or any(needle in module.lower() for module in item[1])
+        ]
+    if not packages:
+        click.echo(_("no installed plugin packages found"))
+        return
+    click.echo(_("installed:"))
+    modules_label = _("modules:")
+    for name, modules in packages:
+        click.echo(f"  - {name}")
+        click.echo(f"    {modules_label} {', '.join(modules)}")
+
+
+def _installed_plugin_package_names() -> list[str]:
+    return sorted(read_project_plugin_config()["packages"])
+
+
+def _echo_registered_plugins(
+    config_path: Path | None, query: str | None = None
+) -> None:
+    config = read_project_plugin_config(config_path)
+    current_path = _current_config_path(config_path, default_plugin_config_path())
+    needle = (query or "").lower()
+    modules = (
+        [item for item in config["modules"] if needle in item.lower()]
+        if needle
+        else config["modules"]
+    )
+    dirs = (
+        [item for item in config["dirs"] if needle in item.lower()]
+        if needle
+        else config["dirs"]
+    )
+    click.echo(_("registered:"))
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("modules:"))
+    for module in modules:
+        click.echo(f"  - {module}")
+    click.echo(_("dirs:"))
+    for directory in dirs:
+        click.echo(f"  - {directory}")
+
+
+def _echo_adapter_config(config_path: Path | None) -> None:
+    config = read_project_adapter_config(config_path)
+    current_path = _current_config_path(config_path, default_adapter_config_path())
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("modules:"))
+    for module in config["modules"]:
+        click.echo(f"  - {module}")
+
+
+def _echo_driver_config(config_path: Path | None) -> None:
+    config = read_project_driver_config(config_path)
+    current_path = _current_config_path(config_path, default_driver_config_path())
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("builtin:"))
+    for item in config["builtin"]:
+        click.echo(f"  - {item}")
+
+
+def _echo_installed_drivers(query: str | None = None) -> None:
+    config = read_project_driver_config()
+    packages = sorted(config["packages"].items())
+    if query:
+        needle = query.lower()
+        packages = [
+            item
+            for item in packages
+            if needle in item[0].lower()
+            or any(needle in builtin.lower() for builtin in item[1])
+        ]
+    if not packages:
+        click.echo(_("no installed driver packages found"))
+        return
+    click.echo(_("installed:"))
+    builtin_label = _("builtin:")
+    for name, builtin in packages:
+        click.echo(f"  - {name}")
+        click.echo(f"    {builtin_label} {', '.join(builtin)}")
+
+
+def _installed_driver_package_names() -> list[str]:
+    return sorted(read_project_driver_config()["packages"])
+
+
+def _echo_installed_adapters(query: str | None = None) -> None:
+    config = read_project_adapter_config()
+    packages = sorted(config["packages"].items())
+    if query:
+        needle = query.lower()
+        packages = [
+            item
+            for item in packages
+            if needle in item[0].lower()
+            or any(needle in module.lower() for module in item[1])
+        ]
+    if not packages:
+        click.echo(_("no installed adapter packages found"))
+        return
+    click.echo(_("installed:"))
+    modules_label = _("modules:")
+    for name, modules in packages:
+        click.echo(f"  - {name}")
+        click.echo(f"    {modules_label} {', '.join(modules)}")
+
+
+def _installed_adapter_package_names() -> list[str]:
+    return sorted(read_project_adapter_config()["packages"])
+
+
+def _echo_registered_adapters(
+    config_path: Path | None, query: str | None = None
+) -> None:
+    config = read_project_adapter_config(config_path)
+    current_path = _current_config_path(config_path, default_adapter_config_path())
+    needle = (query or "").lower()
+    modules = (
+        [item for item in config["modules"] if needle in item.lower()]
+        if needle
+        else config["modules"]
+    )
+    click.echo(_("registered:"))
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("modules:"))
+    for module in modules:
+        click.echo(f"  - {module}")
+
+
+def _fail(message: str) -> None:
+    raise click.ClickException(message)
+
+
+def _prompt_package_name(question: str, packages: list[str]) -> str:
+    if not packages:
+        raise click.ClickException(_("no installed packages available"))
+    try:
+        return prompt_select_text(question, packages)
+    except RuntimeError as exc:
+        if str(exc) != "nb-cli":
+            raise
+    except Exception as exc:
+        if exc.__class__.__name__ == "CancelledError":
+            raise click.Abort from exc
+        raise
+    click.echo(_("installed:"))
+    for index, package_name in enumerate(packages, start=1):
+        click.echo(f"  {index}. {package_name}")
+    selected = click.prompt(question, type=click.IntRange(1, len(packages)))
+    return packages[selected - 1]
+
+
+def _echo_store_packages(items: list[object]) -> None:
+    if not items:
+        click.echo(_("no store packages found"))
+        return
+    click.echo(format_store_packages(items))
+
+
+def _store_packages(module_type: str, query: str | None = None) -> list[object]:
+    try:
+        return search_store_packages(module_type, query)
+    except RuntimeError as exc:
+        if str(exc) == "nb-cli":
+            _fail(_("nb-cli is required for official store features"))
+        raise
+
+
+def _exact_store_package(module_type: str, value: str) -> object | None:
+    try:
+        return find_exact_store_package(module_type, value)
+    except RuntimeError as exc:
+        if str(exc) == "nb-cli":
+            _fail(_("nb-cli is required for official store features"))
+        raise
+
+
+def _select_store_package(module_type: str, query: str | None = None) -> object:
+    try:
+        return prompt_select_store_package(
+            module_type,
+            _("choose package"),
+            query,
+        )
+    except RuntimeError as exc:
+        if str(exc) == "nb-cli":
+            _fail(_("nb-cli is required for official store features"))
+        if str(exc) == "empty-store":
+            _fail(_("no store packages found"))
+        _fail(str(exc))
+        raise
+    except Exception as exc:
+        if exc.__class__.__name__ == "CancelledError":
+            raise click.Abort from exc
+        raise
+
+
+def _ensure_plugin_can_be_removed(module_name: str) -> None:
+    if is_framework_protected_plugin_module(module_name):
+        _fail(
+            _("cannot remove protected plugin {module}: framework required").format(
+                module=module_name
+            )
+        )
+
+
+def _store_module_name(item: object) -> str:
+    return str(getattr(item, "module_name", "")).strip()
+
+
+def _store_project_link(item: object) -> str:
+    return str(getattr(item, "project_link", "")).strip()
+
+
+def _package_target(module_type: str, value: str) -> str:
+    package = _exact_store_package(module_type, value)
+    if package is None:
+        return value
+    project_link = _store_project_link(package)
+    return project_link or value
+
+
+def _resolve_plugin_module(
+    package: object | None,
+    module_name: str | None,
+) -> str:
+    if module_name:
+        return module_name.strip()
+    resolved = _store_module_name(package) if package is not None else ""
+    if resolved:
+        return resolved
+    _fail(_("plugin module name is required when package is not from store"))
+    return ""
+
+
+def _resolve_adapter_module(
+    package: object | None,
+    module_name: str | None,
+) -> str:
+    if module_name:
+        return module_name.strip()
+    resolved = _store_module_name(package) if package is not None else ""
+    if resolved:
+        return resolved
+    _fail(_("adapter module name is required when package is not from store"))
+    return ""
+
+
+def _resolve_driver_builtin(
+    package: object | None,
+    builtin_name: str | None,
+) -> str:
+    if builtin_name:
+        return builtin_name.strip()
+    resolved = _store_module_name(package) if package is not None else ""
+    if resolved:
+        return resolved
+    _fail(_("driver builtin name is required when package is not from store"))
+    return ""
+
+
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+def cli() -> None:
+    """Apeiria project tools."""
+
+
+@cli.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=_("Manage Apeiria project plugins."),
+)
+def plugin() -> None:
+    """Manage Apeiria project plugins."""
+
+
+@plugin.command(
+    "store",
+    help=_("Browse nonebot plugin store with interactive selection."),
+)
+@click.argument("query", required=False)
+def plugin_store(query: str | None) -> None:
+    item = _select_store_package("plugin", query)
+    _echo_store_packages([item])
+
+
+@cli.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=_("Manage Apeiria project adapters."),
+)
+def adapter() -> None:
+    """Manage Apeiria project adapters."""
+
+
+@adapter.command(
+    "store",
+    help=_("Browse nonebot adapter store with interactive selection."),
+)
+@click.argument("query", required=False)
+def adapter_store(query: str | None) -> None:
+    item = _select_store_package("adapter", query)
+    _echo_store_packages([item])
+
+
+@cli.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=_("Manage Apeiria project drivers."),
+)
+def driver() -> None:
+    """Manage Apeiria project drivers."""
+
+
+@driver.command(
+    "store",
+    help=_("Browse nonebot driver store with interactive selection."),
+)
+@click.argument("query", required=False)
+def driver_store(query: str | None) -> None:
+    item = _select_store_package("driver", query)
+    _echo_store_packages([item])
+
+
+@plugin.command(
+    "init",
+    help=_("Create apeiria.plugins.toml if it does not exist."),
+    hidden=True,
+)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def plugin_init(config_arg: str | None) -> None:
+    target = ensure_project_plugin_config(_config_path(config_arg))
+    click.echo(_("initialized: {target}").format(target=target))
+
+
+@plugin.command("list", help=_("List registered plugins or installed plugin packages."))
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("List installed plugin packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("List registered plugin config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("List official store packages.")
+)
+def plugin_list(
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_plugins()
+        return
+    if registered:
+        _echo_registered_plugins(_config_path(config_arg))
+        return
+    if use_store:
+        _echo_store_packages(_store_packages("plugin"))
+        return
+    _echo_registered_plugins(_config_path(config_arg))
+    click.echo()
+    _echo_installed_plugins()
+
+
+@plugin.command(
+    "search",
+    help=_("Search registered plugins or installed plugin packages."),
+    hidden=True,
+)
+@click.argument("query", required=False)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("Search installed plugin packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("Search registered plugin config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Search official store packages.")
+)
+def plugin_search(
+    query: str | None,
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_plugins(query)
+        return
+    if registered:
+        _echo_registered_plugins(_config_path(config_arg), query)
+        return
+    if use_store:
+        _echo_store_packages(_store_packages("plugin", query))
+        return
+    _echo_registered_plugins(_config_path(config_arg), query)
+    click.echo()
+    _echo_installed_plugins(query)
+
+
+@plugin.command(
+    "register",
+    help=_("Register a plugin module in apeiria.plugins.toml."),
+    hidden=True,
+)
+@click.argument("module_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def plugin_register(module_name: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_plugin_config(config_path)
+    add_project_plugin_module(module_name, config_path)
+    click.echo(_("registered module: {module}").format(module=module_name))
+    _echo_config(config_path)
+
+
+@plugin.command(
+    "unregister",
+    help=_("Remove a plugin module from apeiria.plugins.toml."),
+    hidden=True,
+)
+@click.argument("module_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def plugin_unregister(module_name: str, config_arg: str | None) -> None:
+    _ensure_plugin_can_be_removed(module_name)
+    config_path = _config_path(config_arg)
+    ensure_project_plugin_config(config_path)
+    remove_project_plugin_module(module_name, config_path)
+    click.echo(_("unregistered module: {module}").format(module=module_name))
+    _echo_config(config_path)
+
+
+@plugin.command(
+    "install",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Install a plugin package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Plugin module name to register when store metadata is unavailable."),
+)
+def plugin_install(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    module_name: str | None,
+) -> None:
+    package = (
+        _select_store_package("plugin", package_name)
+        if use_store or not package_name
+        else _exact_store_package("plugin", package_name)
+    )
+    target = package.as_dependency() if package else package_name
+    if not target:
+        _fail(_("package name is required"))
+    resolved_module = _resolve_plugin_module(package, module_name)
+    install_package(target, pip_args)
+    bind_project_plugin_package(target, resolved_module)
+    click.echo(_("installed package: {package}").format(package=target))
+
+
+@plugin.command("add", context_settings={"ignore_unknown_options": True}, hidden=True)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Plugin module name to register when store metadata is unavailable."),
+)
+def plugin_add(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    module_name: str | None,
+) -> None:
+    plugin_install(package_name, pip_args, use_store=use_store, module_name=module_name)
+
+
+@plugin.command(
+    "update",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Update a plugin package with current environment manager."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+def plugin_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_plugin_package_names(),
+    )
+    target = _package_target("plugin", selected_package)
+    update_package(target, pip_args)
+    click.echo(_("updated package: {package}").format(package=target))
+
+
+@plugin.command(
+    "uninstall",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Uninstall a plugin package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Plugin module name to unregister when package metadata is unavailable."),
+)
+def plugin_uninstall(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    module_name: str | None,
+) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_plugin_package_names(),
+    )
+    target = _package_target("plugin", selected_package)
+    registered_modules = get_project_plugin_package_modules(target)
+    if not registered_modules:
+        registered_module = module_name.strip() if module_name else ""
+        if not registered_module:
+            package = _exact_store_package("plugin", selected_package)
+            registered_module = (
+                _store_module_name(package) if package is not None else ""
+            )
+        if not registered_module:
+            _fail(_("plugin module name is required when package is not from store"))
+        registered_modules = [registered_module]
+    for registered_module in registered_modules:
+        _ensure_plugin_can_be_removed(registered_module)
+    uninstall_package(target, pip_args)
+    if get_project_plugin_package_modules(target):
+        unbind_project_plugin_package(target)
+    else:
+        for registered_module in registered_modules:
+            remove_project_plugin_module(registered_module)
+    click.echo(_("uninstalled package: {package}").format(package=target))
+
+
+@plugin.command(
+    "remove",
+    context_settings={"ignore_unknown_options": True},
+    hidden=True,
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Plugin module name to unregister when package metadata is unavailable."),
+)
+def plugin_remove(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    module_name: str | None,
+) -> None:
+    plugin_uninstall(package_name, pip_args, module_name)
+
+
+@plugin.command(
+    "add-dir",
+    help=_("Register a plugin directory in apeiria.plugins.toml."),
+    hidden=True,
+)
+@click.argument("directory")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def plugin_add_dir(directory: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_plugin_config(config_path)
+    add_project_plugin_dir(directory, config_path)
+    click.echo(_("added dir: {directory}").format(directory=directory))
+    _echo_config(config_path)
+
+
+@plugin.command(
+    "remove-dir",
+    help=_("Remove a plugin directory from apeiria.plugins.toml."),
+    hidden=True,
+)
+@click.argument("directory")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def plugin_remove_dir(directory: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_plugin_config(config_path)
+    remove_project_plugin_dir(directory, config_path)
+    click.echo(_("removed dir: {directory}").format(directory=directory))
+    _echo_config(config_path)
+
+
+@adapter.command(
+    "init",
+    help=_("Create apeiria.adapters.toml if it does not exist."),
+    hidden=True,
+)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def adapter_init(config_arg: str | None) -> None:
+    target = ensure_project_adapter_config(_config_path(config_arg))
+    click.echo(_("initialized: {target}").format(target=target))
+
+
+@adapter.command(
+    "list", help=_("List registered adapters or installed adapter packages.")
+)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("List installed adapter packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("List registered adapter config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("List official store packages.")
+)
+def adapter_list(
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_adapters()
+        return
+    if registered:
+        _echo_registered_adapters(_config_path(config_arg))
+        return
+    if use_store:
+        _echo_store_packages(_store_packages("adapter"))
+        return
+    _echo_registered_adapters(_config_path(config_arg))
+    click.echo()
+    _echo_installed_adapters()
+
+
+@adapter.command(
+    "search",
+    help=_("Search registered adapters or installed adapter packages."),
+    hidden=True,
+)
+@click.argument("query", required=False)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("Search installed adapter packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("Search registered adapter config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Search official store packages.")
+)
+def adapter_search(
+    query: str | None,
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_adapters(query)
+        return
+    if registered:
+        _echo_registered_adapters(_config_path(config_arg), query)
+        return
+    if use_store:
+        _echo_store_packages(_store_packages("adapter", query))
+        return
+    _echo_registered_adapters(_config_path(config_arg), query)
+    click.echo()
+    _echo_installed_adapters(query)
+
+
+@adapter.command(
+    "register",
+    help=_("Register an adapter module in apeiria.adapters.toml."),
+    hidden=True,
+)
+@click.argument("module_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def adapter_register(module_name: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_adapter_config(config_path)
+    add_project_adapter_module(module_name, config_path)
+    click.echo(_("registered module: {module}").format(module=module_name))
+    _echo_adapter_config(config_path)
+
+
+@adapter.command(
+    "unregister",
+    help=_("Remove an adapter module from apeiria.adapters.toml."),
+    hidden=True,
+)
+@click.argument("module_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def adapter_unregister(module_name: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_adapter_config(config_path)
+    remove_project_adapter_module(module_name, config_path)
+    click.echo(_("unregistered module: {module}").format(module=module_name))
+    _echo_adapter_config(config_path)
+
+
+@adapter.command(
+    "install",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Install an adapter package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Adapter module name to register when store metadata is unavailable."),
+)
+def adapter_install(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    module_name: str | None,
+) -> None:
+    package = (
+        _select_store_package("adapter", package_name)
+        if use_store or not package_name
+        else _exact_store_package("adapter", package_name)
+    )
+    target = package.as_dependency() if package else package_name
+    if not target:
+        _fail(_("package name is required"))
+    resolved_module = _resolve_adapter_module(package, module_name)
+    install_package(target, pip_args)
+    bind_project_adapter_package(target, resolved_module)
+    click.echo(_("installed package: {package}").format(package=target))
+
+
+@adapter.command("add", context_settings={"ignore_unknown_options": True}, hidden=True)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Adapter module name to register when store metadata is unavailable."),
+)
+def adapter_add(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    module_name: str | None,
+) -> None:
+    adapter_install(
+        package_name,
+        pip_args,
+        use_store=use_store,
+        module_name=module_name,
+    )
+
+
+@adapter.command(
+    "update",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Update an adapter package with current environment manager."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+def adapter_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_adapter_package_names(),
+    )
+    target = _package_target("adapter", selected_package)
+    update_package(target, pip_args)
+    click.echo(_("updated package: {package}").format(package=target))
+
+
+@adapter.command(
+    "uninstall",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Uninstall an adapter package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Adapter module name to unregister when package metadata is unavailable."),
+)
+def adapter_uninstall(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    module_name: str | None,
+) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_adapter_package_names(),
+    )
+    target = _package_target("adapter", selected_package)
+    registered_modules = get_project_adapter_package_modules(target)
+    if not registered_modules:
+        registered_module = module_name.strip() if module_name else ""
+        if not registered_module:
+            package = _exact_store_package("adapter", selected_package)
+            registered_module = (
+                _store_module_name(package) if package is not None else ""
+            )
+        if not registered_module:
+            _fail(_("adapter module name is required when package is not from store"))
+        registered_modules = [registered_module]
+    uninstall_package(target, pip_args)
+    if get_project_adapter_package_modules(target):
+        unbind_project_adapter_package(target)
+    else:
+        for registered_module in registered_modules:
+            remove_project_adapter_module(registered_module)
+    click.echo(_("uninstalled package: {package}").format(package=target))
+
+
+@adapter.command(
+    "remove",
+    context_settings={"ignore_unknown_options": True},
+    hidden=True,
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--module",
+    "module_name",
+    help=_("Adapter module name to unregister when package metadata is unavailable."),
+)
+def adapter_remove(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    module_name: str | None,
+) -> None:
+    adapter_uninstall(package_name, pip_args, module_name)
+
+
+@driver.command(
+    "init",
+    help=_("Create apeiria.drivers.toml if it does not exist."),
+    hidden=True,
+)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def driver_init(config_arg: str | None) -> None:
+    target = ensure_project_driver_config(_config_path(config_arg))
+    click.echo(_("initialized: {target}").format(target=target))
+
+
+@driver.command("list", help=_("List registered drivers or installed driver packages."))
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("List installed driver packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("List registered driver config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("List official store packages.")
+)
+def driver_list(
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_drivers()
+        return
+    if registered:
+        _echo_driver_config(_config_path(config_arg))
+        return
+    if use_store:
+        _echo_store_packages(_store_packages("driver"))
+        return
+    _echo_driver_config(_config_path(config_arg))
+    click.echo()
+    _echo_installed_drivers()
+
+
+@driver.command(
+    "search",
+    help=_("Search registered drivers or installed driver packages."),
+    hidden=True,
+)
+@click.argument("query", required=False)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+@click.option("--installed", is_flag=True, help=_("Search installed driver packages."))
+@click.option(
+    "--registered", is_flag=True, help=_("Search registered driver config only.")
+)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Search official store packages.")
+)
+def driver_search(
+    query: str | None,
+    config_arg: str | None,
+    *,
+    installed: bool,
+    registered: bool,
+    use_store: bool,
+) -> None:
+    if sum([installed, registered, use_store]) > 1:
+        _fail(_("--installed, --registered and --store cannot be used together"))
+    if installed:
+        _echo_installed_drivers(query)
+        return
+    if registered:
+        config = read_project_driver_config(_config_path(config_arg))
+    else:
+        config = read_project_driver_config(_config_path(config_arg))
+    if use_store:
+        _echo_store_packages(_store_packages("driver", query))
+        return
+    needle = (query or "").lower()
+    filtered_builtin = (
+        [item for item in config["builtin"] if needle in item.lower()]
+        if needle
+        else config["builtin"]
+    )
+    current_path = _current_config_path(
+        _config_path(config_arg),
+        default_driver_config_path(),
+    )
+    click.echo(_("config: {path}").format(path=current_path))
+    click.echo(_("builtin:"))
+    for item in filtered_builtin:
+        click.echo(f"  - {item}")
+    if not registered:
+        click.echo()
+        _echo_installed_drivers(query)
+
+
+@driver.command(
+    "install",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Install a driver package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--builtin",
+    "builtin_name",
+    help=_("Driver builtin name to register when store metadata is unavailable."),
+)
+def driver_install(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    builtin_name: str | None,
+) -> None:
+    package = (
+        _select_store_package("driver", package_name)
+        if use_store or not package_name
+        else _exact_store_package("driver", package_name)
+    )
+    target = package.as_dependency() if package else package_name
+    if not target:
+        _fail(_("package name is required"))
+    resolved_builtin = _resolve_driver_builtin(package, builtin_name)
+    install_package(target, pip_args)
+    bind_project_driver_package(target, resolved_builtin)
+    click.echo(_("installed package: {package}").format(package=target))
+
+
+@driver.command("add", context_settings={"ignore_unknown_options": True}, hidden=True)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--store", "use_store", is_flag=True, help=_("Choose from official store.")
+)
+@click.option(
+    "--builtin",
+    "builtin_name",
+    help=_("Driver builtin name to register when store metadata is unavailable."),
+)
+def driver_add(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    *,
+    use_store: bool,
+    builtin_name: str | None,
+) -> None:
+    driver_install(
+        package_name,
+        pip_args,
+        use_store=use_store,
+        builtin_name=builtin_name,
+    )
+
+
+@driver.command(
+    "update",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Update a driver package with current environment manager."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+def driver_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_driver_package_names(),
+    )
+    target = _package_target("driver", selected_package)
+    update_package(target, pip_args)
+    click.echo(_("updated package: {package}").format(package=target))
+
+
+@driver.command(
+    "uninstall",
+    context_settings={"ignore_unknown_options": True},
+    help=_("Uninstall a driver package."),
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--builtin",
+    "builtin_name",
+    help=_("Driver builtin name to unregister when package metadata is unavailable."),
+)
+def driver_uninstall(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    builtin_name: str | None,
+) -> None:
+    selected_package = package_name or _prompt_package_name(
+        _("choose package"),
+        _installed_driver_package_names(),
+    )
+    target = _package_target("driver", selected_package)
+    registered_builtin = get_project_driver_package_builtin(target)
+    if not registered_builtin:
+        resolved_builtin = builtin_name.strip() if builtin_name else ""
+        if not resolved_builtin:
+            package = _exact_store_package("driver", selected_package)
+            resolved_builtin = (
+                _store_module_name(package) if package is not None else ""
+            )
+        if not resolved_builtin:
+            _fail(_("driver builtin name is required when package is not from store"))
+        registered_builtin = [resolved_builtin]
+    uninstall_package(target, pip_args)
+    if get_project_driver_package_builtin(target):
+        unbind_project_driver_package(target)
+    else:
+        for item in registered_builtin:
+            remove_project_driver_builtin(item)
+    click.echo(_("uninstalled package: {package}").format(package=target))
+
+
+@driver.command(
+    "remove",
+    context_settings={"ignore_unknown_options": True},
+    hidden=True,
+)
+@click.argument("package_name", required=False)
+@click.argument("pip_args", nargs=-1)
+@click.option(
+    "--builtin",
+    "builtin_name",
+    help=_("Driver builtin name to unregister when package metadata is unavailable."),
+)
+def driver_remove(
+    package_name: str | None,
+    pip_args: tuple[str, ...],
+    builtin_name: str | None,
+) -> None:
+    driver_uninstall(package_name, pip_args, builtin_name)
+
+
+@driver.command(
+    "register",
+    help=_("Register a built-in driver entry in apeiria.drivers.toml."),
+    hidden=True,
+)
+@click.argument("builtin_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def driver_register(builtin_name: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_driver_config(config_path)
+    add_project_driver_builtin(builtin_name, config_path)
+    click.echo(_("registered builtin: {builtin}").format(builtin=builtin_name))
+    _echo_driver_config(config_path)
+
+
+@driver.command(
+    "unregister",
+    help=_("Remove a built-in driver entry from apeiria.drivers.toml."),
+    hidden=True,
+)
+@click.argument("builtin_name")
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def driver_unregister(builtin_name: str, config_arg: str | None) -> None:
+    config_path = _config_path(config_arg)
+    ensure_project_driver_config(config_path)
+    remove_project_driver_builtin(builtin_name, config_path)
+    click.echo(_("unregistered builtin: {builtin}").format(builtin=builtin_name))
+    _echo_driver_config(config_path)
+
+
+@driver.command(
+    "show",
+    help=_("Show effective NoneBot init kwargs generated from apeiria.drivers.toml."),
+)
+@click.option("--config", "config_arg", type=click.Path(dir_okay=False))
+def driver_show(config_arg: str | None) -> None:
+    kwargs = get_project_driver_kwargs(_config_path(config_arg))
+    if not kwargs:
+        click.echo("{}")
+        return
+    for key, value in kwargs.items():
+        click.echo(f"{key}={value}")
+
+
+def main() -> None:
+    cli(prog_name="apeiria")
+
+
+if __name__ == "__main__":
+    main()

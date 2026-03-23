@@ -32,6 +32,13 @@ web_ui:
   plugins:
     not_found: "插件不存在"
     protected: "该插件不可禁用：{reason}"
+    framework_required: "框架依赖"
+    package_required: "必须提供包名"
+    plugin_module_required: "非商店插件包必须提供插件模块名"
+    adapter_module_required: "非商店适配器包必须提供适配器模块名"
+    driver_builtin_required: "非商店驱动包必须提供驱动 builtin 名"
+    package_installed: "已安装包：{package}"
+    package_uninstalled: "已卸载包：{package}"
   sessions:
     owner_mismatch: "会话所属用户不匹配"
     not_found: "聊天会话不存在"
@@ -43,3 +50,5 @@ web_ui:
     build_success: "前端构建成功"
     ready: "Web UI 已就绪：{url}"
     password: "Web UI 密码：{password}"
+  dashboard:
+    restart_scheduled: "已安排重启"

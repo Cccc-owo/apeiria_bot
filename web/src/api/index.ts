@@ -15,8 +15,80 @@ export const getStatus = () =>
     adapters: string[]
   }>('/dashboard/status')
 
+export const restartBot = () =>
+  client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
+
 export const getPlugins = () =>
   client.get<any[]>('/plugins/')
+
+export const getPluginConfig = () =>
+  client.get<{
+    modules: Array<{
+      name: string
+      is_loaded: boolean
+      is_importable: boolean
+    }>
+    dirs: Array<{
+      path: string
+      exists: boolean
+      is_loaded: boolean
+    }>
+  }>('/plugins/config')
+
+export const getAdapterConfig = () =>
+  client.get<{
+    modules: Array<{
+      name: string
+      is_loaded: boolean
+      is_importable: boolean
+    }>
+  }>('/plugins/adapters/config')
+
+export const updateAdapterConfig = (payload: {
+  modules: string[]
+}) =>
+  client.patch<{
+    modules: Array<{
+      name: string
+      is_loaded: boolean
+      is_importable: boolean
+    }>
+  }>('/plugins/adapters/config', payload)
+
+export const getDriverConfig = () =>
+  client.get<{
+    builtin: Array<{
+      name: string
+      is_active: boolean
+    }>
+  }>('/plugins/drivers/config')
+
+export const updateDriverConfig = (payload: {
+  builtin: string[]
+}) =>
+  client.patch<{
+    builtin: Array<{
+      name: string
+      is_active: boolean
+    }>
+  }>('/plugins/drivers/config', payload)
+
+export const updatePluginConfig = (payload: {
+  modules: string[]
+  dirs: string[]
+}) =>
+  client.patch<{
+    modules: Array<{
+      name: string
+      is_loaded: boolean
+      is_importable: boolean
+    }>
+    dirs: Array<{
+      path: string
+      exists: boolean
+      is_loaded: boolean
+    }>
+  }>('/plugins/config', payload)
 
 export const updatePlugin = (moduleName: string, enabled: boolean) =>
   client.patch(`/plugins/${moduleName}`, null, {

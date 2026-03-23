@@ -9,8 +9,29 @@
       {{ errorMessage }}
     </v-alert>
 
+    <div class="d-flex flex-wrap ga-3">
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('groups.totalCount') }}</div>
+        <div class="text-h5 font-weight-bold">{{ groups.length }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('groups.enabledCount') }}</div>
+        <div class="text-h5 font-weight-bold">{{ enabledGroupsCount }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('groups.customizedCount') }}</div>
+        <div class="text-h5 font-weight-bold">{{ customizedGroupsCount }}</div>
+      </v-sheet>
+    </div>
+
     <v-card>
       <v-data-table :headers="headers" :items="groups" :loading="loading" density="comfortable">
+        <template #item.group_name="{ item }">
+          <div class="d-flex flex-column py-2">
+            <span class="font-weight-medium">{{ item.group_name || t('groups.unnamed') }}</span>
+            <span class="text-caption text-medium-emphasis">{{ item.group_id }}</span>
+          </div>
+        </template>
         <template #item.bot_status="{ item }">
           <v-switch
             :model-value="item.bot_status"
@@ -22,13 +43,13 @@
           />
         </template>
         <template #item.disabled_plugins="{ value }">
-          <span v-if="value.length === 0" class="text-grey">{{ t('common.none') }}</span>
-          <v-chip v-for="plugin in value" :key="plugin" size="x-small" class="mr-1" color="warning">
+          <span v-if="value.length === 0" class="text-medium-emphasis">{{ t('common.none') }}</span>
+          <v-chip v-for="plugin in value" :key="plugin" size="x-small" class="mr-1 mb-1" color="warning" variant="tonal">
             {{ plugin }}
           </v-chip>
         </template>
         <template #item.actions="{ item }">
-          <v-btn size="small" variant="text" color="primary" @click="openPluginDialog(item)">
+          <v-btn size="small" variant="tonal" color="primary" @click="openPluginDialog(item)">
             {{ t('groups.settings') }}
           </v-btn>
         </template>
@@ -102,12 +123,14 @@ const noticeStore = useNoticeStore()
 const { t } = useI18n()
 
 const headers = computed(() => [
-  { title: t('groups.id'), key: 'group_id' },
   { title: t('groups.name'), key: 'group_name' },
   { title: t('groups.botStatus'), key: 'bot_status', sortable: false },
   { title: t('groups.disabledPluginsHeader'), key: 'disabled_plugins', sortable: false },
   { title: t('groups.actions'), key: 'actions', sortable: false },
 ])
+
+const enabledGroupsCount = computed(() => groups.value.filter((item) => item.bot_status).length)
+const customizedGroupsCount = computed(() => groups.value.filter((item) => item.disabled_plugins.length > 0).length)
 
 async function loadGroups() {
   loading.value = true
@@ -182,3 +205,10 @@ onMounted(() => {
   void loadGroups()
 })
 </script>
+
+<style scoped>
+.summary-card {
+  min-width: 168px;
+  padding: 16px 18px;
+}
+</style>

@@ -14,7 +14,7 @@ const routes = [
     children: [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { titleKey: 'dashboard.title' } },
-      { path: 'plugins', name: 'plugins', component: () => import('@/views/PluginsView.vue'), meta: { titleKey: 'plugins.title' } },
+      { path: 'core', name: 'core', component: () => import('@/views/PluginsView.vue'), meta: { titleKey: 'plugins.title' } },
       { path: 'permissions', name: 'permissions', component: () => import('@/views/PermissionsView.vue'), meta: { titleKey: 'permissions.title' } },
       { path: 'groups', name: 'groups', component: () => import('@/views/GroupsView.vue'), meta: { titleKey: 'groups.title' } },
       { path: 'logs', name: 'logs', component: () => import('@/views/LogsView.vue'), meta: { titleKey: 'logs.title' } },
