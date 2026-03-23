@@ -32,6 +32,13 @@ web_ui:
   plugins:
     not_found: "Plugin not found"
     protected: "This plugin cannot be disabled: {reason}"
+    framework_required: "framework required"
+    package_required: "Package name is required"
+    plugin_module_required: "Plugin module name is required for non-store packages"
+    adapter_module_required: "Adapter module name is required for non-store packages"
+    driver_builtin_required: "Driver builtin name is required for non-store packages"
+    package_installed: "Installed package: {package}"
+    package_uninstalled: "Uninstalled package: {package}"
   sessions:
     owner_mismatch: "Session owner mismatch"
     not_found: "Chat session not found"
@@ -43,3 +50,5 @@ web_ui:
     build_success: "Frontend built successfully"
     ready: "Web UI ready at {url}"
     password: "Web UI password: {password}"
+  dashboard:
+    restart_scheduled: "Restart scheduled"

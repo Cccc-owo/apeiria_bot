@@ -3,6 +3,9 @@
     <div class="d-flex align-center flex-wrap ga-3">
       <h1 class="text-h4">{{ t('data.title') }}</h1>
       <v-spacer />
+      <v-btn variant="tonal" :loading="loading" @click="loadRecords">
+        {{ t('common.refresh') }}
+      </v-btn>
       <v-select
         v-model="selectedTable"
         :items="tableOptions"
@@ -20,22 +23,20 @@
       {{ errorMessage }}
     </v-alert>
 
-    <v-card>
-      <v-card-text class="d-flex align-center flex-wrap ga-4">
-        <div>
-          <div class="text-caption text-medium-emphasis">{{ t('data.currentTable') }}</div>
-          <div class="text-subtitle-1">{{ selectedTableLabel || t('data.notSelected') }}</div>
-        </div>
-        <div>
-          <div class="text-caption text-medium-emphasis">{{ t('data.total') }}</div>
-          <div class="text-subtitle-1">{{ total }}</div>
-        </div>
-        <div>
-          <div class="text-caption text-medium-emphasis">{{ t('data.pageSize') }}</div>
-          <div class="text-subtitle-1">{{ pageSize }}</div>
-        </div>
-      </v-card-text>
-    </v-card>
+    <div class="d-flex flex-wrap ga-3">
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('data.currentTable') }}</div>
+        <div class="text-subtitle-1 font-weight-medium">{{ selectedTableLabel || t('data.notSelected') }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('data.total') }}</div>
+        <div class="text-h5 font-weight-bold">{{ total }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg" border>
+        <div class="text-caption text-medium-emphasis">{{ t('data.pageSize') }}</div>
+        <div class="text-h5 font-weight-bold">{{ pageSize }}</div>
+      </v-sheet>
+    </div>
 
     <v-card>
       <v-data-table-server
@@ -50,10 +51,15 @@
         :items-per-page-text="t('data.itemsPerPage')"
         @update:options="handleOptionsChange"
       >
+        <template #no-data>
+          <div class="py-8 text-body-2 text-medium-emphasis text-center">
+            {{ t('data.empty') }}
+          </div>
+        </template>
         <template #item.actions="{ item }">
           <v-btn
             size="small"
-            variant="text"
+            variant="tonal"
             color="primary"
             @click="openRecordDialog(item)"
           >
@@ -70,7 +76,7 @@
               <template v-if="String(column.key) === 'actions'">
                 <v-btn
                   size="small"
-                  variant="text"
+                  variant="tonal"
                   color="primary"
                   @click="openRecordDialog(item)"
                 >
@@ -387,6 +393,11 @@ onMounted(async () => {
 .data-table-select {
   max-width: 240px;
   min-width: 220px;
+}
+
+.summary-card {
+  min-width: 180px;
+  padding: 16px 18px;
 }
 
 .data-cell {

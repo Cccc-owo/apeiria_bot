@@ -142,6 +142,10 @@ dmypy.json
 
 # Bot runtime data
 data/
+user_bot.py
+apeiria.plugins.toml
+apeiria.adapters.toml
+apeiria.drivers.toml
 
 # Frontend artifacts
 web/dist/

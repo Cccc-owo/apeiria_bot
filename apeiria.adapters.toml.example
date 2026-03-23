@@ -1,0 +1,8 @@
+[adapters]
+modules = []
+
+# Example:
+# Adapters registered directly in user_bot.py do not need to be declared here.
+# modules = ["nonebot.adapters.onebot.v11"]
+# [adapter_packages]
+# "nonebot-adapter-onebot" = ["nonebot.adapters.onebot.v11"]

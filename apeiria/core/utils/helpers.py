@@ -12,17 +12,8 @@ import nonebot
 
 from apeiria.core.configs.models import PluginExtraData
 from apeiria.core.i18n import t
+from apeiria.core.plugin_policy import is_framework_protected_plugin_module
 
-FRAMEWORK_REQUIRED_PLUGIN_MODULES = frozenset(
-    {
-        "web_ui",
-        "nonebot_plugin_orm",
-        "nonebot_plugin_alconna",
-        "nonebot_plugin_localstore",
-        "nonebot_plugin_htmlkit",
-        "nonebot_plugin_apscheduler",
-    }
-)
 OFFICIAL_PLUGIN_ROOT = (Path(__file__).resolve().parents[2] / "plugins").resolve()
 CUSTOM_PLUGIN_ROOT = (Path(__file__).resolve().parents[3] / "local_plugins").resolve()
 
@@ -86,9 +77,9 @@ def get_plugin_source(plugin: Plugin) -> str:
             if CUSTOM_PLUGIN_ROOT in resolved.parents:
                 return "custom"
 
-    if plugin.module_name.startswith("nonebot_plugin_"):
+    if is_framework_protected_plugin_module(plugin.module_name):
         return "framework"
-    if plugin.module_name == "echo":
+    if plugin.module_name in {"echo", "nonebot.plugins.echo"}:
         return "builtin"
     return "external"
 
@@ -96,7 +87,7 @@ def get_plugin_source(plugin: Plugin) -> str:
 def get_plugin_protection_reason(module_name: str) -> str | None:
     """Return human-readable reason when a plugin should not be disabled."""
     reasons: list[str] = []
-    if module_name in FRAMEWORK_REQUIRED_PLUGIN_MODULES:
+    if is_framework_protected_plugin_module(module_name):
         reasons.append(t("common.framework_required"))
 
     dependents = get_plugin_dependents(module_name)

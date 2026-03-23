@@ -2,14 +2,32 @@
   <div class="d-flex flex-column ga-6">
     <div class="d-flex align-center justify-space-between flex-wrap ga-3">
       <h1 class="text-h4">{{ t('dashboard.title') }}</h1>
-      <v-btn variant="tonal" :loading="loading" @click="loadStatus">{{ t('common.refresh') }}</v-btn>
+      <div class="d-flex flex-wrap ga-2">
+        <v-btn color="warning" variant="tonal" :loading="restarting" @click="handleRestart">
+          {{ t('dashboard.restart') }}
+        </v-btn>
+        <v-btn variant="tonal" :loading="loading" @click="loadStatus">{{ t('common.refresh') }}</v-btn>
+      </div>
     </div>
+
+    <v-alert
+      v-if="status"
+      type="info"
+      variant="tonal"
+      density="comfortable"
+    >
+      {{ t('dashboard.summary', {
+        plugins: status.plugins_count,
+        adapters: status.adapters.length,
+        groups: status.groups_count,
+      }) }}
+    </v-alert>
 
     <v-row>
       <v-col cols="12" sm="6" md="3">
         <v-card>
           <v-card-text class="d-flex align-center">
-            <v-icon size="48" color="success" class="mr-4">mdi-check-circle</v-icon>
+            <v-icon size="48" :color="statusColor" class="mr-4">{{ statusIcon }}</v-icon>
             <div>
               <div class="text-overline">{{ t('dashboard.status') }}</div>
               <div class="text-h5">{{ status?.status || '...' }}</div>
@@ -55,6 +73,23 @@
       </v-col>
     </v-row>
 
+    <v-card v-if="status?.adapters?.length" variant="outlined">
+      <v-card-text class="d-flex flex-column ga-3">
+        <div class="text-subtitle-2 font-weight-medium">{{ t('dashboard.adapterList') }}</div>
+        <div class="d-flex flex-wrap ga-2">
+          <v-chip
+            v-for="adapter in status.adapters"
+            :key="adapter"
+            size="small"
+            variant="tonal"
+            color="info"
+          >
+            {{ adapter }}
+          </v-chip>
+        </div>
+      </v-card-text>
+    </v-card>
+
     <v-row>
       <v-col cols="12" sm="6" md="3">
         <v-card variant="outlined">
@@ -96,9 +131,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getStatus } from '@/api'
+import { getStatus, restartBot } from '@/api'
+import { useNoticeStore } from '@/stores/notice'
 
 interface DashboardStatus {
   status: string
@@ -113,7 +149,12 @@ interface DashboardStatus {
 
 const status = ref<DashboardStatus | null>(null)
 const loading = ref(false)
+const restarting = ref(false)
 const { t } = useI18n()
+const noticeStore = useNoticeStore()
+
+const statusColor = computed(() => status.value?.status === 'running' ? 'success' : 'warning')
+const statusIcon = computed(() => status.value?.status === 'running' ? 'mdi-check-circle' : 'mdi-alert-circle')
 
 async function loadStatus() {
   loading.value = true
@@ -122,6 +163,20 @@ async function loadStatus() {
     status.value = res.data
   } finally {
     loading.value = false
+  }
+}
+
+async function handleRestart() {
+  if (!window.confirm(t('dashboard.restartConfirm'))) return
+  restarting.value = true
+  try {
+    const res = await restartBot()
+    noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : t('dashboard.restartFailed')
+    noticeStore.show(message, 'error')
+  } finally {
+    restarting.value = false
   }
 }
 

@@ -16,6 +16,17 @@
 
     <v-tabs-window v-model="tab">
       <v-tabs-window-item value="bans">
+        <div class="d-flex flex-wrap ga-3 mb-4">
+          <v-sheet class="summary-card" rounded="lg" border>
+            <div class="text-caption text-medium-emphasis">{{ t('permissions.totalBans') }}</div>
+            <div class="text-h5 font-weight-bold">{{ bans.length }}</div>
+          </v-sheet>
+          <v-sheet class="summary-card" rounded="lg" border>
+            <div class="text-caption text-medium-emphasis">{{ t('permissions.permanentBans') }}</div>
+            <div class="text-h5 font-weight-bold">{{ permanentBansCount }}</div>
+          </v-sheet>
+        </div>
+
         <v-card class="mb-4">
           <v-card-title>{{ t('permissions.createBanTitle') }}</v-card-title>
           <v-card-text class="d-flex flex-wrap ga-3">
@@ -60,6 +71,12 @@
 
         <v-card>
           <v-data-table :headers="banHeaders" :items="bans" :loading="loading" density="comfortable">
+            <template #item.user_id="{ item }">
+              <span>{{ item.user_id || t('common.none') }}</span>
+            </template>
+            <template #item.group_id="{ item }">
+              <span>{{ item.group_id || t('common.none') }}</span>
+            </template>
             <template #item.duration="{ value }">
               {{ value === 0 ? t('permissions.permanent') : `${value}s` }}
             </template>
@@ -78,6 +95,13 @@
       </v-tabs-window-item>
 
       <v-tabs-window-item value="users">
+        <div class="d-flex flex-wrap ga-3 mb-4">
+          <v-sheet class="summary-card" rounded="lg" border>
+            <div class="text-caption text-medium-emphasis">{{ t('permissions.totalUsers') }}</div>
+            <div class="text-h5 font-weight-bold">{{ users.length }}</div>
+          </v-sheet>
+        </div>
+
         <v-card>
           <v-data-table :headers="userHeaders" :items="users" :loading="loading" density="comfortable">
             <template #item.level="{ item }">
@@ -159,6 +183,8 @@ const userHeaders = computed(() => [
   { title: t('permissions.group'), key: 'group_id' },
   { title: t('permissions.level'), key: 'level', sortable: false },
 ])
+
+const permanentBansCount = computed(() => bans.value.filter((item) => item.duration === 0).length)
 
 async function loadAll() {
   loading.value = true
@@ -251,6 +277,11 @@ onMounted(() => {
 .permission-field {
   min-width: 180px;
   max-width: 240px;
+}
+
+.summary-card {
+  min-width: 168px;
+  padding: 16px 18px;
 }
 
 .permission-field--wide {
