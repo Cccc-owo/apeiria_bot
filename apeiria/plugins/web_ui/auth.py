@@ -9,9 +9,9 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from apeiria.core.configs.config import bot_config
 from apeiria.core.i18n import t
 
+from .config import get_web_ui_config
 from .secrets import get_token_secret
 
 _security = HTTPBearer()
@@ -19,9 +19,10 @@ _security = HTTPBearer()
 
 def create_token(data: dict[str, Any] | None = None) -> str:
     """Create a JWT token."""
+    web_ui_config = get_web_ui_config()
     payload = {
         "exp": datetime.now(timezone.utc)
-        + timedelta(days=bot_config.web_ui_token_expire_days),
+        + timedelta(days=web_ui_config.token_expire_days),
         "iat": datetime.now(timezone.utc),
         "sub": "webui",
         **(data or {}),

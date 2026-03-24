@@ -1,5 +1,56 @@
 import client from './client'
 
+export interface SettingsFieldItem {
+  key: string
+  type: string
+  editor: string
+  item_type: string | null
+  key_type: string | null
+  default: unknown
+  help: string
+  choices: unknown[]
+  current_value: unknown
+  local_value: unknown
+  value_source: string
+  global_key: string | null
+  has_local_override: boolean
+  allows_null: boolean
+  editable: boolean
+  type_category: string
+}
+
+export interface SettingsResponse {
+  module_name: string
+  section: string
+  legacy_flatten: boolean
+  config_source: string
+  has_config_model: boolean
+  fields: SettingsFieldItem[]
+}
+
+export interface RawSettingsResponse {
+  module_name: string
+  section: string
+  text: string
+}
+
+export interface ModuleConfigItem {
+  name: string
+  is_loaded: boolean
+  is_importable: boolean
+}
+
+export interface DirConfigItem {
+  path: string
+  exists: boolean
+  is_loaded: boolean
+}
+
+export interface DriverConfigItem {
+  name: string
+  is_active: boolean
+}
+
 export const login = (password: string) =>
   client.post<{ token: string }>('/auth/login', { password })
 
@@ -21,73 +72,67 @@ export const restartBot = () =>
 export const getPlugins = () =>
   client.get<any[]>('/plugins/')
 
+export const getCoreSettings = () =>
+  client.get<SettingsResponse>('/plugins/core/settings')
+
+export const getCoreSettingsRaw = () =>
+  client.get<RawSettingsResponse>('/plugins/core/settings/raw')
+
+export const updateCoreSettings = (payload: {
+  values: Record<string, unknown>
+  clear?: string[]
+}) =>
+  client.patch<SettingsResponse>('/plugins/core/settings', payload)
+
+export const updateCoreSettingsRaw = (payload: { text: string }) =>
+  client.patch<RawSettingsResponse>('/plugins/core/settings/raw', payload)
+
+export const getPluginSettings = (moduleName: string) =>
+  client.get<SettingsResponse>(`/plugins/${moduleName}/settings`)
+
+export const getPluginSettingsRaw = (moduleName: string) =>
+  client.get<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`)
+
+export const updatePluginSettings = (
+  moduleName: string,
+  payload: {
+    values: Record<string, unknown>
+    clear?: string[]
+  },
+) =>
+  client.patch<SettingsResponse>(`/plugins/${moduleName}/settings`, payload)
+
+export const updatePluginSettingsRaw = (
+  moduleName: string,
+  payload: { text: string },
+) =>
+  client.patch<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`, payload)
+
 export const getPluginConfig = () =>
   client.get<{
-    modules: Array<{
-      name: string
-      is_loaded: boolean
-      is_importable: boolean
-    }>
-    dirs: Array<{
-      path: string
-      exists: boolean
-      is_loaded: boolean
-    }>
+    modules: ModuleConfigItem[]
+    dirs: DirConfigItem[]
   }>('/plugins/config')
 
 export const getAdapterConfig = () =>
-  client.get<{
-    modules: Array<{
-      name: string
-      is_loaded: boolean
-      is_importable: boolean
-    }>
-  }>('/plugins/adapters/config')
+  client.get<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config')
 
-export const updateAdapterConfig = (payload: {
-  modules: string[]
-}) =>
-  client.patch<{
-    modules: Array<{
-      name: string
-      is_loaded: boolean
-      is_importable: boolean
-    }>
-  }>('/plugins/adapters/config', payload)
+export const updateAdapterConfig = (payload: { modules: string[] }) =>
+  client.patch<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config', payload)
 
 export const getDriverConfig = () =>
-  client.get<{
-    builtin: Array<{
-      name: string
-      is_active: boolean
-    }>
-  }>('/plugins/drivers/config')
+  client.get<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config')
 
-export const updateDriverConfig = (payload: {
-  builtin: string[]
-}) =>
-  client.patch<{
-    builtin: Array<{
-      name: string
-      is_active: boolean
-    }>
-  }>('/plugins/drivers/config', payload)
+export const updateDriverConfig = (payload: { builtin: string[] }) =>
+  client.patch<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config', payload)
 
 export const updatePluginConfig = (payload: {
   modules: string[]
   dirs: string[]
 }) =>
   client.patch<{
-    modules: Array<{
-      name: string
-      is_loaded: boolean
-      is_importable: boolean
-    }>
-    dirs: Array<{
-      path: string
-      exists: boolean
-      is_loaded: boolean
-    }>
+    modules: ModuleConfigItem[]
+    dirs: DirConfigItem[]
   }>('/plugins/config', payload)
 
 export const updatePlugin = (moduleName: string, enabled: boolean) =>

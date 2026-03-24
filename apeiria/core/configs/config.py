@@ -12,14 +12,11 @@ class BotConfig(BaseModel):
     """Extended bot configuration.
 
     Loaded via nonebot.get_plugin_config(BotConfig).
-    Values can be set in .env / .env.dev / .env.prod files.
+    Values are expected to come from apeiria.config.toml [nonebot].
     """
 
     # Error handling
     error_message: str = "common.error"
-
-    # Web UI
-    web_ui_token_expire_days: int = 7
 
     # Rate limiting (default: per-user per-command)
     rate_limit_default: int = 5  # Max calls per window

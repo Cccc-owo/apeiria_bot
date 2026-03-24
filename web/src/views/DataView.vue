@@ -179,6 +179,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getDataRecord, getDataRecords, getDataTables, updateDataRecord } from '@/api'
+import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 interface DataTableInfo {
@@ -292,7 +293,7 @@ async function loadRecords() {
     rows.value = response.data.items
     total.value = response.data.total
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('data.loadFailed')
+    errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -320,7 +321,7 @@ async function openRecordDialog(row: Record<string, unknown>) {
         .map(([key, value]) => [key, Boolean(value)]),
     )
   } catch (error) {
-    dialogErrorMessage.value = error instanceof Error ? error.message : t('data.loadRecordFailed')
+    dialogErrorMessage.value = getErrorMessage(error, t('data.loadRecordFailed'))
   } finally {
     dialogLoading.value = false
   }
@@ -357,7 +358,7 @@ async function saveRecord() {
     await loadRecords()
     noticeStore.show(t('data.updated'), 'success')
   } catch (error) {
-    dialogErrorMessage.value = error instanceof Error ? error.message : t('data.saveFailed')
+    dialogErrorMessage.value = getErrorMessage(error, t('data.saveFailed'))
     noticeStore.show(dialogErrorMessage.value, 'error')
   } finally {
     savingRecord.value = false

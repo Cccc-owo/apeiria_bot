@@ -66,6 +66,11 @@ __all__ = [
     "PluginConfigRequest",
     "PluginConfigResponse",
     "PluginItem",
+    "PluginRawSettingsResponse",
+    "PluginSettingFieldItem",
+    "PluginSettingsRawUpdateRequest",
+    "PluginSettingsResponse",
+    "PluginSettingsUpdateRequest",
     "RawSegment",
     "ReplySegment",
     "SessionCreatePayload",
@@ -122,6 +127,49 @@ class OperationStatusResponse(BaseModel):
 class PluginConfigResponse(BaseModel):
     modules: list["PluginConfigModuleItem"]
     dirs: list["PluginConfigDirItem"]
+
+
+class PluginSettingFieldItem(BaseModel):
+    key: str
+    type: str
+    editor: str = "readonly"
+    item_type: str | None = None
+    key_type: str | None = None
+    default: object | None
+    help: str
+    choices: list[object] = []
+    current_value: object | None = None
+    local_value: object | None = None
+    value_source: str = "default"
+    global_key: str | None = None
+    has_local_override: bool = False
+    allows_null: bool = False
+    editable: bool = False
+    type_category: str = "unsupported"
+
+
+class PluginSettingsResponse(BaseModel):
+    module_name: str
+    section: str
+    legacy_flatten: bool = False
+    config_source: str = "none"
+    has_config_model: bool = False
+    fields: list[PluginSettingFieldItem]
+
+
+class PluginRawSettingsResponse(BaseModel):
+    module_name: str
+    section: str
+    text: str
+
+
+class PluginSettingsUpdateRequest(BaseModel):
+    values: dict[str, object | None]
+    clear: list[str] = []
+
+
+class PluginSettingsRawUpdateRequest(BaseModel):
+    text: str
 
 
 class PluginConfigRequest(BaseModel):

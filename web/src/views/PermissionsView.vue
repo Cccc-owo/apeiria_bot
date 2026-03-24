@@ -141,6 +141,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { createBan, deleteBan, getBans, getUsers, updateUserLevel } from '@/api'
+import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 interface BanRow {
@@ -201,7 +202,7 @@ async function loadAll() {
     bans.value = b.data
     users.value = u.data
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('permissions.loadFailed')
+    errorMessage.value = getErrorMessage(error, t('permissions.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -228,7 +229,7 @@ async function handleCreateBan() {
     banForm.reason = ''
     noticeStore.show(t('permissions.created'), 'success')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('permissions.createFailed')
+    errorMessage.value = getErrorMessage(error, t('permissions.createFailed'))
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     creatingBan.value = false
@@ -243,7 +244,7 @@ async function handleDeleteBan(id: number) {
     bans.value = bans.value.filter((item) => item.id !== id)
     noticeStore.show(t('permissions.deleted'), 'success')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('permissions.deleteFailed')
+    errorMessage.value = getErrorMessage(error, t('permissions.deleteFailed'))
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     deletingBanId.value = null
@@ -268,7 +269,7 @@ async function updateLevel(item: UserLevelRow, nextValue: unknown) {
     )
   } catch (error) {
     item.level = previous
-    errorMessage.value = error instanceof Error ? error.message : t('permissions.levelUpdateFailed')
+    errorMessage.value = getErrorMessage(error, t('permissions.levelUpdateFailed'))
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     pendingUserKey.value = ''
