@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import nonebot
 from fastapi import APIRouter, Depends, HTTPException
+from nonebot.config import Config, Env
 
+from apeiria.core.configs import configs_from_model
+from apeiria.core.configs.capabilities import (
+    coerce_config_value,
+    format_type_name,
+    get_field_capability,
+    normalize_choices_for_response,
+    normalize_value_for_response,
+)
+from apeiria.core.configs.config import BotConfig
+from apeiria.core.configs.plugin_config_resolver import resolve_plugin_declared_config
+from apeiria.core.configs.registry import get_registered_plugin_config
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import (
     get_plugin_name,
@@ -28,10 +41,29 @@ from apeiria.plugins.web_ui.models import (
     PluginConfigRequest,
     PluginConfigResponse,
     PluginItem,
+    PluginRawSettingsResponse,
+    PluginSettingFieldItem,
+    PluginSettingsRawUpdateRequest,
+    PluginSettingsResponse,
+    PluginSettingsUpdateRequest,
 )
 from apeiria.user_adapters import (
     read_project_adapter_config,
     write_project_adapter_config,
+)
+from apeiria.user_config import (
+    read_env_config,
+    read_project_config,
+    read_project_nonebot_section_config,
+    read_project_nonebot_section_toml,
+    read_project_plugin_section_toml,
+    write_project_nonebot_config,
+    write_project_nonebot_section_toml,
+    write_project_plugin_section_config,
+    write_project_plugin_section_toml,
+)
+from apeiria.user_config import (
+    read_project_plugin_config as read_project_plugin_section_config,
 )
 from apeiria.user_drivers import (
     read_project_driver_config,
@@ -43,7 +75,15 @@ from apeiria.user_plugins import (
     write_project_plugin_config,
 )
 
+if TYPE_CHECKING:
+    from apeiria.core.configs.models import RegisterConfig
+
 router = APIRouter()
+
+_CORE_SETTINGS_EXCLUDED_KEYS = {
+    "driver",
+    "environment",
+}
 
 
 def _loaded_plugin_modules() -> set[str]:
@@ -157,6 +197,226 @@ def _build_driver_config_items(builtin: list[str]) -> list[DriverConfigItem]:
     ]
 
 
+def _normalize_entries(values: list[str]) -> list[str]:
+    return sorted({item.strip() for item in values if item.strip()})
+
+
+def _get_plugin_declared_configs(
+    module_name: str,
+) -> tuple[str, bool, str, bool, list[RegisterConfig]]:
+    resolved = resolve_plugin_declared_config(module_name)
+    return (
+        resolved.section,
+        resolved.legacy_flatten,
+        resolved.source,
+        resolved.has_config_model,
+        resolved.configs,
+    )
+
+
+@dataclass(frozen=True)
+class FieldValueState:
+    current_value: object | None
+    local_value: object | None
+    value_source: str
+    global_key: str | None = None
+    has_local_override: bool = False
+
+
+@dataclass(frozen=True)
+class _PluginFieldContext:
+    plugin_config: dict[str, object]
+    effective_global_config: dict[str, object]
+    env_config: dict[str, object]
+    nonebot_section: dict[str, object]
+    legacy_flatten: bool
+    key_map: dict[str, str]
+
+
+def _build_plugin_field_state(
+    config: RegisterConfig,
+    ctx: _PluginFieldContext,
+) -> FieldValueState:
+    current_value: object | None = config.default
+    local_value: object | None = None
+    value_source = "default"
+    global_key = (
+        ctx.key_map.get(config.key, config.key)
+        if ctx.legacy_flatten
+        else None
+    )
+
+    if ctx.legacy_flatten and global_key:
+        if global_key in ctx.nonebot_section:
+            current_value = ctx.nonebot_section[global_key]
+            value_source = "legacy_global"
+        elif global_key in ctx.env_config:
+            current_value = ctx.env_config[global_key]
+            value_source = "env"
+        elif global_key in ctx.effective_global_config:
+            current_value = ctx.effective_global_config[global_key]
+            value_source = "legacy_global"
+    if config.key in ctx.plugin_config:
+        local_value = ctx.plugin_config[config.key]
+        current_value = ctx.plugin_config[config.key]
+        value_source = "plugin_section"
+
+    return FieldValueState(
+        current_value=current_value,
+        local_value=local_value,
+        value_source=value_source,
+        global_key=global_key,
+        has_local_override=config.key in ctx.plugin_config,
+    )
+
+
+def _build_core_field_state(
+    config: RegisterConfig,
+    env_config: dict[str, object],
+    effective_config: dict[str, object],
+    section_config: dict[str, object],
+) -> FieldValueState:
+    current_value: object | None = config.default
+    local_value: object | None = None
+    value_source = "default"
+
+    if config.key in env_config and env_config[config.key] != config.default:
+        current_value = env_config[config.key]
+        value_source = "env"
+    if config.key in section_config:
+        local_value = section_config[config.key]
+        current_value = section_config[config.key]
+        value_source = "plugin_section"
+    elif (
+        config.key in effective_config
+        and effective_config[config.key] != config.default
+    ):
+        current_value = effective_config[config.key]
+        value_source = "env"
+
+    return FieldValueState(
+        current_value=current_value,
+        local_value=local_value,
+        value_source=value_source,
+        has_local_override=config.key in section_config,
+    )
+
+
+def _build_plugin_setting_fields(
+    module_name: str,
+    section: str,
+    *,
+    legacy_flatten: bool,
+    configs: list[RegisterConfig],
+) -> list[PluginSettingFieldItem]:
+    registration = get_registered_plugin_config(module_name)
+    ctx = _PluginFieldContext(
+        plugin_config=read_project_plugin_section_config(section),
+        effective_global_config=read_project_config(),
+        env_config=read_env_config(),
+        nonebot_section=read_project_nonebot_section_config(),
+        legacy_flatten=legacy_flatten,
+        key_map=registration.key_map if registration is not None else {},
+    )
+    return [
+        _build_setting_field_item(
+            config,
+            _build_plugin_field_state(config, ctx),
+        )
+        for config in configs
+    ]
+
+
+def _build_core_setting_fields() -> list[PluginSettingFieldItem]:
+    effective_config = read_project_config()
+    env_config = read_env_config()
+    section_config = read_project_nonebot_section_config()
+    return [
+        _build_setting_field_item(
+            config,
+            _build_core_field_state(
+                config,
+                env_config,
+                effective_config,
+                section_config,
+            ),
+        )
+        for config in _build_core_declared_configs()
+    ]
+
+
+def _build_core_declared_configs() -> list[RegisterConfig]:
+    merged: dict[str, RegisterConfig] = {}
+    for model in (Env, Config, BotConfig):
+        for config in configs_from_model(model):
+            if config.key not in _CORE_SETTINGS_EXCLUDED_KEYS:
+                merged[config.key] = config
+    return list(merged.values())
+
+
+def _build_setting_field_item(
+    config: RegisterConfig,
+    state: FieldValueState,
+) -> PluginSettingFieldItem:
+    capability = get_field_capability(config)
+    return PluginSettingFieldItem(
+        key=config.key,
+        type=format_type_name(config.type) or "unknown",
+        editor=capability.editor,
+        item_type=format_type_name(config.item_type),
+        key_type=format_type_name(config.key_type),
+        default=normalize_value_for_response(config, config.default),
+        help=config.help,
+        choices=normalize_choices_for_response(list(config.choices)),
+        current_value=normalize_value_for_response(config, state.current_value),
+        local_value=normalize_value_for_response(config, state.local_value),
+        value_source=state.value_source,
+        global_key=state.global_key,
+        has_local_override=state.has_local_override,
+        allows_null=config.allows_null,
+        editable=capability.editable,
+        type_category=capability.category,
+    )
+
+def _validate_and_coerce_updates(
+    payload: PluginSettingsUpdateRequest,
+    configs: list[RegisterConfig],
+) -> dict[str, object | None]:
+    allowed_fields = {config.key: config for config in configs}
+    updates: dict[str, object | None] = {}
+    for key, value in payload.values.items():
+        config = allowed_fields.get(key)
+        if config is None:
+            raise HTTPException(status_code=400, detail=f"unknown field {key}")
+        updates[key] = coerce_config_value(config, value)
+    for key in payload.clear:
+        if key not in allowed_fields:
+            raise HTTPException(status_code=400, detail=f"unknown field {key}")
+        updates[key] = None
+    return updates
+
+
+def _update_config_with_packages(
+    current: dict[str, Any],
+    entries: list[str],
+    key: str,
+) -> dict[str, Any]:
+    normalized = _normalize_entries(entries)
+    config: dict[str, Any] = {
+        key: normalized,
+        "packages": {
+            package_name: [item for item in items if item in normalized]
+            for package_name, items in current["packages"].items()
+        },
+    }
+    config["packages"] = {
+        package_name: items
+        for package_name, items in config["packages"].items()
+        if items
+    }
+    return config
+
+
 @router.get("/adapters/config", response_model=AdapterConfigResponse)
 async def get_adapter_config(
     _: Annotated[Any, Depends(require_auth)],
@@ -173,18 +433,7 @@ async def update_adapter_config(
     _: Annotated[Any, Depends(require_auth)],
 ) -> AdapterConfigResponse:
     current = read_project_adapter_config()
-    config = {
-        "modules": sorted({item.strip() for item in payload.modules if item.strip()}),
-        "packages": {
-            package_name: [item for item in modules if item in payload.modules]
-            for package_name, modules in current["packages"].items()
-        },
-    }
-    config["packages"] = {
-        package_name: modules
-        for package_name, modules in config["packages"].items()
-        if modules
-    }
+    config = _update_config_with_packages(current, payload.modules, "modules")
     write_project_adapter_config(config)
     return AdapterConfigResponse(
         modules=_build_adapter_config_items(config["modules"]),
@@ -207,18 +456,7 @@ async def update_driver_config(
     _: Annotated[Any, Depends(require_auth)],
 ) -> DriverConfigResponse:
     current = read_project_driver_config()
-    config = {
-        "builtin": sorted({item.strip() for item in payload.builtin if item.strip()}),
-        "packages": {
-            package_name: [item for item in builtin if item in payload.builtin]
-            for package_name, builtin in current["packages"].items()
-        },
-    }
-    config["packages"] = {
-        package_name: builtin
-        for package_name, builtin in config["packages"].items()
-        if builtin
-    }
+    config = _update_config_with_packages(current, payload.builtin, "builtin")
     write_project_driver_config(config)
     return DriverConfigResponse(
         builtin=_build_driver_config_items(config["builtin"]),
@@ -236,17 +474,171 @@ async def get_plugin_config(
     )
 
 
+@router.get("/core/settings", response_model=PluginSettingsResponse)
+async def get_core_settings(
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginSettingsResponse:
+    return PluginSettingsResponse(
+        module_name="apeiria.core",
+        section="nonebot",
+        legacy_flatten=False,
+        config_source="built_in",
+        has_config_model=True,
+        fields=_build_core_setting_fields(),
+    )
+
+
+@router.get("/core/settings/raw", response_model=PluginRawSettingsResponse)
+async def get_core_settings_raw(
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginRawSettingsResponse:
+    return PluginRawSettingsResponse(
+        module_name="apeiria.core",
+        section="nonebot",
+        text=read_project_nonebot_section_toml(),
+    )
+
+
+@router.get("/{module_name}/settings", response_model=PluginSettingsResponse)
+async def get_plugin_settings(
+    module_name: str,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginSettingsResponse:
+    section, legacy_flatten, config_source, has_config_model, configs = (
+        _get_plugin_declared_configs(module_name)
+    )
+    return PluginSettingsResponse(
+        module_name=module_name,
+        section=section,
+        legacy_flatten=legacy_flatten,
+        config_source=config_source,
+        has_config_model=has_config_model,
+        fields=_build_plugin_setting_fields(
+            module_name,
+            section,
+            legacy_flatten=legacy_flatten,
+            configs=configs,
+        ),
+    )
+
+
+@router.get("/{module_name}/settings/raw", response_model=PluginRawSettingsResponse)
+async def get_plugin_settings_raw(
+    module_name: str,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginRawSettingsResponse:
+    section, _, _, _, _ = _get_plugin_declared_configs(module_name)
+    return PluginRawSettingsResponse(
+        module_name=module_name,
+        section=section,
+        text=read_project_plugin_section_toml(section),
+    )
+
+
+@router.patch("/core/settings", response_model=PluginSettingsResponse)
+async def update_core_settings(
+    payload: PluginSettingsUpdateRequest,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginSettingsResponse:
+    configs = _build_core_declared_configs()
+    updates = _validate_and_coerce_updates(payload, configs)
+
+    write_project_nonebot_config(updates)
+    return PluginSettingsResponse(
+        module_name="apeiria.core",
+        section="nonebot",
+        legacy_flatten=False,
+        config_source="built_in",
+        has_config_model=True,
+        fields=_build_core_setting_fields(),
+    )
+
+
+@router.patch("/core/settings/raw", response_model=PluginRawSettingsResponse)
+async def update_core_settings_raw(
+    payload: PluginSettingsRawUpdateRequest,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginRawSettingsResponse:
+    try:
+        write_project_nonebot_section_toml(payload.text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PluginRawSettingsResponse(
+        module_name="apeiria.core",
+        section="nonebot",
+        text=read_project_nonebot_section_toml(),
+    )
+
+
+@router.patch("/{module_name}/settings", response_model=PluginSettingsResponse)
+async def update_plugin_settings(
+    module_name: str,
+    payload: PluginSettingsUpdateRequest,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginSettingsResponse:
+    section, legacy_flatten, config_source, has_config_model, configs = (
+        _get_plugin_declared_configs(module_name)
+    )
+    if not has_config_model:
+        raise HTTPException(status_code=404, detail="plugin has no configurable fields")
+
+    updates = _validate_and_coerce_updates(payload, configs)
+
+    write_project_plugin_section_config(
+        section,
+        updates,
+        module_name=module_name,
+    )
+    return PluginSettingsResponse(
+        module_name=module_name,
+        section=section,
+        legacy_flatten=legacy_flatten,
+        config_source=config_source,
+        has_config_model=has_config_model,
+        fields=_build_plugin_setting_fields(
+            module_name,
+            section,
+            legacy_flatten=legacy_flatten,
+            configs=configs,
+        ),
+    )
+
+
+@router.patch("/{module_name}/settings/raw", response_model=PluginRawSettingsResponse)
+async def update_plugin_settings_raw(
+    module_name: str,
+    payload: PluginSettingsRawUpdateRequest,
+    _: Annotated[Any, Depends(require_auth)],
+) -> PluginRawSettingsResponse:
+    section, _, _, _, _ = _get_plugin_declared_configs(module_name)
+    try:
+        write_project_plugin_section_toml(
+            section,
+            payload.text,
+            module_name=module_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PluginRawSettingsResponse(
+        module_name=module_name,
+        section=section,
+        text=read_project_plugin_section_toml(section),
+    )
+
+
 @router.patch("/config", response_model=PluginConfigResponse)
 async def update_plugin_config(
     payload: PluginConfigRequest,
     _: Annotated[Any, Depends(require_auth)],
 ) -> PluginConfigResponse:
     current = read_project_plugin_config()
+    normalized_modules = _normalize_entries(payload.modules)
+    normalized_dirs = _normalize_entries(payload.dirs)
     config = {
-        "modules": sorted({item.strip() for item in payload.modules if item.strip()}),
-        "dirs": sorted({item.strip() for item in payload.dirs if item.strip()}),
+        "modules": normalized_modules,
+        "dirs": normalized_dirs,
         "packages": {
-            package_name: [item for item in modules if item in payload.modules]
+            package_name: [item for item in modules if item in normalized_modules]
             for package_name, modules in current["packages"].items()
         },
     }

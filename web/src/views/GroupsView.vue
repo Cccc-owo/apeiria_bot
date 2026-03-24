@@ -94,6 +94,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getGroups, getPlugins, updateGroup, updateGroupPlugins } from '@/api'
+import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 interface GroupRow {
@@ -150,7 +151,7 @@ async function loadGroups() {
         value: item.module_name,
       }))
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('groups.loadFailed')
+    errorMessage.value = getErrorMessage(error, t('groups.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -173,7 +174,7 @@ async function toggleGroupStatus(item: GroupRow, nextValue: boolean | null) {
     )
   } catch (error) {
     item.bot_status = previous
-    errorMessage.value = error instanceof Error ? error.message : t('groups.updateFailed')
+    errorMessage.value = getErrorMessage(error, t('groups.updateFailed'))
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     pendingGroupId.value = ''
@@ -199,7 +200,7 @@ async function saveGroupPlugins() {
       'success',
     )
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t('groups.settingsSaveFailed')
+    errorMessage.value = getErrorMessage(error, t('groups.settingsSaveFailed'))
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     savingPlugins.value = false

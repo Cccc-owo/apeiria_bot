@@ -24,4 +24,46 @@ client.interceptors.response.use(
   },
 )
 
+function joinValidationErrors(detail: unknown) {
+  if (!Array.isArray(detail)) return ''
+  const messages = detail
+    .map((item) => {
+      if (!item || typeof item !== 'object') return ''
+      const entry = item as { loc?: unknown; msg?: unknown }
+      const path = Array.isArray(entry.loc) ? entry.loc.join('.') : ''
+      const message = typeof entry.msg === 'string' ? entry.msg : ''
+      if (!message) return ''
+      return path ? `${path}: ${message}` : message
+    })
+    .filter(Boolean)
+  return messages.join('\n')
+}
+
+export function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data
+    if (typeof data === 'string' && data.trim()) {
+      return data
+    }
+    if (data && typeof data === 'object') {
+      const detail = (data as { detail?: unknown }).detail
+      if (typeof detail === 'string' && detail.trim()) {
+        return detail
+      }
+      const validationMessage = joinValidationErrors(detail)
+      if (validationMessage) {
+        return validationMessage
+      }
+      const message = (data as { message?: unknown }).message
+      if (typeof message === 'string' && message.trim()) {
+        return message
+      }
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return fallback
+}
+
 export default client

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from nonebot.plugin import PluginMetadata
 
-from apeiria.core.configs.models import PluginExtraData, PluginType
+from apeiria.core.configs.models import PluginExtraData, PluginType, RegisterConfig
 from apeiria.core.i18n import load_locales, t
 
 load_locales(Path(__file__).parent / "locales")
@@ -20,6 +20,14 @@ __plugin_meta__ = PluginMetadata(
         version="0.1.0",
         plugin_type=PluginType.HIDDEN,
         admin_level=0,
+        configs=[
+            RegisterConfig(
+                key="token_expire_days",
+                default=7,
+                help="JWT token expiration days for the Web UI",
+                type=int,
+            )
+        ],
         required_plugins=["nonebot_plugin_localstore", "nonebot_plugin_orm"],
     ).to_dict(),
 )

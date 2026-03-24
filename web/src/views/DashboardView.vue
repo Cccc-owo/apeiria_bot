@@ -147,6 +147,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getStatus, restartBot } from '@/api'
+import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 interface DashboardStatus {
@@ -188,7 +189,7 @@ async function handleRestart() {
     await waitForRestart()
     window.location.reload()
   } catch (error) {
-    const message = error instanceof Error ? error.message : t('dashboard.restartFailed')
+    const message = getErrorMessage(error, t('dashboard.restartFailed'))
     noticeStore.show(message, 'error')
   } finally {
     restarting.value = false

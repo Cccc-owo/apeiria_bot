@@ -24,7 +24,11 @@ class RegisterConfig:
     key: str
     default: Any
     help: str = ""
-    type: type = str
+    type: object = str
+    choices: list[Any] = field(default_factory=list)
+    item_type: object | None = None
+    key_type: object | None = None
+    allows_null: bool = False
 
 
 @dataclass

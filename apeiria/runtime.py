@@ -13,6 +13,8 @@ FRAMEWORK_PLUGIN_MODULES = (
     "nonebot_plugin_htmlkit",
 )
 
+FRAMEWORK_BUILTIN_PLUGIN_NAMES = ("echo",)
+
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -27,7 +29,7 @@ def load_framework() -> None:
 
     setup_logging()
 
-    nonebot.load_builtin_plugins("echo")
+    nonebot.load_builtin_plugins(*FRAMEWORK_BUILTIN_PLUGIN_NAMES)
     for plugin in FRAMEWORK_PLUGIN_MODULES:
         nonebot.load_plugin(plugin)
 

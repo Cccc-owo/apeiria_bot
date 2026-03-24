@@ -15,6 +15,19 @@ from apeiria.plugins.web_ui.models import GroupItem
 router = APIRouter()
 
 
+def _to_group_item(r: Any) -> GroupItem:
+    return GroupItem(
+        group_id=r.group_id,
+        group_name=r.group_name,
+        bot_status=r.bot_status,
+        disabled_plugins=[
+            module
+            for module in json.loads(r.disabled_plugins or "[]")
+            if not is_plugin_protected(module)
+        ],
+    )
+
+
 @router.get("/", response_model=list[GroupItem])
 async def list_groups(_: Annotated[Any, Depends(require_auth)]) -> list[GroupItem]:
     from nonebot_plugin_orm import get_session
@@ -25,19 +38,7 @@ async def list_groups(_: Annotated[Any, Depends(require_auth)]) -> list[GroupIte
     async with get_session() as session:
         result = await session.execute(select(GroupConsole))
         rows = result.scalars().all()
-    return [
-        GroupItem(
-            group_id=r.group_id,
-            group_name=r.group_name,
-            bot_status=r.bot_status,
-            disabled_plugins=[
-                module
-                for module in json.loads(r.disabled_plugins or "[]")
-                if not is_plugin_protected(module)
-            ],
-        )
-        for r in rows
-    ]
+    return [_to_group_item(r) for r in rows]
 
 
 @router.get("/{group_id}", response_model=GroupItem)
@@ -56,16 +57,7 @@ async def get_group(
         r = result.scalar_one_or_none()
         if not r:
             raise HTTPException(status_code=404, detail=t("web_ui.groups.not_found"))
-    return GroupItem(
-        group_id=r.group_id,
-        group_name=r.group_name,
-        bot_status=r.bot_status,
-        disabled_plugins=[
-            module
-            for module in json.loads(r.disabled_plugins or "[]")
-            if not is_plugin_protected(module)
-        ],
-    )
+    return _to_group_item(r)
 
 
 @router.patch("/{group_id}")
