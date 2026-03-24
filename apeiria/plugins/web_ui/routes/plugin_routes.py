@@ -76,6 +76,8 @@ from apeiria.user_plugins import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from apeiria.core.configs.models import RegisterConfig
 
 router = APIRouter()
@@ -397,7 +399,7 @@ def _validate_and_coerce_updates(
 
 
 def _update_config_with_packages(
-    current: dict[str, Any],
+    current: Mapping[str, Any],
     entries: list[str],
     key: str,
 ) -> dict[str, Any]:
@@ -434,7 +436,7 @@ async def update_adapter_config(
 ) -> AdapterConfigResponse:
     current = read_project_adapter_config()
     config = _update_config_with_packages(current, payload.modules, "modules")
-    write_project_adapter_config(config)
+    write_project_adapter_config(config)  # type: ignore[arg-type]
     return AdapterConfigResponse(
         modules=_build_adapter_config_items(config["modules"]),
     )
@@ -457,7 +459,7 @@ async def update_driver_config(
 ) -> DriverConfigResponse:
     current = read_project_driver_config()
     config = _update_config_with_packages(current, payload.builtin, "builtin")
-    write_project_driver_config(config)
+    write_project_driver_config(config)  # type: ignore[arg-type]
     return DriverConfigResponse(
         builtin=_build_driver_config_items(config["builtin"]),
     )
@@ -647,7 +649,7 @@ async def update_plugin_config(
         for package_name, modules in config["packages"].items()
         if modules
     }
-    write_project_plugin_config(config)
+    write_project_plugin_config(config)  # type: ignore[arg-type]
     return PluginConfigResponse(
         modules=_build_module_config_items(config["modules"]),
         dirs=_build_dir_config_items(config["dirs"]),
@@ -666,13 +668,15 @@ async def list_plugins(_: Annotated[Any, Depends(require_auth)]) -> list[PluginI
         result = await session.execute(
             select(PluginInfo.module_name, PluginInfo.is_global_enabled)
         )
-        enabled_map = dict(result.all())
+        enabled_map = {  # pyright: ignore[reportAssignmentType]
+            row[0]: row[1] for row in result.all()
+        }
 
-    result: list[PluginItem] = []
+    plugins: list[PluginItem] = []
     for plugin in nonebot.get_loaded_plugins():
         meta = plugin.metadata
         protected_reason = get_plugin_protection_reason(plugin.module_name)
-        result.append(
+        plugins.append(
             PluginItem(
                 module_name=plugin.module_name,
                 name=get_plugin_name(plugin),
@@ -683,7 +687,7 @@ async def list_plugins(_: Annotated[Any, Depends(require_auth)]) -> list[PluginI
                 protected_reason=protected_reason,
             )
         )
-    return result
+    return plugins
 
 
 @router.patch("/{module_name}")

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .declarations import (
+    FieldDeclaration,
     _literal_eval,
     declaration_from_ast_annotation,
     register_config_from_declaration,
@@ -28,7 +29,7 @@ class ScannedPluginConfig:
 @dataclass
 class _ScannedField:
     key: str
-    declaration: object
+    declaration: FieldDeclaration
     default: Any
     help: str = ""
 
@@ -224,6 +225,8 @@ def _config_model_reference_name(node: ast.AST) -> str | None:
 def _is_apeiria_extra(node: ast.AST, state: _ModuleScanState) -> bool:
     if isinstance(node, ast.Dict):
         for key, value in zip(node.keys, node.values, strict=False):
+            if key is None:
+                continue
             if _literal_eval(key) == "_apeiria" and _literal_eval(value) is True:
                 return True
         return False
