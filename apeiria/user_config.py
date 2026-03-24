@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import tomlkit
+import tomlkit.items
 
 from apeiria.core.configs.registry import build_legacy_nonebot_overrides
 
@@ -12,7 +13,7 @@ try:
     import tomllib
 except ModuleNotFoundError:
     try:
-        import tomli as tomllib
+        import tomli as tomllib  # type: ignore[import-not-found]
     except ModuleNotFoundError:
         tomllib = None
 
@@ -213,7 +214,7 @@ def write_project_plugin_module_map(
     document = _load_toml_document(target)
 
     plugin_modules = document.get("plugin_modules")
-    if not isinstance(plugin_modules, tomlkit.items.Table):
+    if not isinstance(plugin_modules, tomlkit.items.Table):  # type: ignore[attr-defined]
         plugin_modules = tomlkit.table()
         document["plugin_modules"] = plugin_modules
 
@@ -255,8 +256,8 @@ def _load_toml_document(config_path: Path) -> tomlkit.TOMLDocument:
     return tomlkit.document()
 
 
-def _dump_toml_value(value: object) -> tomlkit.items.Item:
-    return tomlkit.item(_normalize_toml_value(value))
+def _dump_toml_value(value: object) -> tomlkit.items.Item:  # type: ignore[attr-defined]
+    return tomlkit.item(_normalize_toml_value(value))  # type: ignore[call-overload]
 
 
 def _normalize_toml_value(value: object) -> object:
@@ -271,7 +272,7 @@ def _normalize_toml_value(value: object) -> object:
     return value
 
 
-def _build_table_from_mapping(values: dict[str, Any]) -> tomlkit.items.Table:
+def _build_table_from_mapping(values: dict[str, Any]) -> tomlkit.items.Table:  # type: ignore[attr-defined]
     table = tomlkit.table()
     for key, value in values.items():
         table[str(key)] = _dump_toml_value(value)
@@ -313,7 +314,7 @@ def write_project_nonebot_section_toml(
     if section is None:
         if "nonebot" in document:
             del document["nonebot"]
-    elif not isinstance(section, tomlkit.items.Table):
+    elif not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
         msg = "raw editor expects a [nonebot] table"
         raise ValueError(msg)
     elif len(section) == 0:
@@ -343,7 +344,7 @@ def read_project_plugin_section_toml(
 def _validate_plugin_section_toml(
     parsed: dict[str, object],
     section_name: str,
-) -> object | None:
+) -> tomlkit.items.Table | None:  # type: ignore[attr-defined]
     if any(key != "plugins" for key in parsed):
         msg = "raw editor only accepts the [plugins.<section>] section"
         raise ValueError(msg)
@@ -351,7 +352,7 @@ def _validate_plugin_section_toml(
     plugins_section = parsed.get("plugins")
     if plugins_section is None:
         return None
-    if not isinstance(plugins_section, tomlkit.items.Table):
+    if not isinstance(plugins_section, tomlkit.items.Table):  # type: ignore[attr-defined]
         msg = "raw editor expects a [plugins.<section>] table"
         raise TypeError(msg)
 
@@ -362,7 +363,7 @@ def _validate_plugin_section_toml(
         )
         raise ValueError(msg)
     section = plugins_section.get(section_name)
-    if section is not None and not isinstance(section, tomlkit.items.Table):
+    if section is not None and not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
         msg = (
             f"raw editor expects"
             f" [plugins.{section_name}] to be a table"
@@ -386,7 +387,7 @@ def write_project_plugin_section_toml(
     section = _validate_plugin_section_toml(parsed, section_name)
 
     plugins = document.get("plugins")
-    if not isinstance(plugins, tomlkit.items.Table):
+    if not isinstance(plugins, tomlkit.items.Table):  # type: ignore[attr-defined]
         plugins = tomlkit.table()
         document["plugins"] = plugins
 
@@ -416,13 +417,13 @@ def write_project_plugin_section_config(
     document = _load_toml_document(target)
 
     plugins = document.get("plugins")
-    if not isinstance(plugins, tomlkit.items.Table):
+    if not isinstance(plugins, tomlkit.items.Table):  # type: ignore[attr-defined]
         plugins = tomlkit.table()
         document["plugins"] = plugins
 
     section_name = next(iter(_plugin_name_candidates(plugin_name)), plugin_name)
     section = plugins.get(section_name)
-    if not isinstance(section, tomlkit.items.Table):
+    if not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
         section = tomlkit.table()
         plugins[section_name] = section
 
@@ -457,7 +458,7 @@ def write_project_nonebot_config(
     document = _load_toml_document(target)
 
     section = document.get("nonebot")
-    if not isinstance(section, tomlkit.items.Table):
+    if not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
         section = tomlkit.table()
         document["nonebot"] = section
 

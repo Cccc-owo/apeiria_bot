@@ -26,7 +26,7 @@ class PluginConfigRegistration:
 @dataclass(frozen=True)
 class RegisterPluginConfigOptions:
     section: str | None = None
-    model: type[ModelT] | None = None
+    model: type[BaseModel] | None = None
     configs: list[RegisterConfig] | None = None
     legacy_flatten: bool = False
     key_map: dict[str, str] = field(default_factory=dict)
@@ -67,14 +67,14 @@ def _model_to_configs(model: type[ModelT]) -> list[RegisterConfig]:
         return result
 
     result = []
-    for key, field_info in model.__fields__.items():
-        default = None if field_info.required else field_info.default
+    for key, field_info in model.__fields__.items():  # pyright: ignore[reportDeprecated]
+        default = None if field_info.required else field_info.default  # pyright: ignore[reportAttributeAccessIssue]
         result.append(
             register_config_from_runtime_annotation(
                 key=key,
-                annotation=field_info.outer_type_,
+                annotation=field_info.outer_type_,  # pyright: ignore[reportAttributeAccessIssue]
                 default=default,
-                help_text=field_info.field_info.description or "",
+                help_text=field_info.field_info.description or "",  # pyright: ignore[reportAttributeAccessIssue]
             )
         )
     return result
