@@ -4,5 +4,6 @@ builtin = []
 # Example:
 # Builtin drivers managed elsewhere do not need to be declared here.
 # builtin = ["~fastapi", "~aiohttp"]
+#
 # [driver_packages]
-# "nonebot2[fastapi]" = ["~fastapi", "~aiohttp"]
+# "nonebot2" = ["~fastapi", "~aiohttp"]

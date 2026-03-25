@@ -27,12 +27,8 @@ class UserPluginConfig(TypedDict):
 logger = logging.getLogger("apeiria.user_plugins")
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parent.parent
-
-
 def _default_config_path() -> Path:
-    return _project_root() / "apeiria.plugins.toml"
+    return Path(__file__).resolve().parent.parent / "apeiria.plugins.toml"
 
 
 def _normalize_str_list(value: object) -> list[str]:
@@ -150,6 +146,7 @@ def write_project_plugin_config(
     config_path: Path | None = None,
 ) -> Path:
     target = config_path or _default_config_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(_dump_config(config), encoding="utf-8")
     return target
 

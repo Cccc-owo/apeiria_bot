@@ -6,17 +6,18 @@ def configure(driver: object, nb: object = nonebot) -> None:
 
     Copy this file to ``user_bot.py`` and edit it freely.
     The repository ignores ``user_bot.py`` so local changes stay out of git.
-    Runtime configuration from ``apeiria.config.toml`` is applied during
+    Runtime configuration from the Apeiria config root is applied during
     ``nonebot.init(...)`` before this function runs.
     Legacy plugin config bridges are auto-registered from framework and
     enabled plugins before ``nonebot.init(...)`` runs.
     ``pyproject.toml`` is loaded afterwards for compatibility with native
     NoneBot plugin declarations.
-    Plugin declarations from ``apeiria.plugins.toml`` are loaded separately.
-    Adapter declarations from ``apeiria.adapters.toml`` are registered after
-    this function runs.
-    Driver declarations from ``apeiria.drivers.toml`` are applied during
-    ``nonebot.init(...)`` before this function runs.
+    Plugin declarations from ``apeiria.plugins.toml`` in the config root are
+    loaded separately.
+    Adapter declarations from ``apeiria.adapters.toml`` in the config root are
+    registered after this function runs.
+    Driver declarations from ``apeiria.drivers.toml`` in the config root are
+    applied during ``nonebot.init(...)`` before this function runs.
     """
 
     _ = (driver, nb)

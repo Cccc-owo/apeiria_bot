@@ -26,12 +26,8 @@ class UserAdapterConfig(TypedDict):
 logger = logging.getLogger("apeiria.user_adapters")
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parent.parent
-
-
 def _default_config_path() -> Path:
-    return _project_root() / "apeiria.adapters.toml"
+    return Path(__file__).resolve().parent.parent / "apeiria.adapters.toml"
 
 
 def _normalize_str_list(value: object) -> list[str]:
@@ -118,6 +114,7 @@ def write_project_adapter_config(
     config_path: Path | None = None,
 ) -> Path:
     target = config_path or _default_config_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(_dump_config(config), encoding="utf-8")
     return target
 

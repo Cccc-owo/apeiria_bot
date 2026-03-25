@@ -8,6 +8,9 @@ MESSAGES_ZH_CN = {
     "Inspect and migrate Apeiria environments.": "查看并迁移 Apeiria 环境。",
     "Initialize Apeiria user environment with uv.": "使用 uv 初始化 Apeiria 用户环境。",
     "Repair Apeiria user environment with uv.": "使用 uv 修复 Apeiria 用户环境。",
+    "Sync the main project environment without development dependencies.": (
+        "同步主项目环境时不安装开发依赖。"
+    ),
     "Run bot.py with the current project Python environment.": (
         "使用当前项目 Python 环境运行 bot.py。"
     ),

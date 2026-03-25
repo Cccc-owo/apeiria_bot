@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.apeiria
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+node_modules/
+web/node_modules/
+web/dist/
+data/

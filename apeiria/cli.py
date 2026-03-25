@@ -377,12 +377,15 @@ def _resolve_driver_builtin(
 def _run_uv_for_project(*args: str) -> None:
     executable = find_uv_executable()
     cache_dir = uv_cache_dir()
+    project_root = _project_root()
     cache_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["UV_CACHE_DIR"] = str(cache_dir)
+    env["UV_PROJECT_ENVIRONMENT"] = str(project_root / ".venv")
+    env.pop("VIRTUAL_ENV", None)
     result = subprocess.run(
         [executable, *args],
-        cwd=_project_root(),
+        cwd=project_root,
         check=False,
         env=env,
     )
@@ -390,15 +393,17 @@ def _run_uv_for_project(*args: str) -> None:
         raise click.ClickException(_("uv command failed"))
 
 
-def _sync_main_project() -> None:
+def _sync_main_project(*, no_dev: bool = False) -> None:
     args = ["sync"]
     if (_project_root() / "uv.lock").exists():
         args.append("--locked")
+    if no_dev:
+        args.append("--no-dev")
     _run_uv_for_project(*args)
 
 
-def _initialize_user_environment() -> None:
-    _sync_main_project()
+def _initialize_user_environment(*, no_dev: bool = False) -> None:
+    _sync_main_project(no_dev=no_dev)
     ensure_project_plugin_config()
     ensure_plugin_project()
     sync_plugin_project(locked=True)
@@ -417,7 +422,10 @@ def _runtime_export_targets() -> list[tuple[Path, Path]]:
     return [
         (project_root / "apeiria.config.toml", Path("apeiria.config.toml")),
         (project_root / "apeiria.plugins.toml", Path("apeiria.plugins.toml")),
-        (project_root / "apeiria.adapters.toml", Path("apeiria.adapters.toml")),
+        (
+            project_root / "apeiria.adapters.toml",
+            Path("apeiria.adapters.toml"),
+        ),
         (project_root / "apeiria.drivers.toml", Path("apeiria.drivers.toml")),
         (
             plugin_project_pyproject_path(),
@@ -489,10 +497,15 @@ def env() -> None:
 
 
 @cli.command(help=_("Initialize Apeiria user environment with uv."))
-def init() -> None:
+@click.option(
+    "--no-dev",
+    is_flag=True,
+    help=_("Sync the main project environment without development dependencies."),
+)
+def init(*, no_dev: bool) -> None:
     _check_system_dependencies()
     try:
-        _initialize_user_environment()
+        _initialize_user_environment(no_dev=no_dev)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
     click.echo(_("initialized environment"))
