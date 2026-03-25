@@ -147,6 +147,7 @@ apeiria.config.toml
 apeiria.plugins.toml
 apeiria.adapters.toml
 apeiria.drivers.toml
+.apeiria/
 
 # Frontend artifacts
 web/dist/

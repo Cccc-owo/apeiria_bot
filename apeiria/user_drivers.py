@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import logging
 from pathlib import Path
 from typing import Any, TypedDict
@@ -131,8 +132,7 @@ def add_project_driver_builtin(
 ) -> UserDriverConfig:
     config = read_project_driver_config(config_path)
     if builtin_name not in config["builtin"]:
-        config["builtin"].append(builtin_name)
-        config["builtin"].sort()
+        config["builtin"] = _merge_driver_builtin(config["builtin"], builtin_name)
         write_project_driver_config(config, config_path)
     return config
 
@@ -155,9 +155,10 @@ def remove_project_driver_builtin(
 
 def get_project_driver_kwargs(config_path: Path | None = None) -> dict[str, str]:
     config = read_project_driver_config(config_path)
-    if not config["builtin"]:
+    builtin = effective_driver_builtin(config["builtin"])
+    if not builtin:
         return {}
-    return {"driver": "+".join(config["builtin"])}
+    return {"driver": "+".join(builtin)}
 
 
 def bind_project_driver_package(
@@ -208,3 +209,63 @@ def unbind_project_driver_package(
     config["builtin"] = [item for item in config["builtin"] if item != builtin_name]
     write_project_driver_config(config, config_path)
     return config
+
+
+def effective_driver_builtin(builtin: list[str]) -> list[str]:
+    normalized = [item for item in builtin if item]
+    if not normalized:
+        return []
+
+    capabilities = {item: _driver_builtin_capabilities(item) for item in normalized}
+    pure_drivers = [
+        item
+        for item in normalized
+        if capabilities[item]["driver"] and not capabilities[item]["mixin"]
+    ]
+    if pure_drivers:
+        primary = pure_drivers[-1]
+        mixins = [
+            item
+            for item in normalized
+            if item != primary and capabilities[item]["mixin"]
+        ]
+        return [primary, *mixins]
+
+    hybrid = next(
+        (item for item in normalized if capabilities[item]["driver"]),
+        None,
+    )
+    if hybrid is not None:
+        mixins = [
+            item
+            for item in normalized
+            if item != hybrid and capabilities[item]["mixin"]
+        ]
+        return [hybrid, *mixins]
+
+    return normalized
+
+
+def _merge_driver_builtin(current: list[str], builtin_name: str) -> list[str]:
+    combined = [item for item in current if item != builtin_name]
+    combined.append(builtin_name)
+    return effective_driver_builtin(combined)
+
+
+def _driver_builtin_capabilities(builtin_name: str) -> dict[str, bool]:
+    module_name = builtin_name.strip().removeprefix("~")
+    if not module_name:
+        return {"driver": False, "mixin": False}
+
+    try:
+        from apeiria.user_plugin_env import inject_plugin_site_packages
+
+        inject_plugin_site_packages()
+        module = importlib.import_module(f"nonebot.drivers.{module_name}")
+    except ImportError:
+        return {"driver": False, "mixin": False}
+
+    return {
+        "driver": hasattr(module, "Driver"),
+        "mixin": hasattr(module, "Mixin"),
+    }

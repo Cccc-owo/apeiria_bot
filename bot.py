@@ -6,9 +6,11 @@ from apeiria.plugin_config_bootstrap import bootstrap_plugin_configs
 from apeiria.runtime import load_framework
 from apeiria.user_config import get_project_config_kwargs
 from apeiria.user_drivers import get_project_driver_kwargs
+from apeiria.user_plugin_env import inject_plugin_site_packages
 from apeiria.user_runtime import load_user_plugins, load_user_setup
 
 bootstrap_plugin_configs()
+inject_plugin_site_packages()
 nonebot.init(**get_project_config_kwargs(), **get_project_driver_kwargs())
 nonebot.load_from_toml("pyproject.toml")
 
