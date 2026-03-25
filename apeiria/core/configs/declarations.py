@@ -277,8 +277,7 @@ def _declaration_from_ast_union(
         return FieldDeclaration(type=object, choices=[], allows_null=True)
 
     declarations = [
-        declaration_from_ast_annotation(item, default)
-        for item in non_null_items
+        declaration_from_ast_annotation(item, default) for item in non_null_items
     ]
     merged = _merge_union_declarations(declarations)
     return _clone_declaration(merged, allows_null=allows_null)

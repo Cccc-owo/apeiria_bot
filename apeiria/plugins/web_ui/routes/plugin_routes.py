@@ -152,10 +152,14 @@ def _build_dir_config_items(dirs: list[str]) -> list[PluginConfigDirItem]:
             resolved = directory
 
         exists = resolved.is_dir()
-        is_loaded = any(
-            resolved == path.parent or resolved in path.parents
-            for path in loaded_paths
-        ) if exists else False
+        is_loaded = (
+            any(
+                resolved == path.parent or resolved in path.parents
+                for path in loaded_paths
+            )
+            if exists
+            else False
+        )
         items.append(
             PluginConfigDirItem(
                 path=raw_dir,
@@ -242,11 +246,7 @@ def _build_plugin_field_state(
     current_value: object | None = config.default
     local_value: object | None = None
     value_source = "default"
-    global_key = (
-        ctx.key_map.get(config.key, config.key)
-        if ctx.legacy_flatten
-        else None
-    )
+    global_key = ctx.key_map.get(config.key, config.key) if ctx.legacy_flatten else None
 
     if ctx.legacy_flatten and global_key:
         if global_key in ctx.nonebot_section:
@@ -379,6 +379,7 @@ def _build_setting_field_item(
         editable=capability.editable,
         type_category=capability.category,
     )
+
 
 def _validate_and_coerce_updates(
     payload: PluginSettingsUpdateRequest,

@@ -479,9 +479,9 @@ def _check_system_dependencies() -> None:
         _fail(_("missing system dependencies: {deps}").format(deps=", ".join(missing)))
 
     web_dir = _project_root() / "web"
-    needs_frontend_toolchain = (
-        (web_dir / "package.json").is_file() and not (web_dir / "dist").is_dir()
-    )
+    needs_frontend_toolchain = (web_dir / "package.json").is_file() and not (
+        web_dir / "dist"
+    ).is_dir()
     frontend_missing: list[str] = []
     if needs_frontend_toolchain:
         if shutil.which("node") is None:

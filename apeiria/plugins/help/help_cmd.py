@@ -15,6 +15,7 @@ _help = on_alconna(
     block=True,
 )
 
+
 def _is_console(bot: Bot) -> bool:
     """Check if current adapter is Console (text-only)."""
     return bot.adapter.get_name() == "Console"

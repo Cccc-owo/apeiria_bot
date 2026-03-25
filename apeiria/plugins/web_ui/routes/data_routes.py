@@ -73,9 +73,7 @@ def _editable_columns(model: type[Any]) -> set[str]:
     primary_key = _primary_key_name(model)
     protected = {primary_key, "created_at", "updated_at"}
     return {
-        column.key
-        for column in model.__table__.columns
-        if column.key not in protected
+        column.key for column in model.__table__.columns if column.key not in protected
     }
 
 
@@ -111,11 +109,7 @@ async def list_records(
         total_stmt = select(func.count()).select_from(model)
         total = await session.scalar(total_stmt) or 0
 
-        stmt = (
-            select(model)
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
+        stmt = select(model).offset((page - 1) * page_size).limit(page_size)
         result = await session.execute(stmt)
         rows = result.scalars().all()
 

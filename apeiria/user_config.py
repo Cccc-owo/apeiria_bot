@@ -364,17 +364,11 @@ def _validate_plugin_section_toml(
         raise TypeError(msg)
 
     if any(key != section_name for key in plugins_section):
-        msg = (
-            f"raw editor only accepts the"
-            f" [plugins.{section_name}] section"
-        )
+        msg = f"raw editor only accepts the [plugins.{section_name}] section"
         raise ValueError(msg)
     section = plugins_section.get(section_name)
     if section is not None and not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
-        msg = (
-            f"raw editor expects"
-            f" [plugins.{section_name}] to be a table"
-        )
+        msg = f"raw editor expects [plugins.{section_name}] to be a table"
         raise ValueError(msg)
     return section
 

@@ -181,7 +181,8 @@ def _collect_config_signals(tree: ast.AST, state: _ModuleScanState) -> None:
         if isinstance(node, ast.Call):
             if (
                 _is_get_plugin_config_call(
-                    node, state.get_plugin_config_aliases,
+                    node,
+                    state.get_plugin_config_aliases,
                 )
                 and node.args
             ):
