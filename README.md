@@ -32,6 +32,16 @@ User-managed project files:
 6. `.env.dev`
 7. `.env.prod`
 
+Create `apeiria.*.toml` from the example files before first run:
+
+1. `cp apeiria.config.example.toml apeiria.config.toml`
+2. `cp apeiria.plugins.example.toml apeiria.plugins.toml`
+3. `cp apeiria.adapters.example.toml apeiria.adapters.toml`
+4. `cp apeiria.drivers.example.toml apeiria.drivers.toml`
+
+`apeiria init` only creates missing `.env`, `.env.dev`, and `.env.prod` as empty
+files. It does not create or rewrite any `apeiria.*.toml`.
+
 Generated state:
 
 1. `.apeiria/extensions/`
@@ -44,16 +54,17 @@ Generated state:
 2. install project environment using `uv sync --locked`
 3. activate the virtual environment
 4. POSIX shells: `source .venv/bin/activate`
-5. initialize the project and user extension environments using `apeiria init`
-6. install user plugins using `apeiria plugin install <package>`
-7. run your bot using `apeiria run`
+5. create `apeiria.*.toml` from the example files
+6. initialize the project and user extension environments using `apeiria init`
+7. install user plugins using `apeiria plugin install <package>`
+8. run your bot using `apeiria run`
 
 ## Environment Management
 
 After activating `.venv`, use these commands:
 
 1. `apeiria init`
-   create or sync the main project environment and the user extension environment
+   create missing empty `.env*` files, then sync the main project environment and the user extension environment
 2. `apeiria init --no-dev`
    sync the main project environment without development dependencies
 3. `apeiria repair`
@@ -75,6 +86,7 @@ User extension environment responsibilities:
 The extension environment is managed under `.apeiria/extensions/` and is ignored by git.
 If `APEIRIA_CONFIG_DIR` is set, Apeiria reads and writes `apeiria.*.toml` in that
 directory instead of the project root.
+`apeiria init` does not create or rewrite these TOML files.
 
 ## User Packages
 
@@ -98,7 +110,6 @@ Example config files are kept in the project root:
 2. `apeiria.plugins.example.toml`
 3. `apeiria.adapters.example.toml`
 4. `apeiria.drivers.example.toml`
-5. `.env.example`
 
 To move local runtime state to another machine:
 
@@ -153,6 +164,10 @@ That means Docker keeps:
 2. uv cache in `.apeiria/cache/`
 3. root runtime config files in `apeiria.*.toml`
 4. environment files in `.env*`
+
+The bind-mounted `apeiria.*.toml` files must exist on the host before `docker compose up`.
+Missing `.env*` files can be created by `apeiria init`, including the container startup
+command, as empty files.
 
 The compose service also sets `HOST=0.0.0.0`, so the Web UI is reachable from the
 host on `http://127.0.0.1:8080/`.

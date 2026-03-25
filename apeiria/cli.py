@@ -402,9 +402,23 @@ def _sync_main_project(*, no_dev: bool = False) -> None:
     _run_uv_for_project(*args)
 
 
+def _ensure_empty_file(target: Path) -> None:
+    if target.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("", encoding="utf-8")
+
+
+def _ensure_runtime_env_files() -> None:
+    project_root = _project_root()
+    _ensure_empty_file(project_root / ".env")
+    _ensure_empty_file(project_root / ".env.dev")
+    _ensure_empty_file(project_root / ".env.prod")
+
+
 def _initialize_user_environment(*, no_dev: bool = False) -> None:
+    _ensure_runtime_env_files()
     _sync_main_project(no_dev=no_dev)
-    ensure_project_plugin_config()
     ensure_plugin_project()
     sync_plugin_project(locked=True)
 
