@@ -25,12 +25,12 @@ _PROJECT_NONEBOT_DEFAULTS: dict[str, Any] = {
 }
 
 
-def _project_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+def _ensure_config_parent(target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _default_config_path() -> Path:
-    return _project_root() / "apeiria.config.toml"
+    return Path(__file__).resolve().parent.parent / "apeiria.config.toml"
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
@@ -144,7 +144,7 @@ def read_raw_project_config(config_path: Path | None = None) -> dict[str, Any]:
 def read_pyproject_nonebot_config(
     config_path: Path | None = None,
 ) -> dict[str, list[str]]:
-    target = config_path or (_project_root() / "pyproject.toml")
+    target = config_path or (Path(__file__).resolve().parent.parent / "pyproject.toml")
     data = _load_config(target)
     nonebot_config = data.get("tool", {}).get("nonebot", {})
     if not isinstance(nonebot_config, dict):
@@ -237,6 +237,7 @@ def write_project_plugin_module_map(
     if len(plugin_modules) == 0 and "plugin_modules" in document:
         del document["plugin_modules"]
 
+    _ensure_config_parent(target)
     target.write_text(tomlkit.dumps(document), encoding="utf-8")
     return target
 
@@ -328,6 +329,7 @@ def write_project_nonebot_section_toml(
     else:
         document["nonebot"] = section
 
+    _ensure_config_parent(target)
     target.write_text(tomlkit.dumps(document), encoding="utf-8")
     return target
 
@@ -401,10 +403,12 @@ def write_project_plugin_section_toml(
             del plugins[section_name]
         if len(plugins) == 0 and "plugins" in document:
             del document["plugins"]
+        _ensure_config_parent(target)
         target.write_text(tomlkit.dumps(document), encoding="utf-8")
         return write_project_plugin_module_map({section_name: None}, target)
 
     plugins[section_name] = section
+    _ensure_config_parent(target)
     target.write_text(tomlkit.dumps(document), encoding="utf-8")
     if module_name is not None:
         write_project_plugin_module_map({section_name: module_name}, target)
@@ -447,6 +451,7 @@ def write_project_plugin_section_config(
     if len(plugins) == 0:
         del document["plugins"]
 
+    _ensure_config_parent(target)
     target.write_text(tomlkit.dumps(document), encoding="utf-8")
     if clear_module_mapping:
         write_project_plugin_module_map({section_name: None}, target)
@@ -477,5 +482,6 @@ def write_project_nonebot_config(
     if len(section) == 0:
         del document["nonebot"]
 
+    _ensure_config_parent(target)
     target.write_text(tomlkit.dumps(document), encoding="utf-8")
     return target

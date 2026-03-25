@@ -45,6 +45,7 @@ web_ui:
   secrets:
     generated: "已生成新的 WebUI 密钥"
   startup:
+    build_disabled: "已禁用启动时前端构建"
     no_package_manager: "未找到 pnpm/npm，无法自动构建前端"
     build_failed: "前端构建失败：\n{stderr}"
     build_success: "前端构建成功"

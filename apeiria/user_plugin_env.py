@@ -102,6 +102,7 @@ def _run_uv(args: list[str], *, cwd: Path) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["UV_CACHE_DIR"] = str(cache_dir)
+    env["UV_PROJECT_ENVIRONMENT"] = str(cwd / ".venv")
     env.pop("VIRTUAL_ENV", None)
     result = subprocess.run([executable, *args], cwd=cwd, check=False, env=env)
     if result.returncode != 0:

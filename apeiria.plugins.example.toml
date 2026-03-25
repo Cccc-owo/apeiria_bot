@@ -6,5 +6,6 @@ dirs = []
 # Framework-managed plugins do not need to be declared here.
 # modules = ["your_plugin"]
 # dirs = ["local_plugins"]
+#
 # [plugin_packages]
 # "nonebot-plugin-example" = ["your_plugin"]

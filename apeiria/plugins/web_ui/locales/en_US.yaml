@@ -45,6 +45,7 @@ web_ui:
   secrets:
     generated: "Generated new Web UI secrets"
   startup:
+    build_disabled: "Frontend build on startup is disabled"
     no_package_manager: "No pnpm/npm found, cannot auto-build frontend"
     build_failed: "Frontend build failed:\n{stderr}"
     build_success: "Frontend built successfully"

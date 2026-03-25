@@ -1,0 +1,21 @@
+services:
+  apeiria:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      HOST: 0.0.0.0
+    volumes:
+      - ./.apeiria:/app/.apeiria
+      - ./data:/app/data
+      - ./apeiria.config.toml:/app/apeiria.config.toml
+      - ./apeiria.plugins.toml:/app/apeiria.plugins.toml
+      - ./apeiria.adapters.toml:/app/apeiria.adapters.toml
+      - ./apeiria.drivers.toml:/app/apeiria.drivers.toml
+      - ./.env:/app/.env
+      - ./.env.dev:/app/.env.dev
+      - ./.env.prod:/app/.env.prod
+    restart: unless-stopped

@@ -1,0 +1,44 @@
+FROM node:22.12.0-bookworm-slim AS web-builder
+
+WORKDIR /frontend/web
+
+RUN npm install -g pnpm \
+    && rm -rf /root/.npm
+
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY web/ ./
+RUN pnpm run build
+
+
+FROM python:3.14.3-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        fontconfig \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /bin/
+
+COPY pyproject.toml uv.lock README.md bot.py ./
+COPY apeiria ./apeiria
+COPY --from=web-builder /frontend/web/dist ./web/dist
+
+RUN uv sync --locked --no-dev
+
+RUN mkdir -p /app/.apeiria /app/data
+
+EXPOSE 8080
+
+CMD ["/bin/sh", "-lc", "APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria init --no-dev && exec env APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run"]

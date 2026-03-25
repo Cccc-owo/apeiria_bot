@@ -1,5 +1,6 @@
 """Web UI plugin — management dashboard API + static file serving."""
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -36,6 +37,13 @@ _WEB_DIR = Path(__file__).parent.parent.parent.parent / "web"
 _DIST_DIR = _WEB_DIR / "dist"
 
 
+def _should_build_frontend_on_start() -> bool:
+    value = os.getenv("APEIRIA_BUILD_FRONTEND_ON_START")
+    if value is None:
+        return True
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _build_frontend() -> bool:
     """Auto build frontend if needed. Quiet unless something goes wrong."""
     from nonebot.log import logger
@@ -54,6 +62,10 @@ def _build_frontend() -> bool:
             )
             if src_mtime <= dist_mtime:
                 return True
+
+    if not _should_build_frontend_on_start():
+        logger.info("{}", t("web_ui.startup.build_disabled"))
+        return _DIST_DIR.is_dir()
 
     pm = shutil.which("pnpm") or shutil.which("npm")
     if not pm:

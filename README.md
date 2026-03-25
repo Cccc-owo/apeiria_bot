@@ -11,9 +11,32 @@ Before initialization, make sure the machine has:
 
 1. Python 3.10+
 2. `uv`
-3. `node` and `pnpm` or `npm` if Web UI assets need to build on first start
 
 Some plugins may still require extra system libraries depending on the platform.
+
+### Local Development
+
+For local development, install frontend tooling if Web UI assets may need to build
+or rebuild on startup:
+
+1. `node`
+2. `pnpm` or `npm`
+
+User-managed project files:
+
+1. `apeiria.config.toml`
+2. `apeiria.plugins.toml`
+3. `apeiria.adapters.toml`
+4. `apeiria.drivers.toml`
+5. `.env`
+6. `.env.dev`
+7. `.env.prod`
+
+Generated state:
+
+1. `.apeiria/extensions/`
+2. `.apeiria/cache/`
+3. `data/`
 
 ## How to start
 
@@ -31,9 +54,11 @@ After activating `.venv`, use these commands:
 
 1. `apeiria init`
    create or sync the main project environment and the user extension environment
-2. `apeiria repair`
+2. `apeiria init --no-dev`
+   sync the main project environment without development dependencies
+3. `apeiria repair`
    re-sync both environments from current managed files
-3. `apeiria env info`
+4. `apeiria env info`
    show current environment paths and status
 
 Main environment responsibilities:
@@ -48,6 +73,8 @@ User extension environment responsibilities:
 3. user-installed drivers
 
 The extension environment is managed under `.apeiria/extensions/` and is ignored by git.
+If `APEIRIA_CONFIG_DIR` is set, Apeiria reads and writes `apeiria.*.toml` in that
+directory instead of the project root.
 
 ## User Packages
 
@@ -58,11 +85,20 @@ Use Apeiria commands to manage packages in the user extension environment:
 3. `apeiria driver install <package>`
 
 Installed user packages are declared in `.apeiria/extensions/pyproject.toml`.
-Their project registrations remain in:
+Their project registrations remain in these files:
 
 1. `apeiria.plugins.toml`
 2. `apeiria.adapters.toml`
 3. `apeiria.drivers.toml`
+
+When `APEIRIA_CONFIG_DIR` is set, these files are created in that directory.
+Example config files are kept in the project root:
+
+1. `apeiria.config.example.toml`
+2. `apeiria.plugins.example.toml`
+3. `apeiria.adapters.example.toml`
+4. `apeiria.drivers.example.toml`
+5. `.env.example`
 
 To move local runtime state to another machine:
 
@@ -77,3 +113,54 @@ To move local runtime state to another machine:
 ## Documentation
 
 See [Docs](https://nonebot.dev/)
+
+## Docker
+
+The container image keeps the main project environment in `/app/.venv`.
+User extension state stays under `/app/.apeiria`, which should be mounted.
+The frontend is built into the image at build time, so the running container does
+not need `node`, `pnpm`, or `npm`. Startup frontend builds are explicitly disabled
+in the container.
+
+Build and run:
+
+```bash
+docker compose up --build
+```
+
+The container command is:
+
+```bash
+APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria init --no-dev
+APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run
+```
+
+Mounted paths in `docker-compose.yml`:
+
+1. `.apeiria:/app/.apeiria`
+2. `data:/app/data`
+3. `apeiria.config.toml:/app/apeiria.config.toml`
+4. `apeiria.plugins.toml:/app/apeiria.plugins.toml`
+5. `apeiria.adapters.toml:/app/apeiria.adapters.toml`
+6. `apeiria.drivers.toml:/app/apeiria.drivers.toml`
+7. `.env:/app/.env`
+8. `.env.dev:/app/.env.dev`
+9. `.env.prod:/app/.env.prod`
+
+That means Docker keeps:
+
+1. extension environment in `.apeiria/extensions/`
+2. uv cache in `.apeiria/cache/`
+3. root runtime config files in `apeiria.*.toml`
+4. environment files in `.env*`
+
+The compose service also sets `HOST=0.0.0.0`, so the Web UI is reachable from the
+host on `http://127.0.0.1:8080/`.
+
+If you need to install user plugins inside the container:
+
+```bash
+docker compose exec apeiria /app/.venv/bin/apeiria plugin install <package>
+docker compose exec apeiria /app/.venv/bin/apeiria adapter install <package>
+docker compose exec apeiria /app/.venv/bin/apeiria driver install <package>
+```
