@@ -113,7 +113,9 @@ class MessageCodec:
                     raw_bytes = resolved_path.read_bytes()
                     mime, _ = mimetypes.guess_type(resolved_path.name)
                     return ImageSegment(
-                        asset_id=self._asset_manager.register_path(resolved_path).asset_id,
+                        asset_id=self._asset_manager.register_path(
+                            resolved_path
+                        ).asset_id,
                         base64=base64.b64encode(raw_bytes).decode("ascii"),
                         mime=mime or "image/png",
                         alt=cast("str | None", data.get("alt")),

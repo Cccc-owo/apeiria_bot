@@ -67,6 +67,7 @@ async def handle_disable(event: Event, plugin_name: Match[str]) -> None:
     await _toggle_plugin(group_id, plugin.module_name, enable=False)
     await _disable.finish(t("admin.plugin.disabled", name=get_plugin_name(plugin)))
 
+
 def _find_plugin(name: str) -> Plugin | None:
     """Backward-compatible plugin resolver."""
     return find_loaded_plugin(name)

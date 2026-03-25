@@ -92,9 +92,7 @@ def get_plugin_protection_reason(module_name: str) -> str | None:
 
     dependents = get_plugin_dependents(module_name)
     if dependents:
-        reasons.append(
-            t("common.required_by_plugins", plugins=", ".join(dependents))
-        )
+        reasons.append(t("common.required_by_plugins", plugins=", ".join(dependents)))
 
     return "；".join(reasons) if reasons else None
 

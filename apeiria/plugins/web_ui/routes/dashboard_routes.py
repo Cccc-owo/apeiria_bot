@@ -40,22 +40,28 @@ async def get_status(_: Annotated[Any, Depends(require_auth)]) -> StatusResponse
     plugins = nonebot.get_loaded_plugins()
 
     async with get_session() as session:
-        disabled_plugins_count = await session.scalar(
-            select(func.count()).select_from(PluginInfo).where(
-                PluginInfo.is_global_enabled.is_(False)
+        disabled_plugins_count = (
+            await session.scalar(
+                select(func.count())
+                .select_from(PluginInfo)
+                .where(PluginInfo.is_global_enabled.is_(False))
             )
-        ) or 0
-        groups_count = await session.scalar(
-            select(func.count()).select_from(GroupConsole)
-        ) or 0
-        disabled_groups_count = await session.scalar(
-            select(func.count()).select_from(GroupConsole).where(
-                GroupConsole.bot_status.is_(False)
+            or 0
+        )
+        groups_count = (
+            await session.scalar(select(func.count()).select_from(GroupConsole)) or 0
+        )
+        disabled_groups_count = (
+            await session.scalar(
+                select(func.count())
+                .select_from(GroupConsole)
+                .where(GroupConsole.bot_status.is_(False))
             )
-        ) or 0
-        bans_count = await session.scalar(
-            select(func.count()).select_from(BanConsole)
-        ) or 0
+            or 0
+        )
+        bans_count = (
+            await session.scalar(select(func.count()).select_from(BanConsole)) or 0
+        )
 
     return StatusResponse(
         status="running",
