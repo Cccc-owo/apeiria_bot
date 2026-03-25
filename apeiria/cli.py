@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import click
@@ -8,12 +12,9 @@ from apeiria.cli_i18n import _
 from apeiria.cli_nb import (
     find_exact_store_package,
     format_store_packages,
-    install_package,
     prompt_select_store_package,
     prompt_select_text,
     search_store_packages,
-    uninstall_package,
-    update_package,
 )
 from apeiria.core.plugin_policy import is_framework_protected_plugin_module
 from apeiria.user_adapters import (
@@ -41,6 +42,20 @@ from apeiria.user_drivers import (
 from apeiria.user_drivers import (
     default_config_path as default_driver_config_path,
 )
+from apeiria.user_plugin_env import (
+    add_plugin_requirement,
+    ensure_plugin_project,
+    find_uv_executable,
+    plugin_project_exists,
+    plugin_project_lock_path,
+    plugin_project_pyproject_path,
+    plugin_project_root,
+    remove_plugin_requirement,
+    resolve_declared_plugin_requirement,
+    sync_plugin_project,
+    update_plugin_requirement,
+    uv_cache_dir,
+)
 from apeiria.user_plugins import (
     add_project_plugin_dir,
     add_project_plugin_module,
@@ -59,6 +74,10 @@ from apeiria.user_plugins import (
 
 def _config_path(path: str | None) -> Path | None:
     return Path(path).expanduser().resolve() if path else None
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
 
 
 def _current_config_path(config_path: Path | None, default_path: Path) -> Path:
@@ -312,6 +331,10 @@ def _package_target(module_type: str, value: str) -> str:
     return project_link or value
 
 
+def _declared_package_target(package_name: str) -> str:
+    return resolve_declared_plugin_requirement(package_name)
+
+
 def _resolve_plugin_module(
     package: object | None,
     module_name: str | None,
@@ -351,9 +374,206 @@ def _resolve_driver_builtin(
     return ""
 
 
+def _run_uv_for_project(*args: str) -> None:
+    executable = find_uv_executable()
+    cache_dir = uv_cache_dir()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["UV_CACHE_DIR"] = str(cache_dir)
+    result = subprocess.run(
+        [executable, *args],
+        cwd=_project_root(),
+        check=False,
+        env=env,
+    )
+    if result.returncode != 0:
+        raise click.ClickException(_("uv command failed"))
+
+
+def _sync_main_project() -> None:
+    args = ["sync"]
+    if (_project_root() / "uv.lock").exists():
+        args.append("--locked")
+    _run_uv_for_project(*args)
+
+
+def _initialize_user_environment() -> None:
+    _sync_main_project()
+    ensure_project_plugin_config()
+    ensure_plugin_project()
+    sync_plugin_project(locked=True)
+
+
+def _repair_user_environment() -> None:
+    _initialize_user_environment()
+
+
+def _raise_click_runtime_error(exc: RuntimeError) -> None:
+    raise click.ClickException(str(exc)) from exc
+
+
+def _runtime_export_targets() -> list[tuple[Path, Path]]:
+    project_root = _project_root()
+    return [
+        (project_root / "apeiria.config.toml", Path("apeiria.config.toml")),
+        (project_root / "apeiria.plugins.toml", Path("apeiria.plugins.toml")),
+        (project_root / "apeiria.adapters.toml", Path("apeiria.adapters.toml")),
+        (project_root / "apeiria.drivers.toml", Path("apeiria.drivers.toml")),
+        (
+            plugin_project_pyproject_path(),
+            Path(".apeiria/extensions/pyproject.toml"),
+        ),
+        (
+            plugin_project_lock_path(),
+            Path(".apeiria/extensions/uv.lock"),
+        ),
+    ]
+
+
+def _copy_if_exists(source: Path, destination: Path) -> bool:
+    if not source.exists():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return True
+
+
+def _replace_managed_file(source: Path, destination: Path) -> bool:
+    if not source.exists():
+        if destination.exists():
+            destination.unlink()
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return True
+
+
+def _check_system_dependencies() -> None:
+    missing: list[str] = []
+    if shutil.which("uv") is None:
+        missing.append("uv")
+
+    if missing:
+        _fail(_("missing system dependencies: {deps}").format(deps=", ".join(missing)))
+
+    web_dir = _project_root() / "web"
+    needs_frontend_toolchain = (
+        (web_dir / "package.json").is_file() and not (web_dir / "dist").is_dir()
+    )
+    frontend_missing: list[str] = []
+    if needs_frontend_toolchain:
+        if shutil.which("node") is None:
+            frontend_missing.append("node")
+        if shutil.which("pnpm") is None and shutil.which("npm") is None:
+            frontend_missing.append("pnpm-or-npm")
+    if frontend_missing:
+        click.echo(
+            _("frontend toolchain missing: {deps}").format(
+                deps=", ".join(frontend_missing)
+            ),
+            err=True,
+        )
+
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli() -> None:
     """Apeiria project tools."""
+
+
+@cli.group(
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=_("Inspect and migrate Apeiria environments."),
+)
+def env() -> None:
+    """Inspect and migrate Apeiria environments."""
+
+
+@cli.command(help=_("Initialize Apeiria user environment with uv."))
+def init() -> None:
+    _check_system_dependencies()
+    try:
+        _initialize_user_environment()
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
+    click.echo(_("initialized environment"))
+
+
+@cli.command(help=_("Repair Apeiria user environment with uv."))
+def repair() -> None:
+    _check_system_dependencies()
+    try:
+        _repair_user_environment()
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
+    click.echo(_("repaired environment"))
+
+
+@cli.command(help=_("Run bot.py with the current project Python environment."))
+@click.argument("extra_args", nargs=-1)
+def run(extra_args: tuple[str, ...]) -> None:
+    result = subprocess.run(
+        [sys.executable, "bot.py", *extra_args],
+        cwd=_project_root(),
+        check=False,
+    )
+    if result.returncode != 0:
+        raise click.exceptions.Exit(result.returncode)
+
+
+@env.command("info", help=_("Show current Apeiria environment paths and status."))
+def env_info() -> None:
+    project_root = _project_root()
+    plugin_root = plugin_project_root()
+    lines = [
+        f"project_root={project_root}",
+        f"uv_available={shutil.which('uv') is not None}",
+        f"node_available={shutil.which('node') is not None}",
+        f"pnpm_available={shutil.which('pnpm') is not None}",
+        f"npm_available={shutil.which('npm') is not None}",
+        f"main_lock_exists={(project_root / 'uv.lock').exists()}",
+        f"plugin_project={plugin_root}",
+        f"plugin_project_exists={plugin_project_exists()}",
+        f"plugin_lock_exists={plugin_project_lock_path().exists()}",
+        f"plugin_config_exists={(project_root / 'apeiria.plugins.toml').exists()}",
+        f"adapter_config_exists={(project_root / 'apeiria.adapters.toml').exists()}",
+        f"driver_config_exists={(project_root / 'apeiria.drivers.toml').exists()}",
+    ]
+    for line in lines:
+        click.echo(line)
+
+
+@env.command("export", help=_("Export local runtime state for migration."))
+@click.argument("output_dir", required=False)
+def env_export(output_dir: str | None) -> None:
+    target_root = (
+        Path(output_dir).expanduser().resolve()
+        if output_dir
+        else (_project_root() / ".apeiria" / "export").resolve()
+    )
+    copied = 0
+    for source, relative_path in _runtime_export_targets():
+        if _copy_if_exists(source, target_root / relative_path):
+            copied += 1
+    click.echo(_("exported files: {count}").format(count=copied))
+    click.echo(_("export target: {target}").format(target=target_root))
+
+
+@env.command("import", help=_("Import local runtime state from a migration bundle."))
+@click.argument("input_dir")
+def env_import(input_dir: str) -> None:
+    source_root = Path(input_dir).expanduser().resolve()
+    if not source_root.is_dir():
+        _fail(_("import source not found: {path}").format(path=source_root))
+    copied = 0
+    for destination, relative_path in _runtime_export_targets():
+        source = source_root / relative_path
+        if _replace_managed_file(source, destination):
+            copied += 1
+    try:
+        _initialize_user_environment()
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
+    click.echo(_("imported files: {count}").format(count=copied))
 
 
 @cli.group(
@@ -412,13 +632,15 @@ def driver_store(query: str | None) -> None:
 
 @plugin.command(
     "init",
-    help=_("Create apeiria.plugins.toml if it does not exist."),
+    help=_("Create apeiria.plugins.toml and the user plugin project if missing."),
     hidden=True,
 )
 @click.option("--config", "config_arg", type=click.Path(dir_okay=False))
 def plugin_init(config_arg: str | None) -> None:
     target = ensure_project_plugin_config(_config_path(config_arg))
+    plugin_root = ensure_plugin_project()
     click.echo(_("initialized: {target}").format(target=target))
+    click.echo(_("initialized: {target}").format(target=plugin_root))
 
 
 @plugin.command("list", help=_("List registered plugins or installed plugin packages."))
@@ -553,7 +775,10 @@ def plugin_install(
     if not target:
         _fail(_("package name is required"))
     resolved_module = _resolve_plugin_module(package, module_name)
-    install_package(target, pip_args)
+    try:
+        add_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     bind_project_plugin_package(target, resolved_module)
     click.echo(_("installed package: {package}").format(package=target))
 
@@ -591,8 +816,11 @@ def plugin_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
         _("choose package"),
         _installed_plugin_package_names(),
     )
-    target = _package_target("plugin", selected_package)
-    update_package(target, pip_args)
+    target = _declared_package_target(selected_package)
+    try:
+        update_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     click.echo(_("updated package: {package}").format(package=target))
 
 
@@ -617,7 +845,7 @@ def plugin_uninstall(
         _("choose package"),
         _installed_plugin_package_names(),
     )
-    target = _package_target("plugin", selected_package)
+    target = _declared_package_target(selected_package)
     registered_modules = get_project_plugin_package_modules(target)
     if not registered_modules:
         registered_module = module_name.strip() if module_name else ""
@@ -631,7 +859,10 @@ def plugin_uninstall(
         registered_modules = [registered_module]
     for registered_module in registered_modules:
         _ensure_plugin_can_be_removed(registered_module)
-    uninstall_package(target, pip_args)
+    try:
+        remove_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     if get_project_plugin_package_modules(target):
         unbind_project_plugin_package(target)
     else:
@@ -834,7 +1065,10 @@ def adapter_install(
     if not target:
         _fail(_("package name is required"))
     resolved_module = _resolve_adapter_module(package, module_name)
-    install_package(target, pip_args)
+    try:
+        add_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     bind_project_adapter_package(target, resolved_module)
     click.echo(_("installed package: {package}").format(package=target))
 
@@ -877,8 +1111,11 @@ def adapter_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
         _("choose package"),
         _installed_adapter_package_names(),
     )
-    target = _package_target("adapter", selected_package)
-    update_package(target, pip_args)
+    target = _declared_package_target(selected_package)
+    try:
+        update_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     click.echo(_("updated package: {package}").format(package=target))
 
 
@@ -903,7 +1140,7 @@ def adapter_uninstall(
         _("choose package"),
         _installed_adapter_package_names(),
     )
-    target = _package_target("adapter", selected_package)
+    target = _declared_package_target(selected_package)
     registered_modules = get_project_adapter_package_modules(target)
     if not registered_modules:
         registered_module = module_name.strip() if module_name else ""
@@ -915,7 +1152,10 @@ def adapter_uninstall(
         if not registered_module:
             _fail(_("adapter module name is required when package is not from store"))
         registered_modules = [registered_module]
-    uninstall_package(target, pip_args)
+    try:
+        remove_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     if get_project_adapter_package_modules(target):
         unbind_project_adapter_package(target)
     else:
@@ -1071,7 +1311,10 @@ def driver_install(
     if not target:
         _fail(_("package name is required"))
     resolved_builtin = _resolve_driver_builtin(package, builtin_name)
-    install_package(target, pip_args)
+    try:
+        add_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     bind_project_driver_package(target, resolved_builtin)
     click.echo(_("installed package: {package}").format(package=target))
 
@@ -1114,8 +1357,11 @@ def driver_update(package_name: str | None, pip_args: tuple[str, ...]) -> None:
         _("choose package"),
         _installed_driver_package_names(),
     )
-    target = _package_target("driver", selected_package)
-    update_package(target, pip_args)
+    target = _declared_package_target(selected_package)
+    try:
+        update_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     click.echo(_("updated package: {package}").format(package=target))
 
 
@@ -1140,7 +1386,7 @@ def driver_uninstall(
         _("choose package"),
         _installed_driver_package_names(),
     )
-    target = _package_target("driver", selected_package)
+    target = _declared_package_target(selected_package)
     registered_builtin = get_project_driver_package_builtin(target)
     if not registered_builtin:
         resolved_builtin = builtin_name.strip() if builtin_name else ""
@@ -1152,7 +1398,10 @@ def driver_uninstall(
         if not resolved_builtin:
             _fail(_("driver builtin name is required when package is not from store"))
         registered_builtin = [resolved_builtin]
-    uninstall_package(target, pip_args)
+    try:
+        remove_plugin_requirement(target, pip_args)
+    except RuntimeError as exc:
+        _raise_click_runtime_error(exc)
     if get_project_driver_package_builtin(target):
         unbind_project_driver_package(target)
     else:

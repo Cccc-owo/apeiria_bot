@@ -219,6 +219,13 @@ def load_project_plugins(config_path: Path | None = None) -> None:
 
     import nonebot
 
+    loaded_modules = {
+        plugin.module_name
+        for plugin in nonebot.get_loaded_plugins()
+        if getattr(plugin, "module_name", None)
+    }
+    modules = [module for module in modules if module not in loaded_modules]
+
     existing_dirs: list[str] = []
     for directory in directories:
         if not directory.is_dir():

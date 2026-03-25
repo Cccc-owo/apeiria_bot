@@ -20,6 +20,10 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger("apeiria.user_config")
 
+_PROJECT_NONEBOT_DEFAULTS: dict[str, Any] = {
+    "localstore_use_cwd": True,
+}
+
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -58,7 +62,8 @@ def _normalize_config(data: dict[str, Any]) -> dict[str, Any]:
 
 def _read_nonebot_overrides(config_path: Path) -> dict[str, Any]:
     data = _load_config(config_path)
-    config = _normalize_config(data)
+    config = dict(_PROJECT_NONEBOT_DEFAULTS)
+    config.update(_normalize_config(data))
     config.update(build_legacy_nonebot_overrides(data))
     return config
 

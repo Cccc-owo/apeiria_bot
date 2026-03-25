@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import nonebot
 
 from apeiria.user_adapters import load_project_adapters
+from apeiria.user_plugin_env import inject_plugin_site_packages
 from apeiria.user_plugins import load_project_plugins
 
 if TYPE_CHECKING:
@@ -48,8 +49,7 @@ def _apply_user_module(module: ModuleType, driver: object) -> None:
     signature = inspect.signature(configure)
     parameters = list(signature.parameters.values())
     accepts_varargs = any(
-        parameter.kind is inspect.Parameter.VAR_POSITIONAL
-        for parameter in parameters
+        parameter.kind is inspect.Parameter.VAR_POSITIONAL for parameter in parameters
     )
     positional_params = [
         parameter
@@ -67,6 +67,7 @@ def _apply_user_module(module: ModuleType, driver: object) -> None:
 
 
 def load_user_setup(user_bot: Path | None = None) -> None:
+    inject_plugin_site_packages()
     target = user_bot or _project_root() / "user_bot.py"
     module = _load_user_module(target)
     if module is not None:
@@ -75,4 +76,5 @@ def load_user_setup(user_bot: Path | None = None) -> None:
 
 
 def load_user_plugins() -> None:
+    inject_plugin_site_packages()
     load_project_plugins()

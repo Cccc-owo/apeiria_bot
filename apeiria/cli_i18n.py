@@ -5,6 +5,17 @@ import os
 
 MESSAGES_ZH_CN = {
     "Apeiria project tools.": "Apeiria 项目工具。",
+    "Inspect and migrate Apeiria environments.": "查看并迁移 Apeiria 环境。",
+    "Initialize Apeiria user environment with uv.": "使用 uv 初始化 Apeiria 用户环境。",
+    "Repair Apeiria user environment with uv.": "使用 uv 修复 Apeiria 用户环境。",
+    "Run bot.py with the current project Python environment.": (
+        "使用当前项目 Python 环境运行 bot.py。"
+    ),
+    "Show current Apeiria environment paths and status.": (
+        "显示当前 Apeiria 环境路径和状态。"
+    ),
+    "Export local runtime state for migration.": "导出本地运行态以便迁移。",
+    "Import local runtime state from a migration bundle.": ("从迁移包导入本地运行态。"),
     "Manage Apeiria project plugins.": "管理 Apeiria 项目插件。",
     "Manage Apeiria project adapters.": "管理 Apeiria 项目适配器。",
     "Manage Apeiria project drivers.": "管理 Apeiria 项目驱动。",
@@ -22,6 +33,13 @@ MESSAGES_ZH_CN = {
     "Search registered plugin config only.": "仅搜索已登记插件配置。",
     "Search registered adapter config only.": "仅搜索已登记适配器配置。",
     "initialized: {target}": "已初始化：{target}",
+    "initialized environment": "已初始化用户环境",
+    "repaired environment": "已修复用户环境",
+    "exported files: {count}": "已导出文件：{count}",
+    "export target: {target}": "导出目标：{target}",
+    "imported files: {count}": "已导入文件：{count}",
+    "missing system dependencies: {deps}": "缺少系统依赖：{deps}",
+    "frontend toolchain missing: {deps}": "缺少前端工具链：{deps}",
     "registered module: {module}": "已注册模块：{module}",
     "unregistered module: {module}": "已取消注册模块：{module}",
     "installed package: {package}": "已安装包：{package}",
@@ -39,6 +57,9 @@ MESSAGES_ZH_CN = {
     ),
     "Create apeiria.plugins.toml if it does not exist.": (
         "在 apeiria.plugins.toml 不存在时创建它。"
+    ),
+    "Create apeiria.plugins.toml and the user plugin project if missing.": (
+        "在 apeiria.plugins.toml 或用户插件子项目不存在时创建它们。"
     ),
     "List registered plugins or installed plugin packages.": (
         "列出已登记插件或已安装插件包。"
@@ -126,6 +147,8 @@ MESSAGES_ZH_CN = {
     "nb-cli is required for official store features": (
         "官方商店功能需要当前环境安装 nb-cli"
     ),
+    "uv command failed": "uv 命令执行失败",
+    "import source not found: {path}": "导入源不存在：{path}",
     "--installed, --registered and --store cannot be used together": (
         "--installed、--registered 和 --store 不能同时使用"
     ),

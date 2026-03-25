@@ -1,23 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from typing import Literal
 
-from packaging.requirements import Requirement
-
 MODULE_TYPE = Literal["plugin", "adapter", "driver"]
-
-
-class _ApeiriaConfigBridge:
-    def add_dependency(self, *packages: Requirement, group: str | None = None) -> None:
-        _ = packages, group
-
-    def update_dependency(self, *packages: Requirement) -> None:
-        _ = packages
-
-    def remove_dependency(self, *packages: Requirement) -> list[Requirement]:
-        return list(packages)
 
 
 def _load_handlers() -> tuple[object, object, object, object, object]:
@@ -36,14 +22,6 @@ def _load_handlers() -> tuple[object, object, object, object, object]:
         format_package_results,
         find_exact_package,
     )
-
-
-def _load_environment_executor() -> object:
-    try:
-        from nb_cli.handlers.environment import EnvironmentExecutor
-    except ModuleNotFoundError as exc:
-        raise RuntimeError("nb-cli") from exc
-    return EnvironmentExecutor
 
 
 def search_store_packages(
@@ -79,43 +57,6 @@ def find_exact_store_package(
 def format_store_packages(items: list[object]) -> str:
     _, _, _, format_package_results, _ = _load_handlers()
     return str(format_package_results(items))
-
-
-def _run_environment_action(
-    action: Literal["install", "update", "uninstall"],
-    requirement: str,
-    extra_args: tuple[str, ...] = (),
-) -> None:
-    environment_executor_cls = _load_environment_executor()
-
-    async def _runner() -> None:
-        executor = await environment_executor_cls.get(
-            toml_manager=_ApeiriaConfigBridge(),
-            stdin=sys.stdin,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
-        package = Requirement(requirement)
-        if action == "install":
-            await executor.install(package, extra_args=extra_args)
-        elif action == "update":
-            await executor.update(package, extra_args=extra_args)
-        else:
-            await executor.uninstall(package, extra_args=extra_args)
-
-    asyncio.run(_runner())
-
-
-def install_package(requirement: str, extra_args: tuple[str, ...] = ()) -> None:
-    _run_environment_action("install", requirement, extra_args)
-
-
-def update_package(requirement: str, extra_args: tuple[str, ...] = ()) -> None:
-    _run_environment_action("update", requirement, extra_args)
-
-
-def uninstall_package(requirement: str, extra_args: tuple[str, ...] = ()) -> None:
-    _run_environment_action("uninstall", requirement, extra_args)
 
 
 def prompt_select_store_package(
