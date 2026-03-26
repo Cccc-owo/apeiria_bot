@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import ValidationError
 
@@ -16,7 +18,7 @@ from apeiria.core.services.web_chat.protocol import (
     SessionDeletePayload,
     SessionUpdatePayload,
 )
-from apeiria.plugins.web_ui.auth import verify_token
+from apeiria.plugins.web_ui.auth import require_optional_auth, verify_token
 
 router = APIRouter()
 
@@ -24,10 +26,8 @@ router = APIRouter()
 @router.get("/assets/{asset_id}", response_model=None)
 async def get_chat_asset(
     asset_id: str,
-    token: str = Query(...),  # noqa: FAST002
+    _: Annotated[Any, Depends(require_optional_auth)],
 ) -> FileResponse | RedirectResponse:
-    verify_token(token)
-
     asset = web_chat_service.get_asset(asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail=t("web_ui.chat.asset_not_found"))

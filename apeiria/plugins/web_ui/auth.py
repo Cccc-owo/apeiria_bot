@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from apeiria.core.i18n import t
@@ -51,3 +51,15 @@ async def require_auth(
 ) -> dict[str, Any]:
     """FastAPI dependency: require valid JWT token."""
     return verify_token(credentials.credentials)
+
+
+async def require_optional_auth(request: Request) -> dict[str, Any]:
+    """FastAPI dependency: require a bearer token when headers are handled manually."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=t("web_ui.auth.token_invalid"),
+        )
+    return verify_token(token)

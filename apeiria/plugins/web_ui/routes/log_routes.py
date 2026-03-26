@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from apeiria.plugins.web_ui.auth import verify_token
 
@@ -31,18 +31,13 @@ async def log_websocket(websocket: WebSocket) -> None:
     for line in log_buffer.get_recent(50):
         await websocket.send_text(line)
 
-    # Stream new logs
-    import asyncio
-
-    last_count = len(log_buffer._buffer)
+    subscription = log_buffer.subscribe()
     try:
         while True:
-            await asyncio.sleep(0.5)
-            current = list(log_buffer._buffer)
-            if len(current) > last_count:
-                new_lines = current[last_count:]
-                for line in new_lines:
-                    await websocket.send_text(line)
-            last_count = len(current)
+            await websocket.send_text(await subscription.queue.get())
+    except HTTPException:
+        pass
     except WebSocketDisconnect:
         pass
+    finally:
+        log_buffer.unsubscribe(subscription)
