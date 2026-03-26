@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal, overload
 
 import nonebot
 from nonebot.config import Config, Env
@@ -33,6 +33,9 @@ from apeiria.core.configs.registry import (
 )
 
 if TYPE_CHECKING:
+    from apeiria.config.adapters import AdapterConfig
+    from apeiria.config.drivers import DriverConfig
+    from apeiria.config.plugins import PluginConfig
     from apeiria.core.configs.models import RegisterConfig
 
 _CORE_SETTINGS_EXCLUDED_KEYS = {
@@ -213,7 +216,7 @@ class PluginConfigViewService:
         current = plugin_config_service.read_project_plugin_config()
         normalized_modules = self._normalize_entries(modules)
         normalized_dirs = self._normalize_entries(dirs)
-        config = {
+        config: PluginConfig = {
             "modules": normalized_modules,
             "dirs": normalized_dirs,
             "packages": {
@@ -612,26 +615,47 @@ class PluginConfigViewService:
             updates[key] = None
         return updates
 
+    @overload
     def _update_config_with_packages(
         self,
-        current: dict[str, Any],
+        current: AdapterConfig,
         entries: list[str],
-        key: str,
-    ) -> dict[str, Any]:
+        key: Literal["modules"],
+    ) -> AdapterConfig: ...
+
+    @overload
+    def _update_config_with_packages(
+        self,
+        current: DriverConfig,
+        entries: list[str],
+        key: Literal["builtin"],
+    ) -> DriverConfig: ...
+
+    def _update_config_with_packages(
+        self,
+        current: AdapterConfig | DriverConfig,
+        entries: list[str],
+        key: Literal["modules", "builtin"],
+    ) -> AdapterConfig | DriverConfig:
         normalized = self._normalize_entries(entries)
-        config: dict[str, Any] = {
-            key: normalized,
-            "packages": {
-                package_name: [item for item in items if item in normalized]
-                for package_name, items in current["packages"].items()
-            },
+        packages = {
+            package_name: [item for item in items if item in normalized]
+            for package_name, items in current["packages"].items()
         }
-        config["packages"] = {
+        packages = {
             package_name: items
-            for package_name, items in config["packages"].items()
+            for package_name, items in packages.items()
             if items
         }
-        return config
+        if key == "modules":
+            return {
+                "modules": normalized,
+                "packages": packages,
+            }
+        return {
+            "builtin": normalized,
+            "packages": packages,
+        }
 
 
 plugin_config_view_service = PluginConfigViewService()

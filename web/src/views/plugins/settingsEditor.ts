@@ -26,7 +26,7 @@ export interface PluginSettingsState {
   fields: PluginSettingField[]
 }
 
-export function displayFieldValue(value: unknown) {
+export function displayFieldValue (value: unknown) {
   if (value == null) return 'null'
   if (typeof value === 'string') return value
   try {
@@ -36,23 +36,23 @@ export function displayFieldValue(value: unknown) {
   }
 }
 
-export function isSequenceChipField(field: PluginSettingField) {
+export function isSequenceChipField (field: PluginSettingField) {
   return field.editor === 'chips'
 }
 
-export function isTextInputField(field: PluginSettingField) {
+export function isTextInputField (field: PluginSettingField) {
   return field.editor === 'input'
 }
 
-export function textInputType(field: PluginSettingField) {
+export function textInputType (field: PluginSettingField) {
   return field.type === 'int' || field.type === 'float' ? 'number' : 'text'
 }
 
-export function isNullableBoolField(field: PluginSettingField) {
+export function isNullableBoolField (field: PluginSettingField) {
   return field.type === 'bool' && field.allows_null
 }
 
-export function toEditorValue(field: PluginSettingField, sourceValue: unknown) {
+export function toEditorValue (field: PluginSettingField, sourceValue: unknown) {
   if (sourceValue == null && field.allows_null) {
     return null
   }
@@ -72,7 +72,7 @@ export function toEditorValue(field: PluginSettingField, sourceValue: unknown) {
   return sourceValue ?? ''
 }
 
-export function buildSettingsForm(fields: PluginSettingField[]) {
+export function buildSettingsForm (fields: PluginSettingField[]) {
   const next: Record<string, unknown> = {}
   for (const field of fields) {
     const sourceValue = field.has_local_override ? field.local_value : null
@@ -81,11 +81,11 @@ export function buildSettingsForm(fields: PluginSettingField[]) {
   return next
 }
 
-export function buildOverrideInitialValue(field: PluginSettingField) {
+export function buildOverrideInitialValue (field: PluginSettingField) {
   return toEditorValue(field, field.current_value ?? field.default)
 }
 
-function coercePrimitiveValue(typeName: string | null, value: unknown) {
+function coercePrimitiveValue (typeName: string | null, value: unknown) {
   if (typeName === 'int') {
     if (typeof value !== 'number' || !Number.isInteger(value)) {
       throw new Error('invalid int')
@@ -106,7 +106,7 @@ function coercePrimitiveValue(typeName: string | null, value: unknown) {
   return String(value)
 }
 
-function normalizeScalarNumberValue(
+function normalizeScalarNumberValue (
   typeName: 'int' | 'float',
   rawValue: unknown,
 ) {
@@ -130,7 +130,7 @@ function normalizeScalarNumberValue(
   return numericValue
 }
 
-function normalizeSequenceValue(field: PluginSettingField, rawValue: unknown) {
+function normalizeSequenceValue (field: PluginSettingField, rawValue: unknown) {
   if (rawValue == null && field.allows_null) {
     return null
   }
@@ -144,11 +144,11 @@ function normalizeSequenceValue(field: PluginSettingField, rawValue: unknown) {
     values = parsed
   }
   return values
-    .map((item) => coercePrimitiveValue(field.item_type, item))
-    .filter((item) => item !== '')
+    .map(item => coercePrimitiveValue(field.item_type, item))
+    .filter(item => item !== '')
 }
 
-export function normalizeFieldValueForSave(
+export function normalizeFieldValueForSave (
   field: PluginSettingField,
   rawValue: unknown,
 ) {
@@ -178,7 +178,7 @@ export function normalizeFieldValueForSave(
   return rawValue
 }
 
-export function normalizeComparableFieldValue(
+export function normalizeComparableFieldValue (
   field: PluginSettingField,
   value: unknown,
 ) {
@@ -186,13 +186,13 @@ export function normalizeComparableFieldValue(
   if (field.type === 'float') return Number(value)
   if (field.type_category === 'sequence') {
     return Array.isArray(value)
-      ? value.map((item) => field.item_type === 'float' ? Number(item) : item)
+      ? value.map(item => field.item_type === 'float' ? Number(item) : item)
       : []
   }
   return value
 }
 
-export function resolveNullableFieldValue(
+export function resolveNullableFieldValue (
   field: PluginSettingField,
   value: unknown,
 ) {
@@ -200,11 +200,11 @@ export function resolveNullableFieldValue(
   throw new Error('null not allowed')
 }
 
-function isSameSettingValue(left: unknown, right: unknown) {
+function isSameSettingValue (left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-export function buildChangedValues(
+export function buildChangedValues (
   fields: PluginSettingField[],
   form: Record<string, unknown>,
   invalidJsonMessage: string,
@@ -228,7 +228,7 @@ export function buildChangedValues(
   return values
 }
 
-export function hasPendingChanges(
+export function hasPendingChanges (
   fields: PluginSettingField[],
   form: Record<string, unknown>,
   invalidJsonMessage: string,

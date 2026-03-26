@@ -3,11 +3,11 @@
     <div class="page-header">
       <h1 class="page-title">{{ t('groups.title') }}</h1>
       <div class="page-actions">
-        <v-btn variant="tonal" :loading="loading" @click="loadGroups">{{ t('common.refresh') }}</v-btn>
+        <v-btn :loading="loading" variant="tonal" @click="loadGroups">{{ t('common.refresh') }}</v-btn>
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
       {{ errorMessage }}
     </v-alert>
 
@@ -34,34 +34,40 @@
       <v-card-text class="groups-filter-bar">
         <v-text-field
           v-model="search"
-          :label="t('groups.search')"
-          prepend-inner-icon="mdi-magnify"
+          class="groups-filter-bar__search"
+          clearable
           density="compact"
           hide-details
-          clearable
-          class="groups-filter-bar__search"
+          :label="t('groups.search')"
+          prepend-inner-icon="mdi-magnify"
         />
         <v-select
           v-model="statusFilter"
-          :items="statusFilterOptions"
-          :label="t('groups.statusFilter')"
+          class="groups-filter-bar__select"
           density="compact"
           hide-details
-          class="groups-filter-bar__select"
+          :items="statusFilterOptions"
+          :label="t('groups.statusFilter')"
         />
         <v-select
           v-model="pluginFilter"
-          :items="pluginFilterOptions"
-          :label="t('groups.pluginFilter')"
+          class="groups-filter-bar__select"
           density="compact"
           hide-details
-          class="groups-filter-bar__select"
+          :items="pluginFilterOptions"
+          :label="t('groups.pluginFilter')"
         />
       </v-card-text>
     </v-card>
 
     <v-card class="page-panel">
-      <v-data-table :headers="headers" :items="filteredGroups" :loading="loading" density="compact" class="page-table groups-table">
+      <v-data-table
+        class="page-table groups-table"
+        density="compact"
+        :headers="headers"
+        :items="filteredGroups"
+        :loading="loading"
+      >
         <template #item.group_name="{ item }">
           <div class="groups-table__name">
             <span class="font-weight-medium">{{ item.group_name || t('groups.unnamed') }}</span>
@@ -70,11 +76,11 @@
         </template>
         <template #item.bot_status="{ item }">
           <v-switch
-            :model-value="item.bot_status"
             color="success"
             hide-details
             inset
             :loading="pendingGroupId === item.group_id"
+            :model-value="item.bot_status"
             @update:model-value="toggleGroupStatus(item, $event)"
           />
         </template>
@@ -82,7 +88,13 @@
           <div class="groups-table__plugins">
             <span v-if="value.length === 0" class="text-medium-emphasis">{{ t('common.none') }}</span>
             <template v-else>
-              <v-chip v-for="plugin in value.slice(0, 3)" :key="plugin" size="x-small" color="warning" variant="tonal">
+              <v-chip
+                v-for="plugin in value.slice(0, 3)"
+                :key="plugin"
+                color="warning"
+                size="x-small"
+                variant="tonal"
+              >
                 {{ plugin }}
               </v-chip>
               <span v-if="value.length > 3" class="text-caption text-medium-emphasis">
@@ -92,7 +104,7 @@
           </div>
         </template>
         <template #item.actions="{ item }">
-          <v-btn size="small" variant="tonal" color="primary" @click="openPluginDialog(item)">
+          <v-btn color="primary" size="small" variant="tonal" @click="openPluginDialog(item)">
             {{ t('groups.settings') }}
           </v-btn>
         </template>
@@ -118,23 +130,23 @@
           </div>
           <v-alert
             v-if="protectedPluginCount > 0"
+            density="comfortable"
             type="info"
             variant="tonal"
-            density="comfortable"
           >
             {{ t('groups.protectedInfo') }}
           </v-alert>
           <v-autocomplete
             v-model="selectedDisabledPlugins"
-            :items="pluginOptions"
+            chips
+            class="group-dialog__field"
+            closable-chips
+            density="compact"
             item-title="title"
             item-value="value"
+            :items="pluginOptions"
             :label="t('groups.disabledPlugins')"
-            chips
-            closable-chips
             multiple
-            density="compact"
-            class="group-dialog__field"
           />
         </v-card-text>
         <v-card-actions>
@@ -150,160 +162,160 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { getGroups, getPlugins, updateGroup, updateGroupPlugins } from '@/api'
-import type { PluginItem } from '@/api'
-import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
+  import { computed, onMounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { getGroups, getPlugins, updateGroup, updateGroupPlugins } from '@/api'
+  import type { PluginItem } from '@/api'
+  import { getErrorMessage } from '@/api/client'
+  import { useNoticeStore } from '@/stores/notice'
 
-interface GroupRow {
-  group_id: string
-  group_name: string | null
-  bot_status: boolean
-  disabled_plugins: string[]
-}
+  interface GroupRow {
+    group_id: string
+    group_name: string | null
+    bot_status: boolean
+    disabled_plugins: string[]
+  }
 
-interface PluginOption {
-  title: string
-  value: string
-  disabled?: boolean
-}
+  interface PluginOption {
+    title: string
+    value: string
+    disabled?: boolean
+  }
 
-const groups = ref<GroupRow[]>([])
-const pluginOptions = ref<PluginOption[]>([])
-const protectedPluginCount = ref(0)
-const loading = ref(false)
-const pendingGroupId = ref('')
-const errorMessage = ref('')
-const pluginDialogVisible = ref(false)
-const savingPlugins = ref(false)
-const editingGroup = ref<GroupRow | null>(null)
-const selectedDisabledPlugins = ref<string[]>([])
-const search = ref('')
-const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
-const pluginFilter = ref<'all' | 'customized' | 'clean'>('all')
-const noticeStore = useNoticeStore()
-const { t } = useI18n()
+  const groups = ref<GroupRow[]>([])
+  const pluginOptions = ref<PluginOption[]>([])
+  const protectedPluginCount = ref(0)
+  const loading = ref(false)
+  const pendingGroupId = ref('')
+  const errorMessage = ref('')
+  const pluginDialogVisible = ref(false)
+  const savingPlugins = ref(false)
+  const editingGroup = ref<GroupRow | null>(null)
+  const selectedDisabledPlugins = ref<string[]>([])
+  const search = ref('')
+  const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
+  const pluginFilter = ref<'all' | 'customized' | 'clean'>('all')
+  const noticeStore = useNoticeStore()
+  const { t } = useI18n()
 
-const headers = computed(() => [
-  { title: t('groups.name'), key: 'group_name' },
-  { title: t('groups.botStatus'), key: 'bot_status', sortable: false },
-  { title: t('groups.disabledPluginsHeader'), key: 'disabled_plugins', sortable: false },
-  { title: t('groups.actions'), key: 'actions', sortable: false },
-])
+  const headers = computed(() => [
+    { title: t('groups.name'), key: 'group_name' },
+    { title: t('groups.botStatus'), key: 'bot_status', sortable: false },
+    { title: t('groups.disabledPluginsHeader'), key: 'disabled_plugins', sortable: false },
+    { title: t('groups.actions'), key: 'actions', sortable: false },
+  ])
 
-const enabledGroupsCount = computed(() => groups.value.filter((item) => item.bot_status).length)
-const customizedGroupsCount = computed(() => groups.value.filter((item) => item.disabled_plugins.length > 0).length)
+  const enabledGroupsCount = computed(() => groups.value.filter(item => item.bot_status).length)
+  const customizedGroupsCount = computed(() => groups.value.filter(item => item.disabled_plugins.length > 0).length)
 
-const statusFilterOptions = computed(() => [
-  { title: t('groups.statusAll'), value: 'all' },
-  { title: t('groups.statusEnabled'), value: 'enabled' },
-  { title: t('groups.statusDisabled'), value: 'disabled' },
-])
+  const statusFilterOptions = computed(() => [
+    { title: t('groups.statusAll'), value: 'all' },
+    { title: t('groups.statusEnabled'), value: 'enabled' },
+    { title: t('groups.statusDisabled'), value: 'disabled' },
+  ])
 
-const pluginFilterOptions = computed(() => [
-  { title: t('groups.pluginFilterAll'), value: 'all' },
-  { title: t('groups.pluginFilterCustomized'), value: 'customized' },
-  { title: t('groups.pluginFilterClean'), value: 'clean' },
-])
+  const pluginFilterOptions = computed(() => [
+    { title: t('groups.pluginFilterAll'), value: 'all' },
+    { title: t('groups.pluginFilterCustomized'), value: 'customized' },
+    { title: t('groups.pluginFilterClean'), value: 'clean' },
+  ])
 
-const filteredGroups = computed(() => {
-  const keyword = search.value.trim().toLowerCase()
-  return groups.value.filter((item) => {
-    const matchesKeyword = !keyword || [
-      item.group_id,
-      item.group_name || '',
-      ...item.disabled_plugins,
-    ].some(value => value.toLowerCase().includes(keyword))
+  const filteredGroups = computed(() => {
+    const keyword = search.value.trim().toLowerCase()
+    return groups.value.filter(item => {
+      const matchesKeyword = !keyword || [
+        item.group_id,
+        item.group_name || '',
+        ...item.disabled_plugins,
+      ].some(value => value.toLowerCase().includes(keyword))
 
-    const matchesStatus = statusFilter.value === 'all'
-      || (statusFilter.value === 'enabled' && item.bot_status)
-      || (statusFilter.value === 'disabled' && !item.bot_status)
+      const matchesStatus = statusFilter.value === 'all'
+        || (statusFilter.value === 'enabled' && item.bot_status)
+        || (statusFilter.value === 'disabled' && !item.bot_status)
 
-    const matchesPluginState = pluginFilter.value === 'all'
-      || (pluginFilter.value === 'customized' && item.disabled_plugins.length > 0)
-      || (pluginFilter.value === 'clean' && item.disabled_plugins.length === 0)
+      const matchesPluginState = pluginFilter.value === 'all'
+        || (pluginFilter.value === 'customized' && item.disabled_plugins.length > 0)
+        || (pluginFilter.value === 'clean' && item.disabled_plugins.length === 0)
 
-    return matchesKeyword && matchesStatus && matchesPluginState
+      return matchesKeyword && matchesStatus && matchesPluginState
+    })
   })
-})
 
-async function loadGroups() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    const [groupsResponse, pluginsResponse] = await Promise.all([getGroups(), getPlugins()])
-    groups.value = groupsResponse.data
-    protectedPluginCount.value = pluginsResponse.data.filter(
-      (item: PluginItem) => item.source !== 'framework' && item.is_protected,
-    ).length
-    pluginOptions.value = pluginsResponse.data
-      .filter((item: PluginItem) => item.source !== 'framework' && !item.is_protected)
-      .map((item: PluginItem) => ({
-        title: item.name || item.module_name,
-        value: item.module_name,
-      }))
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('groups.loadFailed'))
-  } finally {
-    loading.value = false
+  async function loadGroups () {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+      const [groupsResponse, pluginsResponse] = await Promise.all([getGroups(), getPlugins()])
+      groups.value = groupsResponse.data
+      protectedPluginCount.value = pluginsResponse.data.filter(
+        (item: PluginItem) => item.source !== 'framework' && item.is_protected,
+      ).length
+      pluginOptions.value = pluginsResponse.data
+        .filter((item: PluginItem) => item.source !== 'framework' && !item.is_protected)
+        .map((item: PluginItem) => ({
+          title: item.name || item.module_name,
+          value: item.module_name,
+        }))
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('groups.loadFailed'))
+    } finally {
+      loading.value = false
+    }
   }
-}
 
-async function toggleGroupStatus(item: GroupRow, nextValue: boolean | null) {
-  const botStatus = Boolean(nextValue)
-  const previous = item.bot_status
-  item.bot_status = botStatus
-  pendingGroupId.value = item.group_id
-  errorMessage.value = ''
-  try {
-    await updateGroup(item.group_id, botStatus)
-    noticeStore.show(
-      t('groups.botUpdated', {
-        groupId: item.group_id,
-        action: botStatus ? t('groups.enabled') : t('groups.disabled'),
-      }),
-      'success',
-    )
-  } catch (error) {
-    item.bot_status = previous
-    errorMessage.value = getErrorMessage(error, t('groups.updateFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    pendingGroupId.value = ''
+  async function toggleGroupStatus (item: GroupRow, nextValue: boolean | null) {
+    const botStatus = Boolean(nextValue)
+    const previous = item.bot_status
+    item.bot_status = botStatus
+    pendingGroupId.value = item.group_id
+    errorMessage.value = ''
+    try {
+      await updateGroup(item.group_id, botStatus)
+      noticeStore.show(
+        t('groups.botUpdated', {
+          groupId: item.group_id,
+          action: botStatus ? t('groups.enabled') : t('groups.disabled'),
+        }),
+        'success',
+      )
+    } catch (error) {
+      item.bot_status = previous
+      errorMessage.value = getErrorMessage(error, t('groups.updateFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      pendingGroupId.value = ''
+    }
   }
-}
 
-function openPluginDialog(item: GroupRow) {
-  editingGroup.value = item
-  selectedDisabledPlugins.value = [...item.disabled_plugins]
-  pluginDialogVisible.value = true
-}
-
-async function saveGroupPlugins() {
-  if (!editingGroup.value) return
-  savingPlugins.value = true
-  errorMessage.value = ''
-  try {
-    await updateGroupPlugins(editingGroup.value.group_id, selectedDisabledPlugins.value)
-    editingGroup.value.disabled_plugins = [...selectedDisabledPlugins.value]
-    pluginDialogVisible.value = false
-    noticeStore.show(
-      t('groups.settingsSaved', { groupId: editingGroup.value.group_id }),
-      'success',
-    )
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('groups.settingsSaveFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    savingPlugins.value = false
+  function openPluginDialog (item: GroupRow) {
+    editingGroup.value = item
+    selectedDisabledPlugins.value = [...item.disabled_plugins]
+    pluginDialogVisible.value = true
   }
-}
 
-onMounted(() => {
-  void loadGroups()
-})
+  async function saveGroupPlugins () {
+    if (!editingGroup.value) return
+    savingPlugins.value = true
+    errorMessage.value = ''
+    try {
+      await updateGroupPlugins(editingGroup.value.group_id, selectedDisabledPlugins.value)
+      editingGroup.value.disabled_plugins = [...selectedDisabledPlugins.value]
+      pluginDialogVisible.value = false
+      noticeStore.show(
+        t('groups.settingsSaved', { groupId: editingGroup.value.group_id }),
+        'success',
+      )
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('groups.settingsSaveFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      savingPlugins.value = false
+    }
+  }
+
+  onMounted(() => {
+    void loadGroups()
+  })
 </script>
 
 <style scoped>

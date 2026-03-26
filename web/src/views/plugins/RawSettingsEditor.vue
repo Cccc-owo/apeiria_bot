@@ -3,47 +3,53 @@
     <div class="raw-settings-editor__toolbar">
       <div class="text-caption text-medium-emphasis">{{ description }}</div>
       <div class="raw-settings-editor__actions">
-        <v-btn variant="text" size="small" :loading="loading" @click="$emit('reload')">
+        <v-btn :loading="loading" size="small" variant="text" @click="$emit('reload')">
           {{ reloadLabel }}
         </v-btn>
-        <v-btn color="primary" size="small" :disabled="!dirty" :loading="saving" @click="$emit('save')">
+        <v-btn
+          color="primary"
+          :disabled="!dirty"
+          :loading="saving"
+          size="small"
+          @click="$emit('save')"
+        >
           {{ saveLabel }}
         </v-btn>
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
       {{ errorMessage }}
     </v-alert>
 
     <MonacoEditor
       v-model="model"
+      :height="380"
       language="toml"
       :read-only="loading || saving"
-      :height="380"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import MonacoEditor from './MonacoEditor.vue'
+  import MonacoEditor from './MonacoEditor.vue'
 
-const model = defineModel<string>({ required: true })
+  const model = defineModel<string>({ required: true })
 
-defineProps<{
-  description: string
-  dirty: boolean
-  errorMessage: string
-  loading: boolean
-  reloadLabel: string
-  saveLabel: string
-  saving: boolean
-}>()
+  defineProps<{
+    description: string
+    dirty: boolean
+    errorMessage: string
+    loading: boolean
+    reloadLabel: string
+    saveLabel: string
+    saving: boolean
+  }>()
 
-defineEmits<{
-  reload: []
-  save: []
-}>()
+  defineEmits<{
+    reload: []
+    save: []
+  }>()
 </script>
 
 <style scoped>

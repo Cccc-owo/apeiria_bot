@@ -12,6 +12,15 @@ if TYPE_CHECKING:
 
 
 class WebChatMessageEvent(Event):
+    session: "ChatSession"
+    message: "WebChatMessage"
+    message_id: str
+    time: int
+    self_id: str
+    post_type: str
+    message_type: str
+    user_id: str
+
     def __init__(
         self,
         *,

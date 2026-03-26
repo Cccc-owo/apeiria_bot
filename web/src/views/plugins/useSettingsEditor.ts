@@ -31,7 +31,7 @@ interface UseSettingsEditorOptions {
   save: (values: Record<string, unknown>) => Promise<SettingsEditorResponse>
 }
 
-export function useSettingsEditor(options: UseSettingsEditorOptions) {
+export function useSettingsEditor (options: UseSettingsEditorOptions) {
   const noticeStore = useNoticeStore()
   const loading = ref(false)
   const saving = ref(false)
@@ -44,30 +44,30 @@ export function useSettingsEditor(options: UseSettingsEditorOptions) {
   const fields = computed(() => state.value?.fields ?? [])
   const hasPendingChangesState = computed(() =>
     hasPendingChanges(
-      fields.value.filter((field) => isFieldEditing(field)),
+      fields.value.filter(field => isFieldEditing(field)),
       form.value,
       options.messages.invalidJson,
     ),
   )
 
-  function applyState(nextState: PluginSettingsState) {
+  function applyState (nextState: PluginSettingsState) {
     state.value = nextState
     form.value = buildSettingsForm(nextState.fields)
     draftOverrides.value = {}
   }
 
-  function reset() {
+  function reset () {
     errorMessage.value = ''
     state.value = null
     form.value = {}
     draftOverrides.value = {}
   }
 
-  function isFieldEditing(field: PluginSettingField) {
+  function isFieldEditing (field: PluginSettingField) {
     return field.has_local_override || Boolean(draftOverrides.value[field.key])
   }
 
-  function startOverride(field: PluginSettingField) {
+  function startOverride (field: PluginSettingField) {
     draftOverrides.value = {
       ...draftOverrides.value,
       [field.key]: true,
@@ -75,7 +75,7 @@ export function useSettingsEditor(options: UseSettingsEditorOptions) {
     form.value[field.key] = buildOverrideInitialValue(field)
   }
 
-  async function reload() {
+  async function reload () {
     if (!options.load) return
     loading.value = true
     errorMessage.value = ''
@@ -89,8 +89,8 @@ export function useSettingsEditor(options: UseSettingsEditorOptions) {
     }
   }
 
-  async function submit() {
-    const editingFields = fields.value.filter((field) => isFieldEditing(field))
+  async function submit () {
+    const editingFields = fields.value.filter(field => isFieldEditing(field))
     let values: Record<string, unknown> = {}
     try {
       values = buildChangedValues(editingFields, form.value, options.messages.invalidJson)
@@ -118,7 +118,7 @@ export function useSettingsEditor(options: UseSettingsEditorOptions) {
     }
   }
 
-  async function clearField(field: PluginSettingField) {
+  async function clearField (field: PluginSettingField) {
     clearingKey.value = field.key
     errorMessage.value = ''
     try {

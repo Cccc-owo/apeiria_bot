@@ -6,13 +6,13 @@ export const useNoticeStore = defineStore('notice', () => {
   const message = ref('')
   const color = ref<'success' | 'error' | 'warning' | 'info'>('info')
 
-  function show(nextMessage: string, nextColor: 'success' | 'error' | 'warning' | 'info' = 'info') {
+  function show (nextMessage: string, nextColor: 'success' | 'error' | 'warning' | 'info' = 'info') {
     message.value = nextMessage
     color.value = nextColor
     visible.value = true
   }
 
-  function hide() {
+  function hide () {
     visible.value = false
   }
 

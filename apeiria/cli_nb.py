@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Literal
+from typing import Any, Literal
 
 MODULE_TYPE = Literal["plugin", "adapter", "driver"]
 
 
-def _load_handlers() -> tuple[object, object, object, object, object]:
+def _load_handlers() -> tuple[Any, Any, Any, Any, Any]:
     try:
         from nb_cli.cli.utils import find_exact_package, format_package_results
         from nb_cli.handlers.adapter import list_adapters

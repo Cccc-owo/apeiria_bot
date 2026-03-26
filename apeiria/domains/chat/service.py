@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from apeiria.core.services.web_chat.assets import ChatAsset
+    from apeiria.core.services.web_chat.protocol import WebUIPrincipal
 
 
 class ChatAssetNotFoundError(ValueError):
@@ -170,9 +171,10 @@ class ChatGatewayService:
                     active_session_id,
                 )
             case "session.list":
+                principal = self._require_principal(connection)
                 await web_chat_service.emit_session_list(
                     connection,
-                    connection.principal,
+                    principal,
                     request_id=frame.request_id,
                 )
             case "session.close":
@@ -201,8 +203,9 @@ class ChatGatewayService:
         active_session_id: str | None,
     ) -> str | None:
         payload = SessionCreatePayload.model_validate(frame.payload)
+        principal = self._require_principal(connection)
         session = web_chat_service.create_session(
-            connection.principal,
+            principal,
             payload,
         )
         active_session_id = session.session_id
@@ -213,7 +216,7 @@ class ChatGatewayService:
         )
         await web_chat_service.emit_session_list(
             connection,
-            connection.principal,
+            principal,
         )
         return active_session_id
 
@@ -224,8 +227,9 @@ class ChatGatewayService:
         active_session_id: str | None,
     ) -> str | None:
         payload = SessionUpdatePayload.model_validate(frame.payload)
+        principal = self._require_principal(connection)
         session = web_chat_service.update_session(
-            connection.principal,
+            principal,
             payload,
         )
         active_session_id = session.session_id
@@ -236,7 +240,7 @@ class ChatGatewayService:
         )
         await web_chat_service.emit_session_list(
             connection,
-            connection.principal,
+            principal,
         )
         return active_session_id
 
@@ -248,9 +252,10 @@ class ChatGatewayService:
     ) -> str | None:
         payload = MessageSendPayload.model_validate(frame.payload)
         await web_chat_service.handle_message(connection, payload)
+        principal = self._require_principal(connection)
         await web_chat_service.emit_session_list(
             connection,
-            connection.principal,
+            principal,
         )
         return active_session_id
 
@@ -293,6 +298,7 @@ class ChatGatewayService:
     ) -> str | None:
         """Close the active session tracked by this websocket connection."""
         if active_session_id:
+            principal = self._require_principal(connection)
             web_chat_service.close_session(active_session_id)
             await web_chat_service.emit_system_info(
                 connection,
@@ -300,7 +306,7 @@ class ChatGatewayService:
             )
             await web_chat_service.emit_session_list(
                 connection,
-                connection.principal,
+                principal,
             )
         return None
 
@@ -332,24 +338,31 @@ class ChatGatewayService:
         frame: ChatEnvelope,
         active_session_id: str | None,
     ) -> str | None:
-        if connection.principal is not None:
-            payload = SessionDeletePayload.model_validate(frame.payload)
-            deleted_session_id = web_chat_service.delete_session(
-                connection.principal,
-                payload,
-            )
-            if active_session_id == deleted_session_id:
-                active_session_id = None
-            await web_chat_service.emit_session_deleted(
-                connection,
-                deleted_session_id,
-                request_id=frame.request_id,
-            )
-            await web_chat_service.emit_session_list(
-                connection,
-                connection.principal,
-            )
+        principal = self._require_principal(connection)
+        payload = SessionDeletePayload.model_validate(frame.payload)
+        deleted_session_id = web_chat_service.delete_session(
+            principal,
+            payload,
+        )
+        if active_session_id == deleted_session_id:
+            active_session_id = None
+        await web_chat_service.emit_session_deleted(
+            connection,
+            deleted_session_id,
+            request_id=frame.request_id,
+        )
+        await web_chat_service.emit_session_list(
+            connection,
+            principal,
+        )
         return active_session_id
+
+    def _require_principal(self, connection: WebChatConnection) -> WebUIPrincipal:
+        principal = connection.principal
+        if principal is None:
+            msg = t("web_ui.chat.auth_required")
+            raise HTTPException(status_code=401, detail=msg)
+        return principal
 
 chat_gateway_service = ChatGatewayService()
 

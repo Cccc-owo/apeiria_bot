@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from apeiria.core.utils.helpers import get_plugin_protection_reason, safe_json_loads
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
 from apeiria.domains.permissions import permission_service
+
+if TYPE_CHECKING:
+    from apeiria.core.models.group import GroupConsole
 
 
 @dataclass(frozen=True)
@@ -96,7 +100,12 @@ class GroupService:
 
         await self.update_group_disabled_plugins(group_id, normalized)
 
-    async def _fetch_group(self, group_id: str, *, create_if_missing: bool = False):
+    async def _fetch_group(
+        self,
+        group_id: str,
+        *,
+        create_if_missing: bool = False,
+    ) -> "GroupConsole":
         from nonebot_plugin_orm import get_session
         from sqlalchemy import select
 
@@ -116,7 +125,7 @@ class GroupService:
                 raise ResourceNotFoundError(group_id)
             return row
 
-    def _to_record(self, row: object) -> GroupRecord:
+    def _to_record(self, row: "GroupConsole") -> GroupRecord:
         raw_disabled = getattr(row, "disabled_plugins", "[]")
         disabled_plugins = [
             module

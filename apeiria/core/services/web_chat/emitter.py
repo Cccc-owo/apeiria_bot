@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from .protocol import (
@@ -64,7 +64,7 @@ class WebChatEmitter:
             key=lambda item: (
                 item.last_message_at
                 or item.session.updated_at
-                or datetime.min.replace(tzinfo=UTC)
+                or datetime.min.replace(tzinfo=timezone.utc)
             ),
             reverse=True,
         )

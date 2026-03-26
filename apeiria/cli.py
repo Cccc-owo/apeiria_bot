@@ -10,6 +10,7 @@ import click
 
 from apeiria.cli_i18n import _
 from apeiria.cli_nb import (
+    MODULE_TYPE,
     find_exact_store_package,
     format_store_packages,
     prompt_select_store_package,
@@ -271,7 +272,10 @@ def _echo_store_packages(items: list[object]) -> None:
     click.echo(format_store_packages(items))
 
 
-def _store_packages(module_type: str, query: str | None = None) -> list[object]:
+def _store_packages(
+    module_type: MODULE_TYPE,
+    query: str | None = None,
+) -> list[object]:
     try:
         return search_store_packages(module_type, query)
     except RuntimeError as exc:
@@ -280,7 +284,10 @@ def _store_packages(module_type: str, query: str | None = None) -> list[object]:
         raise
 
 
-def _exact_store_package(module_type: str, value: str) -> object | None:
+def _exact_store_package(
+    module_type: MODULE_TYPE,
+    value: str,
+) -> object | None:
     try:
         return find_exact_store_package(module_type, value)
     except RuntimeError as exc:
@@ -289,7 +296,10 @@ def _exact_store_package(module_type: str, value: str) -> object | None:
         raise
 
 
-def _select_store_package(module_type: str, query: str | None = None) -> object:
+def _select_store_package(
+    module_type: MODULE_TYPE,
+    query: str | None = None,
+) -> object:
     try:
         return prompt_select_store_package(
             module_type,
@@ -326,7 +336,20 @@ def _store_project_link(item: object) -> str:
     return str(getattr(item, "project_link", "")).strip()
 
 
-def _package_target(module_type: str, value: str) -> str:
+def _store_package_dependency(
+    package: object | None,
+    fallback: str | None,
+) -> str | None:
+    if package is None:
+        return fallback
+    as_dependency = getattr(package, "as_dependency", None)
+    if not callable(as_dependency):
+        return fallback
+    dependency = as_dependency()
+    return dependency if isinstance(dependency, str) else fallback
+
+
+def _package_target(module_type: MODULE_TYPE, value: str) -> str:
     package = _exact_store_package(module_type, value)
     if package is None:
         return value
@@ -336,6 +359,13 @@ def _package_target(module_type: str, value: str) -> str:
 
 def _declared_package_target(package_name: str) -> str:
     return resolve_declared_plugin_requirement(package_name)
+
+
+def _require_package_target(target: str | None) -> str:
+    if target:
+        return target
+    _fail(_("package name is required"))
+    raise AssertionError("unreachable")
 
 
 def _resolve_plugin_module(
@@ -554,7 +584,7 @@ def _build_frontend() -> None:
     if shutil.which("node") is None:
         _fail(_("frontend toolchain missing: {deps}").format(deps="node"))
 
-    build_cmd: list[str]
+    build_cmd = ["npm", "run", "build"]
     if shutil.which("pnpm") is not None:
         build_cmd = ["pnpm", "build"]
     elif shutil.which("npm") is not None:
@@ -881,9 +911,7 @@ def plugin_install(
         if use_store or not package_name
         else _exact_store_package("plugin", package_name)
     )
-    target = package.as_dependency() if package else package_name
-    if not target:
-        _fail(_("package name is required"))
+    target = _require_package_target(_store_package_dependency(package, package_name))
     resolved_module = _resolve_plugin_module(package, module_name)
     try:
         add_plugin_requirement(target, pip_args)
@@ -1177,9 +1205,7 @@ def adapter_install(
         if use_store or not package_name
         else _exact_store_package("adapter", package_name)
     )
-    target = package.as_dependency() if package else package_name
-    if not target:
-        _fail(_("package name is required"))
+    target = _require_package_target(_store_package_dependency(package, package_name))
     resolved_module = _resolve_adapter_module(package, module_name)
     try:
         add_plugin_requirement(target, pip_args)
@@ -1429,9 +1455,7 @@ def driver_install(
         if use_store or not package_name
         else _exact_store_package("driver", package_name)
     )
-    target = package.as_dependency() if package else package_name
-    if not target:
-        _fail(_("package name is required"))
+    target = _require_package_target(_store_package_dependency(package, package_name))
     resolved_builtin = _resolve_driver_builtin(package, builtin_name)
     try:
         add_plugin_requirement(target, pip_args)

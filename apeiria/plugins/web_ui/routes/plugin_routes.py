@@ -227,8 +227,9 @@ async def update_core_settings(
             payload.values,
             payload.clear,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_settings_response(state)
 
 
@@ -239,8 +240,9 @@ async def update_core_settings_raw(
 ) -> PluginRawSettingsResponse:
     try:
         state = plugin_config_view_service.update_core_settings_raw(payload.text)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_raw_settings_response(state)
 
 
@@ -251,8 +253,9 @@ async def get_plugin_settings(
 ) -> PluginSettingsResponse:
     try:
         state = plugin_config_view_service.get_plugin_settings(module_name)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_settings_response(state)
 
 
@@ -263,8 +266,9 @@ async def get_plugin_settings_raw(
 ) -> PluginRawSettingsResponse:
     try:
         state = plugin_config_view_service.get_plugin_settings_raw(module_name)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_raw_settings_response(state)
 
 
@@ -280,8 +284,9 @@ async def update_plugin_settings(
             payload.values,
             payload.clear,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_settings_response(state)
 
 
@@ -296,8 +301,9 @@ async def update_plugin_settings_raw(
             module_name,
             payload.text,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
     return _to_plugin_raw_settings_response(state)
 
 

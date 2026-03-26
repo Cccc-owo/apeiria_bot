@@ -3,11 +3,11 @@
     <div class="page-header">
       <h1 class="page-title">{{ t('plugins.title') }}</h1>
       <div class="page-actions">
-        <v-btn variant="tonal" :loading="loading" @click="loadPlugins">{{ t('common.refresh') }}</v-btn>
+        <v-btn :loading="loading" variant="tonal" @click="loadPlugins">{{ t('common.refresh') }}</v-btn>
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
       {{ errorMessage }}
     </v-alert>
 
@@ -32,12 +32,12 @@
                 <div class="settings-shell__actions">
                   <v-btn-toggle
                     v-model="coreEditorMode"
-                    mandatory
-                    density="comfortable"
-                    variant="outlined"
-                    divided
-                    color="primary"
                     class="mode-switch"
+                    color="primary"
+                    density="comfortable"
+                    divided
+                    mandatory
+                    variant="outlined"
                   >
                     <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
                     <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
@@ -45,8 +45,8 @@
                   <v-btn
                     v-if="coreEditorMode === 'basic'"
                     color="primary"
-                    :loading="coreSaving"
                     :disabled="!hasPendingCoreChanges"
+                    :loading="coreSaving"
                     @click="openCoreSettingsPreview"
                   >
                     {{ t('plugins.settingsSave') }}
@@ -55,11 +55,11 @@
               </div>
 
               <template v-if="coreEditorMode === 'basic'">
-                <v-alert v-if="coreErrorMessage" type="error" variant="tonal" density="comfortable">
+                <v-alert v-if="coreErrorMessage" density="comfortable" type="error" variant="tonal">
                   {{ coreErrorMessage }}
                 </v-alert>
 
-                <v-progress-linear v-if="coreLoading" indeterminate color="primary" />
+                <v-progress-linear v-if="coreLoading" color="primary" indeterminate />
 
                 <div v-else class="settings-list-panel">
                   <div
@@ -72,9 +72,9 @@
                         <div class="settings-list-row__title">
                           <span class="font-weight-medium">{{ field.key }}</span>
                           <v-chip
+                            :color="field.has_local_override ? 'primary' : 'default'"
                             size="x-small"
                             variant="tonal"
-                            :color="field.has_local_override ? 'primary' : 'default'"
                           >
                             {{ field.has_local_override ? t('plugins.settingsLocalShort') : settingsValueSourceLabel(field.value_source) }}
                           </v-chip>
@@ -91,19 +91,19 @@
                         <div class="settings-list-row__actions">
                           <v-btn
                             v-if="!coreEditor.isFieldEditing(field) && field.editable"
-                            variant="text"
-                            size="small"
                             color="primary"
+                            size="small"
+                            variant="text"
                             @click="coreEditor.startOverride(field)"
                           >
                             {{ t('plugins.settingsAddOverride') }}
                           </v-btn>
                           <v-btn
                             v-if="field.has_local_override"
-                            variant="text"
-                            size="small"
                             color="warning"
                             :loading="coreClearingKey === field.key"
+                            size="small"
+                            variant="text"
                             @click="clearCoreField(field)"
                           >
                             {{ t('plugins.settingsClear') }}
@@ -115,9 +115,9 @@
                     <div v-if="coreEditor.isFieldEditing(field)" class="settings-list-row__editor">
                       <SettingsFieldEditor
                         v-model="coreForm[field.key]"
-                        :field="field"
-                        :editing="coreEditor.isFieldEditing(field)"
                         :array-hint="t('plugins.settingsArrayHint')"
+                        :editing="coreEditor.isFieldEditing(field)"
+                        :field="field"
                         :json-hint="t('plugins.settingsJsonHint')"
                         :show-readonly="false"
                       />
@@ -173,11 +173,11 @@
                 <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.configTitle') }}</div>
                 <v-text-field
                   v-model.trim="pluginSearch"
-                  :label="t('plugins.search')"
+                  class="plugin-search"
                   density="comfortable"
                   hide-details
+                  :label="t('plugins.search')"
                   prepend-inner-icon="mdi-magnify"
-                  class="plugin-search"
                 />
               </div>
               <div class="section-heading__actions">
@@ -192,11 +192,11 @@
             </div>
 
             <v-data-table
+              class="page-table plugins-table"
+              density="compact"
               :headers="pluginHeaders"
               :items="visiblePlugins"
               :loading="loading"
-              density="compact"
-              class="page-table plugins-table"
             >
               <template #item.name="{ item }">
                 <div class="plugins-table__name">
@@ -204,16 +204,16 @@
                     <span class="font-weight-medium">{{ item.name || item.module_name }}</span>
                     <v-chip
                       v-if="item.admin_level > 0"
+                      color="secondary"
                       size="x-small"
                       variant="tonal"
-                      color="secondary"
                     >
                       Lv.{{ item.admin_level }}
                     </v-chip>
                     <v-chip
+                      :color="item.plugin_type === 'admin' || item.plugin_type === 'superuser' ? 'warning' : 'default'"
                       size="x-small"
                       variant="tonal"
-                      :color="item.plugin_type === 'admin' || item.plugin_type === 'superuser' ? 'warning' : 'default'"
                     >
                       {{ item.plugin_type }}
                     </v-chip>
@@ -229,18 +229,18 @@
                     <v-chip
                       v-for="dependency in item.required_plugins"
                       :key="`req:${item.module_name}:${dependency}`"
+                      color="info"
                       size="x-small"
                       variant="tonal"
-                      color="info"
                     >
                       {{ t('plugins.requires', { name: dependency }) }}
                     </v-chip>
                     <v-chip
                       v-for="dependent in item.dependent_plugins"
                       :key="`dep:${item.module_name}:${dependent}`"
+                      color="warning"
                       size="x-small"
                       variant="tonal"
-                      color="warning"
                     >
                       {{ t('plugins.requiredBy', { name: dependent }) }}
                     </v-chip>
@@ -248,7 +248,7 @@
                 </div>
               </template>
               <template #item.source="{ value }">
-                <v-chip size="small" variant="tonal" :color="sourceColor(value)">
+                <v-chip :color="sourceColor(value)" size="small" variant="tonal">
                   {{ sourceLabel(value) }}
                 </v-chip>
               </template>
@@ -259,29 +259,29 @@
                       <v-chip
                         v-if="item.is_protected"
                         class="plugin-status-card__protected-chip"
-                        size="small"
                         color="warning"
-                        variant="tonal"
+                        size="small"
                         :title="item.protected_reason || ''"
+                        variant="tonal"
                       >
                         {{ t('plugins.protected') }}
                       </v-chip>
                       <v-btn
-                        size="small"
-                        variant="text"
                         color="primary"
                         :loading="settingsLoadingModule === item.module_name"
+                        size="small"
+                        variant="text"
                         @click="openSettings(item)"
                       >
                         {{ t('plugins.settings') }}
                       </v-btn>
                       <v-switch
-                        :model-value="item.is_global_enabled"
                         color="success"
+                        :disabled="item.is_protected"
                         hide-details
                         inset
-                        :disabled="item.is_protected"
                         :loading="pendingModule === item.module_name"
+                        :model-value="item.is_global_enabled"
                         @update:model-value="togglePlugin(item, $event)"
                       />
                     </div>
@@ -313,16 +313,16 @@
                   <div class="plugin-config-section__toolbar">
                     <v-text-field
                       v-model.trim="newModule"
-                      :label="t('plugins.moduleInput')"
+                      class="config-input"
                       density="comfortable"
                       hide-details
-                      class="config-input"
+                      :label="t('plugins.moduleInput')"
                       @keydown.enter.prevent="addModule"
                     />
                     <v-btn
                       color="primary"
-                      variant="tonal"
                       :loading="configSaving"
+                      variant="tonal"
                       @click="addModule"
                     >
                       {{ t('plugins.addModule') }}
@@ -333,8 +333,8 @@
                       v-for="moduleItem in pluginModules"
                       :key="moduleItem.name"
                       closable
-                      variant="tonal"
                       :color="moduleChipColor(moduleItem)"
+                      variant="tonal"
                       @click:close="removeModule(moduleItem.name)"
                     >
                       {{ moduleItem.name }}
@@ -355,16 +355,16 @@
                   <div class="plugin-config-section__toolbar">
                     <v-text-field
                       v-model.trim="newDir"
-                      :label="t('plugins.dirInput')"
+                      class="config-input"
                       density="comfortable"
                       hide-details
-                      class="config-input"
+                      :label="t('plugins.dirInput')"
                       @keydown.enter.prevent="addDir"
                     />
                     <v-btn
                       color="secondary"
-                      variant="tonal"
                       :loading="configSaving"
+                      variant="tonal"
                       @click="addDir"
                     >
                       {{ t('plugins.addDir') }}
@@ -375,8 +375,8 @@
                       v-for="dirItem in pluginDirs"
                       :key="dirItem.path"
                       closable
-                      variant="tonal"
                       :color="dirChipColor(dirItem)"
+                      variant="tonal"
                       @click:close="removeDir(dirItem.path)"
                     >
                       {{ dirItem.path }}
@@ -407,8 +407,8 @@
               <v-chip
                 v-for="adapterItem in adapterModules"
                 :key="adapterItem.name"
-                variant="tonal"
                 :color="moduleChipColor(adapterItem)"
+                variant="tonal"
               >
                 {{ adapterItem.name }}
                 <v-tooltip activator="parent" location="top">
@@ -435,8 +435,8 @@
               <v-chip
                 v-for="driverItem in driverBuiltin"
                 :key="driverItem.name"
-                variant="tonal"
                 :color="driverChipColor(driverItem)"
+                variant="tonal"
               >
                 {{ driverItem.name }}
                 <v-tooltip activator="parent" location="top">
@@ -462,25 +462,25 @@
         </v-card-title>
         <v-card-text class="d-flex flex-column ga-4">
           <div v-if="settingsState" class="d-flex flex-wrap ga-2">
-            <v-chip size="small" variant="tonal" color="primary">
+            <v-chip color="primary" size="small" variant="tonal">
               {{ settingsState.section }}
             </v-chip>
-            <v-chip size="small" variant="tonal" :color="settingsState.legacy_flatten ? 'warning' : 'default'">
+            <v-chip :color="settingsState.legacy_flatten ? 'warning' : 'default'" size="small" variant="tonal">
               {{ settingsState.legacy_flatten ? t('plugins.settingsLegacy') : settingsSourceLabel(settingsState.config_source) }}
             </v-chip>
             <v-chip
               v-if="settingsPlugin?.admin_level"
+              color="secondary"
               size="small"
               variant="tonal"
-              color="secondary"
             >
               Lv.{{ settingsPlugin.admin_level }}
             </v-chip>
             <v-chip
               v-if="settingsPlugin?.plugin_type"
+              :color="settingsPlugin.plugin_type === 'admin' || settingsPlugin.plugin_type === 'superuser' ? 'warning' : 'default'"
               size="small"
               variant="tonal"
-              :color="settingsPlugin.plugin_type === 'admin' || settingsPlugin.plugin_type === 'superuser' ? 'warning' : 'default'"
             >
               {{ settingsPlugin.plugin_type }}
             </v-chip>
@@ -495,9 +495,9 @@
               <v-chip
                 v-for="dependency in settingsPlugin.required_plugins"
                 :key="`detail-required:${dependency}`"
+                color="info"
                 size="x-small"
                 variant="tonal"
-                color="info"
               >
                 {{ dependency }}
               </v-chip>
@@ -507,20 +507,20 @@
               <v-chip
                 v-for="dependency in settingsPlugin.dependent_plugins"
                 :key="`detail-dependent:${dependency}`"
+                color="warning"
                 size="x-small"
                 variant="tonal"
-                color="warning"
               >
                 {{ dependency }}
               </v-chip>
             </div>
           </div>
 
-          <v-alert v-if="settingsErrorMessage" type="error" variant="tonal" density="comfortable">
+          <v-alert v-if="settingsErrorMessage" density="comfortable" type="error" variant="tonal">
             {{ settingsErrorMessage }}
           </v-alert>
 
-          <v-progress-linear v-if="settingsDialogLoading" indeterminate color="primary" />
+          <v-progress-linear v-if="settingsDialogLoading" color="primary" indeterminate />
 
           <div v-if="!settingsDialogLoading" class="settings-shell">
             <div class="settings-shell__toolbar settings-shell__toolbar--dialog">
@@ -528,12 +528,12 @@
               <div class="settings-shell__actions">
                 <v-btn-toggle
                   v-model="settingsEditorMode"
-                  mandatory
-                  density="comfortable"
-                  variant="outlined"
-                  divided
-                  color="primary"
                   class="mode-switch"
+                  color="primary"
+                  density="comfortable"
+                  divided
+                  mandatory
+                  variant="outlined"
                 >
                   <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
                   <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
@@ -570,11 +570,11 @@
                     </div>
                     <div class="settings-list-row__chips">
                       <v-chip size="x-small" variant="tonal">{{ field.type }}</v-chip>
-                      <v-chip size="x-small" variant="tonal" color="secondary">{{ field.editor }}</v-chip>
-                      <v-chip size="x-small" variant="tonal" :color="field.editable ? 'default' : 'warning'">
+                      <v-chip color="secondary" size="x-small" variant="tonal">{{ field.editor }}</v-chip>
+                      <v-chip :color="field.editable ? 'default' : 'warning'" size="x-small" variant="tonal">
                         {{ settingsValueSourceLabel(field.value_source) }}
                       </v-chip>
-                      <v-chip v-if="field.choices.length > 0" size="x-small" variant="tonal" color="secondary">
+                      <v-chip v-if="field.choices.length > 0" color="secondary" size="x-small" variant="tonal">
                         {{ field.choices.join(', ') }}
                       </v-chip>
                     </div>
@@ -583,19 +583,19 @@
                   <div class="settings-list-row__actions">
                     <v-btn
                       v-if="!pluginEditor.isFieldEditing(field) && field.editable"
-                      variant="text"
-                      size="small"
                       color="primary"
+                      size="small"
+                      variant="text"
                       @click="pluginEditor.startOverride(field)"
                     >
                       {{ t('plugins.settingsAddOverride') }}
                     </v-btn>
                     <v-btn
                       v-if="field.has_local_override"
-                      variant="text"
-                      size="small"
                       color="warning"
                       :loading="settingsClearingKey === field.key"
+                      size="small"
+                      variant="text"
                       @click="clearPluginField(field)"
                     >
                       {{ t('plugins.settingsClear') }}
@@ -604,11 +604,11 @@
 
                   <SettingsFieldEditor
                     v-model="settingsForm[field.key]"
-                    :field="field"
-                    :editing="pluginEditor.isFieldEditing(field)"
                     :array-hint="t('plugins.settingsArrayHint')"
+                    :editing="pluginEditor.isFieldEditing(field)"
+                    :field="field"
                     :json-hint="t('plugins.settingsJsonHint')"
-                    />
+                  />
 
                   <div class="settings-list-row__meta text-caption text-medium-emphasis">
                     <span>{{ t('plugins.settingsCurrent') }}: {{ displayFieldValue(field.current_value) }}</span>
@@ -646,7 +646,7 @@
       <v-card>
         <v-card-title>{{ previewTitle }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-4">
-          <v-alert type="warning" variant="tonal" density="comfortable">
+          <v-alert density="comfortable" type="warning" variant="tonal">
             {{ t('plugins.settingsRestartHint') }}
           </v-alert>
           <div v-if="previewMode === 'basic'" class="preview-list">
@@ -693,7 +693,7 @@
       <v-card>
         <v-card-title>{{ toggleConfirmTitle }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-4">
-          <v-alert type="warning" variant="tonal" density="comfortable">
+          <v-alert density="comfortable" type="warning" variant="tonal">
             {{ toggleConfirmSummary }}
           </v-alert>
           <div v-if="toggleConfirmItem" class="confirm-plugin-list">
@@ -708,9 +708,9 @@
                 <v-chip
                   v-for="dependent in toggleConfirmItem.dependent_plugins"
                   :key="`confirm-dependent:${toggleConfirmItem.module_name}:${dependent}`"
+                  color="warning"
                   size="x-small"
                   variant="tonal"
-                  color="warning"
                 >
                   {{ t('plugins.requiredBy', { name: dependent }) }}
                 </v-chip>
@@ -731,633 +731,632 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import {
-  getCoreSettings,
-  getCoreSettingsRaw,
-  getAdapterConfig,
-  getDriverConfig,
-  getPluginConfig,
-  getPluginSettings,
-  getPluginSettingsRaw,
-  getPlugins,
-  updateCoreSettings,
-  updateCoreSettingsRaw,
-  updatePlugin,
-  updatePluginConfig,
-  updatePluginSettings,
-  updatePluginSettingsRaw,
-  type PluginItem,
-  type ModuleConfigItem,
-  type DirConfigItem,
-  type DriverConfigItem,
-  type RawSettingsResponse,
-} from '@/api'
-import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
-import {
-  buildChangedValues,
-  displayFieldValue,
-  type PluginSettingField,
-  type PluginSettingsState,
-} from '@/views/plugins/settingsEditor'
-import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
-import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
-import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
+  import { computed, onMounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import {
+    type DirConfigItem,
+    type DriverConfigItem,
+    getAdapterConfig,
+    getCoreSettings,
+    getCoreSettingsRaw,
+    getDriverConfig,
+    getPluginConfig,
+    getPlugins,
+    getPluginSettings,
+    getPluginSettingsRaw,
+    type ModuleConfigItem,
+    type PluginItem,
+    type RawSettingsResponse,
+    updateCoreSettings,
+    updateCoreSettingsRaw,
+    updatePlugin,
+    updatePluginConfig,
+    updatePluginSettings,
+    updatePluginSettingsRaw,
+  } from '@/api'
+  import { getErrorMessage } from '@/api/client'
+  import { useNoticeStore } from '@/stores/notice'
+  import {
+    buildChangedValues,
+    displayFieldValue,
+    type PluginSettingField,
+  } from '@/views/plugins/settingsEditor'
+  import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
+  import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
+  import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
 
-const plugins = ref<PluginItem[]>([])
-const loading = ref(false)
-const pendingModule = ref('')
-const errorMessage = ref('')
-const sectionTab = ref('plugins')
-const hideSystemPlugins = ref(true)
-const pluginSearch = ref('')
-const configSaving = ref(false)
-const adapterModules = ref<ModuleConfigItem[]>([])
-const driverBuiltin = ref<DriverConfigItem[]>([])
-const pluginModules = ref<ModuleConfigItem[]>([])
-const pluginDirs = ref<DirConfigItem[]>([])
-const newModule = ref('')
-const newDir = ref('')
-const coreEditorMode = ref<'basic' | 'advanced'>('basic')
-const coreRawText = ref('')
-const coreRawInitialText = ref('')
-const coreRawLoading = ref(false)
-const coreRawSaving = ref(false)
-const coreRawErrorMessage = ref('')
-const settingsDialogVisible = ref(false)
-const settingsLoadingModule = ref('')
-const settingsPlugin = ref<PluginItem | null>(null)
-const settingsEditorMode = ref<'basic' | 'advanced'>('basic')
-const settingsRawText = ref('')
-const settingsRawInitialText = ref('')
-const settingsRawLoading = ref(false)
-const settingsRawSaving = ref(false)
-const settingsRawErrorMessage = ref('')
-const previewDialogVisible = ref(false)
-const previewMode = ref<'basic' | 'raw'>('basic')
-const previewAction = ref<'plugin-basic' | 'plugin-raw' | 'core-basic' | 'core-raw'>('plugin-basic')
-const toggleConfirmVisible = ref(false)
-const toggleConfirmLoading = ref(false)
-const toggleConfirmItem = ref<PluginItem | null>(null)
-const noticeStore = useNoticeStore()
-const { t } = useI18n()
+  const plugins = ref<PluginItem[]>([])
+  const loading = ref(false)
+  const pendingModule = ref('')
+  const errorMessage = ref('')
+  const sectionTab = ref('plugins')
+  const hideSystemPlugins = ref(true)
+  const pluginSearch = ref('')
+  const configSaving = ref(false)
+  const adapterModules = ref<ModuleConfigItem[]>([])
+  const driverBuiltin = ref<DriverConfigItem[]>([])
+  const pluginModules = ref<ModuleConfigItem[]>([])
+  const pluginDirs = ref<DirConfigItem[]>([])
+  const newModule = ref('')
+  const newDir = ref('')
+  const coreEditorMode = ref<'basic' | 'advanced'>('basic')
+  const coreRawText = ref('')
+  const coreRawInitialText = ref('')
+  const coreRawLoading = ref(false)
+  const coreRawSaving = ref(false)
+  const coreRawErrorMessage = ref('')
+  const settingsDialogVisible = ref(false)
+  const settingsLoadingModule = ref('')
+  const settingsPlugin = ref<PluginItem | null>(null)
+  const settingsEditorMode = ref<'basic' | 'advanced'>('basic')
+  const settingsRawText = ref('')
+  const settingsRawInitialText = ref('')
+  const settingsRawLoading = ref(false)
+  const settingsRawSaving = ref(false)
+  const settingsRawErrorMessage = ref('')
+  const previewDialogVisible = ref(false)
+  const previewMode = ref<'basic' | 'raw'>('basic')
+  const previewAction = ref<'plugin-basic' | 'plugin-raw' | 'core-basic' | 'core-raw'>('plugin-basic')
+  const toggleConfirmVisible = ref(false)
+  const toggleConfirmLoading = ref(false)
+  const toggleConfirmItem = ref<PluginItem | null>(null)
+  const noticeStore = useNoticeStore()
+  const { t } = useI18n()
 
-const coreEditor = useSettingsEditor({
-  load: getCoreSettings,
-  save: (values) => updateCoreSettings({ values }),
-  clear: (key) => updateCoreSettings({ values: {}, clear: [key] }),
-  messages: {
-    clearSuccess: t('plugins.settingsCleared'),
-    invalidJson: t('plugins.settingsInvalidJson'),
-    loadFailed: t('plugins.settingsLoadFailed'),
-    saveFailed: t('plugins.settingsSaveFailed'),
-    saveSuccess: t('plugins.settingsSaved'),
-  },
-})
-
-const pluginEditor = useSettingsEditor({
-  save: (values) => updatePluginSettings(settingsPlugin.value!.module_name, { values }),
-  clear: (key) => updatePluginSettings(settingsPlugin.value!.module_name, { values: {}, clear: [key] }),
-  messages: {
-    clearSuccess: t('plugins.settingsCleared'),
-    invalidJson: t('plugins.settingsInvalidJson'),
-    loadFailed: t('plugins.settingsLoadFailed'),
-    saveFailed: t('plugins.settingsSaveFailed'),
-    saveSuccess: t('plugins.settingsSaved'),
-  },
-})
-
-const settingsDialogLoading = pluginEditor.loading
-const settingsSaving = pluginEditor.saving
-const settingsClearingKey = pluginEditor.clearingKey
-const settingsErrorMessage = pluginEditor.errorMessage
-const settingsState = pluginEditor.state
-const settingsForm = pluginEditor.form
-const coreLoading = coreEditor.loading
-const coreSaving = coreEditor.saving
-const coreClearingKey = coreEditor.clearingKey
-const coreErrorMessage = coreEditor.errorMessage
-const coreSettings = coreEditor.state
-const coreForm = coreEditor.form
-const hasPendingCoreRawChanges = computed(() => coreRawText.value !== coreRawInitialText.value)
-const hasPendingPluginRawChanges = computed(() => settingsRawText.value !== settingsRawInitialText.value)
-
-function normalizeConfigEntry(value: string) {
-  const normalized = value.trim()
-  if (!normalized) return ''
-  if (['none', 'null'].includes(normalized.toLowerCase())) return ''
-  return normalized
-}
-
-function normalizeConfigEntries(values: string[]) {
-  return Array.from(new Set(values.map(normalizeConfigEntry).filter(Boolean))).sort()
-}
-
-const pluginHeaders = computed(() => [
-  { title: t('plugins.name'), key: 'name' },
-  { title: t('plugins.source'), key: 'source' },
-  { title: t('plugins.enabled'), key: 'is_global_enabled', sortable: false, align: 'end' as const },
-])
-
-const settingsFields = pluginEditor.fields
-const coreFields = coreEditor.fields
-
-const systemPlugins = computed(() =>
-  plugins.value.filter((item) => item.source === 'framework'),
-)
-
-const nonSystemPlugins = computed(() =>
-  plugins.value.filter((item) => !systemPlugins.value.some((systemItem) => systemItem.module_name === item.module_name)),
-)
-
-const visiblePlugins = computed(() =>
-  (hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value)
-    .filter((item) => {
-      const keyword = pluginSearch.value.trim().toLowerCase()
-      if (!keyword) return true
-      return `${item.name || ''} ${item.module_name} ${item.description || ''} ${item.source}`.toLowerCase().includes(keyword)
-    }),
-)
-const previewSaving = computed(() =>
-  settingsSaving.value || settingsRawSaving.value || coreSaving.value || coreRawSaving.value,
-)
-const previewTitle = computed(() =>
-  previewMode.value === 'basic' ? t('plugins.previewChangesTitle') : t('plugins.previewRawTitle'),
-)
-const toggleConfirmTitle = computed(() =>
-  t('plugins.disableConfirmTitle'),
-)
-const toggleConfirmSummary = computed(() => {
-  if (!toggleConfirmItem.value) return ''
-  const riskCount = toggleConfirmItem.value.dependent_plugins.length
-  if (riskCount > 0) {
-    return t('plugins.disableConfirmRiskSummary', { count: 1, riskCount })
-  }
-  return t('plugins.disableConfirmSummary', { count: 1 })
-})
-
-const SOURCE_COLORS: Record<string, string> = {
-  framework: 'error',
-  official: 'primary',
-  custom: 'success',
-  builtin: 'secondary',
-  external: 'warning',
-}
-
-function sourceColor(source: string) {
-  return SOURCE_COLORS[source] || 'default'
-}
-
-function labelFromMap(source: string, map: Record<string, string>) {
-  return map[source] || source
-}
-
-function sourceLabel(source: string) {
-  return labelFromMap(source, {
-    framework: t('plugins.framework'),
-    official: t('plugins.official'),
-    custom: t('plugins.custom'),
-    builtin: t('plugins.builtin'),
-    external: t('plugins.external'),
+  const coreEditor = useSettingsEditor({
+    load: getCoreSettings,
+    save: values => updateCoreSettings({ values }),
+    clear: key => updateCoreSettings({ values: {}, clear: [key] }),
+    messages: {
+      clearSuccess: t('plugins.settingsCleared'),
+      invalidJson: t('plugins.settingsInvalidJson'),
+      loadFailed: t('plugins.settingsLoadFailed'),
+      saveFailed: t('plugins.settingsSaveFailed'),
+      saveSuccess: t('plugins.settingsSaved'),
+    },
   })
-}
 
-function pluginMetaSummary(item: PluginItem) {
-  const author = item.author?.trim()
-  const version = item.version?.trim()
-  if (author && version) return `${author} · ${version}`
-  if (author) return author
-  if (version) return `v${version}`
-  return ''
-}
-
-function pluginRiskLabel(item: PluginItem) {
-  if (item.is_protected && item.protected_reason) return item.protected_reason
-  if (item.dependent_plugins.length > 0) {
-    return t('plugins.dependentCountHint', { count: item.dependent_plugins.length })
-  }
-  if (item.required_plugins.length > 0) {
-    return t('plugins.requiredCountHint', { count: item.required_plugins.length })
-  }
-  return ''
-}
-
-function closeToggleConfirm() {
-  toggleConfirmVisible.value = false
-  toggleConfirmLoading.value = false
-  toggleConfirmItem.value = null
-}
-
-function shouldConfirmToggle(item: PluginItem, enabled: boolean) {
-  return !enabled && item.dependent_plugins.length > 0
-}
-
-function openToggleConfirm(item: PluginItem) {
-  toggleConfirmItem.value = item
-  toggleConfirmVisible.value = true
-}
-
-function settingsSourceLabel(source: string) {
-  return labelFromMap(source, {
-    static_scan: t('plugins.settingsSourceStaticScan'),
-    plugin_metadata: t('plugins.settingsSourceMetadata'),
-    none: t('plugins.settingsSourceNone'),
-    manual: t('plugins.settingsSourceManual'),
-    built_in: t('plugins.settingsSourceBuiltIn'),
+  const pluginEditor = useSettingsEditor({
+    save: values => updatePluginSettings(settingsPlugin.value!.module_name, { values }),
+    clear: key => updatePluginSettings(settingsPlugin.value!.module_name, { values: {}, clear: [key] }),
+    messages: {
+      clearSuccess: t('plugins.settingsCleared'),
+      invalidJson: t('plugins.settingsInvalidJson'),
+      loadFailed: t('plugins.settingsLoadFailed'),
+      saveFailed: t('plugins.settingsSaveFailed'),
+      saveSuccess: t('plugins.settingsSaved'),
+    },
   })
-}
 
-function settingsValueSourceLabel(source: string) {
-  return labelFromMap(source, {
-    default: t('plugins.settingsValueSourceDefault'),
-    plugin_section: t('plugins.settingsValueSourcePlugin'),
-    legacy_global: t('plugins.settingsValueSourceLegacy'),
-    env: t('plugins.settingsValueSourceEnv'),
-  })
-}
+  const settingsDialogLoading = pluginEditor.loading
+  const settingsSaving = pluginEditor.saving
+  const settingsClearingKey = pluginEditor.clearingKey
+  const settingsErrorMessage = pluginEditor.errorMessage
+  const settingsState = pluginEditor.state
+  const settingsForm = pluginEditor.form
+  const coreLoading = coreEditor.loading
+  const coreSaving = coreEditor.saving
+  const coreClearingKey = coreEditor.clearingKey
+  const coreErrorMessage = coreEditor.errorMessage
+  const coreSettings = coreEditor.state
+  const coreForm = coreEditor.form
+  const hasPendingCoreRawChanges = computed(() => coreRawText.value !== coreRawInitialText.value)
+  const hasPendingPluginRawChanges = computed(() => settingsRawText.value !== settingsRawInitialText.value)
 
-const hasPendingCoreChanges = coreEditor.hasPendingChanges
-const hasPendingPluginChanges = pluginEditor.hasPendingChanges
-const previewItems = computed(() => {
-  if (previewAction.value === 'plugin-basic') {
-    return buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
-  }
-  return buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
-})
-const previewCurrentText = computed(() =>
-  previewAction.value === 'plugin-raw' ? settingsRawInitialText.value : coreRawInitialText.value,
-)
-const previewNextText = computed(() =>
-  previewAction.value === 'plugin-raw' ? settingsRawText.value : coreRawText.value,
-)
-
-function applyCoreRawState(nextState: RawSettingsResponse) {
-  coreRawText.value = nextState.text
-  coreRawInitialText.value = nextState.text
-}
-
-function applyPluginRawState(nextState: RawSettingsResponse) {
-  settingsRawText.value = nextState.text
-  settingsRawInitialText.value = nextState.text
-}
-
-async function loadCoreRawSettings() {
-  coreRawLoading.value = true
-  coreRawErrorMessage.value = ''
-  try {
-    const response = await getCoreSettingsRaw()
-    applyCoreRawState(response.data)
-  } catch (error) {
-    coreRawErrorMessage.value = getErrorMessage(error, t('plugins.settingsRawLoadFailed'))
-  } finally {
-    coreRawLoading.value = false
-  }
-}
-
-async function loadPluginRawSettings(moduleName: string) {
-  settingsRawLoading.value = true
-  settingsRawErrorMessage.value = ''
-  try {
-    const response = await getPluginSettingsRaw(moduleName)
-    applyPluginRawState(response.data)
-  } catch (error) {
-    settingsRawErrorMessage.value = getErrorMessage(error, t('plugins.settingsRawLoadFailed'))
-  } finally {
-    settingsRawLoading.value = false
-  }
-}
-
-async function loadPlugins() {
-  loading.value = true
-  coreLoading.value = true
-  coreRawLoading.value = true
-  errorMessage.value = ''
-  coreErrorMessage.value = ''
-  coreRawErrorMessage.value = ''
-  try {
-    const [pluginsResponse, pluginConfigResponse, adapterConfigResponse, driverConfigResponse] = await Promise.all([
-      getPlugins(),
-      getPluginConfig(),
-      getAdapterConfig(),
-      getDriverConfig(),
-    ])
-    plugins.value = pluginsResponse.data
-    pluginModules.value = pluginConfigResponse.data.modules
-    pluginDirs.value = pluginConfigResponse.data.dirs
-    adapterModules.value = adapterConfigResponse.data.modules
-    driverBuiltin.value = driverConfigResponse.data.builtin
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('plugins.loadFailed'))
-  } finally {
-    loading.value = false
+  function normalizeConfigEntry (value: string) {
+    const normalized = value.trim()
+    if (!normalized) return ''
+    if (['none', 'null'].includes(normalized.toLowerCase())) return ''
+    return normalized
   }
 
-  try {
-    const coreResponse = await getCoreSettings()
-    coreEditor.applyState(coreResponse.data)
-    coreErrorMessage.value = ''
-  } catch (error) {
-    coreErrorMessage.value = getErrorMessage(error, t('plugins.settingsLoadFailed'))
-  } finally {
-    coreLoading.value = false
+  function normalizeConfigEntries (values: string[]) {
+    return Array.from(new Set(values.map(normalizeConfigEntry).filter(Boolean))).sort()
   }
 
-  await loadCoreRawSettings()
-}
-
-async function openSettings(item: PluginItem) {
-  settingsPlugin.value = item
-  settingsDialogVisible.value = true
-  settingsEditorMode.value = 'basic'
-  settingsDialogLoading.value = true
-  settingsLoadingModule.value = item.module_name
-  pluginEditor.reset()
-  settingsRawText.value = ''
-  settingsRawInitialText.value = ''
-  settingsRawErrorMessage.value = ''
-  try {
-    const settingsResponse = await getPluginSettings(item.module_name)
-    pluginEditor.applyState(settingsResponse.data)
-  } catch (error) {
-    settingsErrorMessage.value = getErrorMessage(error, t('plugins.settingsLoadFailed'))
-  } finally {
-    settingsDialogLoading.value = false
-    settingsLoadingModule.value = ''
-  }
-  await loadPluginRawSettings(item.module_name)
-}
-
-async function saveSettings() {
-  if (!settingsPlugin.value || !settingsState.value) return
-  await pluginEditor.submit()
-}
-
-function buildPreviewItems(
-  fields: PluginSettingField[],
-  form: Record<string, unknown>,
-  draftOverrides: Record<string, boolean>,
-) {
-  try {
-    const editableFields = fields.filter((field) =>
-      field.editable && (field.has_local_override || Boolean(draftOverrides[field.key])),
-    )
-    const values = buildChangedValues(editableFields, form, t('plugins.settingsInvalidJson'))
-    return editableFields
-      .filter((field) => Object.prototype.hasOwnProperty.call(values, field.key))
-      .map((field) => ({
-        key: field.key,
-        current: displayFieldValue(field.current_value),
-        next: displayFieldValue(values[field.key]),
-      }))
-  } catch {
-    return []
-  }
-}
-
-function openPluginSettingsPreview() {
-  if (!settingsState.value) return
-  const items = buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
-  if (items.length === 0) return
-  previewMode.value = 'basic'
-  previewAction.value = 'plugin-basic'
-  previewDialogVisible.value = true
-}
-
-async function clearPluginField(field: PluginSettingField) {
-  if (!settingsPlugin.value) return
-  await pluginEditor.clearField(field)
-}
-
-async function saveCoreSettings() {
-  if (!coreSettings.value) return
-  await coreEditor.submit()
-}
-
-function openCoreSettingsPreview() {
-  if (!coreSettings.value) return
-  const items = buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
-  if (items.length === 0) return
-  previewMode.value = 'basic'
-  previewAction.value = 'core-basic'
-  previewDialogVisible.value = true
-}
-
-async function saveCoreRawSettings() {
-  if (!hasPendingCoreRawChanges.value) return
-  coreRawSaving.value = true
-  coreRawErrorMessage.value = ''
-  try {
-    const rawResponse = await updateCoreSettingsRaw({ text: coreRawText.value })
-    const settingsResponse = await getCoreSettings()
-    applyCoreRawState(rawResponse.data)
-    coreEditor.applyState(settingsResponse.data)
-    noticeStore.show(t('plugins.settingsRawSaved'), 'success')
-  } catch (error) {
-    const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))
-    coreRawErrorMessage.value = message
-    noticeStore.show(message, 'error')
-  } finally {
-    coreRawSaving.value = false
-  }
-}
-
-function openCoreRawPreview() {
-  if (!hasPendingCoreRawChanges.value) return
-  previewMode.value = 'raw'
-  previewAction.value = 'core-raw'
-  previewDialogVisible.value = true
-}
-
-async function clearCoreField(field: PluginSettingField) {
-  await coreEditor.clearField(field)
-}
-
-async function savePluginRawSettings() {
-  if (!settingsPlugin.value || !hasPendingPluginRawChanges.value) return
-  settingsRawSaving.value = true
-  settingsRawErrorMessage.value = ''
-  try {
-    const rawResponse = await updatePluginSettingsRaw(settingsPlugin.value.module_name, {
-      text: settingsRawText.value,
-    })
-    const settingsResponse = await getPluginSettings(settingsPlugin.value.module_name)
-    applyPluginRawState(rawResponse.data)
-    pluginEditor.applyState(settingsResponse.data)
-    noticeStore.show(t('plugins.settingsRawSaved'), 'success')
-  } catch (error) {
-    const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))
-    settingsRawErrorMessage.value = message
-    noticeStore.show(message, 'error')
-  } finally {
-    settingsRawSaving.value = false
-  }
-}
-
-function openPluginRawPreview() {
-  if (!hasPendingPluginRawChanges.value) return
-  previewMode.value = 'raw'
-  previewAction.value = 'plugin-raw'
-  previewDialogVisible.value = true
-}
-
-async function confirmPreviewSave() {
-  if (previewAction.value === 'plugin-basic') {
-    await saveSettings()
-  } else if (previewAction.value === 'plugin-raw') {
-    await savePluginRawSettings()
-  } else if (previewAction.value === 'core-basic') {
-    await saveCoreSettings()
-  } else {
-    await saveCoreRawSettings()
-  }
-
-  if (
-    !settingsErrorMessage.value
-    && !settingsRawErrorMessage.value
-    && !coreErrorMessage.value
-    && !coreRawErrorMessage.value
-  ) {
-    previewDialogVisible.value = false
-  }
-}
-
-async function savePluginConfig(modules: string[], dirs: string[]) {
-  configSaving.value = true
-  errorMessage.value = ''
-  try {
-    const response = await updatePluginConfig({ modules, dirs })
-    pluginModules.value = response.data.modules
-    pluginDirs.value = response.data.dirs
-    noticeStore.show(t('plugins.configSaved'), 'success')
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('plugins.configSaveFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    configSaving.value = false
-  }
-}
-
-async function addModule() {
-  if (!newModule.value) return
-  const nextModules = normalizeConfigEntries([
-    ...pluginModules.value.map((item) => item.name),
-    newModule.value,
+  const pluginHeaders = computed(() => [
+    { title: t('plugins.name'), key: 'name' },
+    { title: t('plugins.source'), key: 'source' },
+    { title: t('plugins.enabled'), key: 'is_global_enabled', sortable: false, align: 'end' as const },
   ])
-  newModule.value = ''
-  await savePluginConfig(nextModules, normalizeConfigEntries(pluginDirs.value.map((item) => item.path)))
-}
 
-async function removeModule(moduleName: string) {
-  await savePluginConfig(
-    pluginModules.value.filter((item) => item.name !== moduleName).map((item) => item.name),
-    normalizeConfigEntries(pluginDirs.value.map((item) => item.path)),
+  const settingsFields = pluginEditor.fields
+  const coreFields = coreEditor.fields
+
+  const systemPlugins = computed(() =>
+    plugins.value.filter(item => item.source === 'framework'),
   )
-}
 
-async function addDir() {
-  if (!newDir.value) return
-  const nextDirs = normalizeConfigEntries([
-    ...pluginDirs.value.map((item) => item.path),
-    newDir.value,
-  ])
-  newDir.value = ''
-  await savePluginConfig(pluginModules.value.map((item) => item.name), nextDirs)
-}
-
-async function removeDir(dirName: string) {
-  await savePluginConfig(
-    pluginModules.value.map((item) => item.name),
-    normalizeConfigEntries(
-      pluginDirs.value.filter((item) => item.path !== dirName).map((item) => item.path),
-    ),
+  const nonSystemPlugins = computed(() =>
+    plugins.value.filter(item => !systemPlugins.value.some(systemItem => systemItem.module_name === item.module_name)),
   )
-}
 
-function moduleChipColor(item: ModuleConfigItem) {
-  if (item.is_loaded) return 'success'
-  if (item.is_importable) return 'warning'
-  return 'error'
-}
-
-function dirChipColor(item: DirConfigItem) {
-  if (!item.exists) return 'error'
-  if (item.is_loaded) return 'success'
-  return 'warning'
-}
-
-function moduleStatusText(item: ModuleConfigItem) {
-  if (item.is_loaded) return t('plugins.moduleLoaded')
-  if (item.is_importable) return t('plugins.moduleRegisteredOnly')
-  return t('plugins.moduleMissing')
-}
-
-function dirStatusText(item: DirConfigItem) {
-  if (!item.exists) return t('plugins.dirMissing')
-  if (item.is_loaded) return t('plugins.dirLoaded')
-  return t('plugins.dirRegisteredOnly')
-}
-
-function driverChipColor(item: DriverConfigItem) {
-  return item.is_active ? 'success' : 'warning'
-}
-
-function driverStatusText(item: DriverConfigItem) {
-  return item.is_active ? t('plugins.driverActive') : t('plugins.driverRegisteredOnly')
-}
-
-async function togglePlugin(item: PluginItem, nextValue: boolean | null) {
-  if (item.is_protected) {
-    noticeStore.show(item.protected_reason || t('plugins.cannotDisable'), 'warning')
-    return
-  }
-  const enabled = Boolean(nextValue)
-  if (shouldConfirmToggle(item, enabled)) {
-    item.is_global_enabled = !enabled
-    openToggleConfirm(item)
-    return
-  }
-  await executeToggle(item, enabled)
-}
-
-async function executeToggle(item: PluginItem, enabled: boolean) {
-  const previous = item.is_global_enabled
-  item.is_global_enabled = enabled
-  pendingModule.value = item.module_name
-  errorMessage.value = ''
-  try {
-    await updatePlugin(item.module_name, enabled)
-    noticeStore.show(
-      t('plugins.toggled', {
-        name: item.name || item.module_name,
-        action: enabled ? t('plugins.enabledAction') : t('plugins.disabledAction'),
+  const visiblePlugins = computed(() =>
+    (hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value)
+      .filter(item => {
+        const keyword = pluginSearch.value.trim().toLowerCase()
+        if (!keyword) return true
+        return `${item.name || ''} ${item.module_name} ${item.description || ''} ${item.source}`.toLowerCase().includes(keyword)
       }),
-      'success',
-    )
-  } catch (error) {
-    item.is_global_enabled = previous
-    errorMessage.value = getErrorMessage(error, t('plugins.updateFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    pendingModule.value = ''
-  }
-}
+  )
+  const previewSaving = computed(() =>
+    settingsSaving.value || settingsRawSaving.value || coreSaving.value || coreRawSaving.value,
+  )
+  const previewTitle = computed(() =>
+    previewMode.value === 'basic' ? t('plugins.previewChangesTitle') : t('plugins.previewRawTitle'),
+  )
+  const toggleConfirmTitle = computed(() =>
+    t('plugins.disableConfirmTitle'),
+  )
+  const toggleConfirmSummary = computed(() => {
+    if (!toggleConfirmItem.value) return ''
+    const riskCount = toggleConfirmItem.value.dependent_plugins.length
+    if (riskCount > 0) {
+      return t('plugins.disableConfirmRiskSummary', { count: 1, riskCount })
+    }
+    return t('plugins.disableConfirmSummary', { count: 1 })
+  })
 
-async function confirmToggleAction() {
-  if (!toggleConfirmItem.value) return
-  toggleConfirmLoading.value = true
-  try {
-    await executeToggle(toggleConfirmItem.value, false)
-    closeToggleConfirm()
-  } finally {
+  const SOURCE_COLORS: Record<string, string> = {
+    framework: 'error',
+    official: 'primary',
+    custom: 'success',
+    builtin: 'secondary',
+    external: 'warning',
+  }
+
+  function sourceColor (source: string) {
+    return SOURCE_COLORS[source] || 'default'
+  }
+
+  function labelFromMap (source: string, map: Record<string, string>) {
+    return map[source] || source
+  }
+
+  function sourceLabel (source: string) {
+    return labelFromMap(source, {
+      framework: t('plugins.framework'),
+      official: t('plugins.official'),
+      custom: t('plugins.custom'),
+      builtin: t('plugins.builtin'),
+      external: t('plugins.external'),
+    })
+  }
+
+  function pluginMetaSummary (item: PluginItem) {
+    const author = item.author?.trim()
+    const version = item.version?.trim()
+    if (author && version) return `${author} · ${version}`
+    if (author) return author
+    if (version) return `v${version}`
+    return ''
+  }
+
+  function pluginRiskLabel (item: PluginItem) {
+    if (item.is_protected && item.protected_reason) return item.protected_reason
+    if (item.dependent_plugins.length > 0) {
+      return t('plugins.dependentCountHint', { count: item.dependent_plugins.length })
+    }
+    if (item.required_plugins.length > 0) {
+      return t('plugins.requiredCountHint', { count: item.required_plugins.length })
+    }
+    return ''
+  }
+
+  function closeToggleConfirm () {
+    toggleConfirmVisible.value = false
     toggleConfirmLoading.value = false
+    toggleConfirmItem.value = null
   }
-}
 
-onMounted(() => {
-  void loadPlugins()
-})
+  function shouldConfirmToggle (item: PluginItem, enabled: boolean) {
+    return !enabled && item.dependent_plugins.length > 0
+  }
+
+  function openToggleConfirm (item: PluginItem) {
+    toggleConfirmItem.value = item
+    toggleConfirmVisible.value = true
+  }
+
+  function settingsSourceLabel (source: string) {
+    return labelFromMap(source, {
+      static_scan: t('plugins.settingsSourceStaticScan'),
+      plugin_metadata: t('plugins.settingsSourceMetadata'),
+      none: t('plugins.settingsSourceNone'),
+      manual: t('plugins.settingsSourceManual'),
+      built_in: t('plugins.settingsSourceBuiltIn'),
+    })
+  }
+
+  function settingsValueSourceLabel (source: string) {
+    return labelFromMap(source, {
+      default: t('plugins.settingsValueSourceDefault'),
+      plugin_section: t('plugins.settingsValueSourcePlugin'),
+      legacy_global: t('plugins.settingsValueSourceLegacy'),
+      env: t('plugins.settingsValueSourceEnv'),
+    })
+  }
+
+  const hasPendingCoreChanges = coreEditor.hasPendingChanges
+  const hasPendingPluginChanges = pluginEditor.hasPendingChanges
+  const previewItems = computed(() => {
+    if (previewAction.value === 'plugin-basic') {
+      return buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
+    }
+    return buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
+  })
+  const previewCurrentText = computed(() =>
+    previewAction.value === 'plugin-raw' ? settingsRawInitialText.value : coreRawInitialText.value,
+  )
+  const previewNextText = computed(() =>
+    previewAction.value === 'plugin-raw' ? settingsRawText.value : coreRawText.value,
+  )
+
+  function applyCoreRawState (nextState: RawSettingsResponse) {
+    coreRawText.value = nextState.text
+    coreRawInitialText.value = nextState.text
+  }
+
+  function applyPluginRawState (nextState: RawSettingsResponse) {
+    settingsRawText.value = nextState.text
+    settingsRawInitialText.value = nextState.text
+  }
+
+  async function loadCoreRawSettings () {
+    coreRawLoading.value = true
+    coreRawErrorMessage.value = ''
+    try {
+      const response = await getCoreSettingsRaw()
+      applyCoreRawState(response.data)
+    } catch (error) {
+      coreRawErrorMessage.value = getErrorMessage(error, t('plugins.settingsRawLoadFailed'))
+    } finally {
+      coreRawLoading.value = false
+    }
+  }
+
+  async function loadPluginRawSettings (moduleName: string) {
+    settingsRawLoading.value = true
+    settingsRawErrorMessage.value = ''
+    try {
+      const response = await getPluginSettingsRaw(moduleName)
+      applyPluginRawState(response.data)
+    } catch (error) {
+      settingsRawErrorMessage.value = getErrorMessage(error, t('plugins.settingsRawLoadFailed'))
+    } finally {
+      settingsRawLoading.value = false
+    }
+  }
+
+  async function loadPlugins () {
+    loading.value = true
+    coreLoading.value = true
+    coreRawLoading.value = true
+    errorMessage.value = ''
+    coreErrorMessage.value = ''
+    coreRawErrorMessage.value = ''
+    try {
+      const [pluginsResponse, pluginConfigResponse, adapterConfigResponse, driverConfigResponse] = await Promise.all([
+        getPlugins(),
+        getPluginConfig(),
+        getAdapterConfig(),
+        getDriverConfig(),
+      ])
+      plugins.value = pluginsResponse.data
+      pluginModules.value = pluginConfigResponse.data.modules
+      pluginDirs.value = pluginConfigResponse.data.dirs
+      adapterModules.value = adapterConfigResponse.data.modules
+      driverBuiltin.value = driverConfigResponse.data.builtin
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('plugins.loadFailed'))
+    } finally {
+      loading.value = false
+    }
+
+    try {
+      const coreResponse = await getCoreSettings()
+      coreEditor.applyState(coreResponse.data)
+      coreErrorMessage.value = ''
+    } catch (error) {
+      coreErrorMessage.value = getErrorMessage(error, t('plugins.settingsLoadFailed'))
+    } finally {
+      coreLoading.value = false
+    }
+
+    await loadCoreRawSettings()
+  }
+
+  async function openSettings (item: PluginItem) {
+    settingsPlugin.value = item
+    settingsDialogVisible.value = true
+    settingsEditorMode.value = 'basic'
+    settingsDialogLoading.value = true
+    settingsLoadingModule.value = item.module_name
+    pluginEditor.reset()
+    settingsRawText.value = ''
+    settingsRawInitialText.value = ''
+    settingsRawErrorMessage.value = ''
+    try {
+      const settingsResponse = await getPluginSettings(item.module_name)
+      pluginEditor.applyState(settingsResponse.data)
+    } catch (error) {
+      settingsErrorMessage.value = getErrorMessage(error, t('plugins.settingsLoadFailed'))
+    } finally {
+      settingsDialogLoading.value = false
+      settingsLoadingModule.value = ''
+    }
+    await loadPluginRawSettings(item.module_name)
+  }
+
+  async function saveSettings () {
+    if (!settingsPlugin.value || !settingsState.value) return
+    await pluginEditor.submit()
+  }
+
+  function buildPreviewItems (
+    fields: PluginSettingField[],
+    form: Record<string, unknown>,
+    draftOverrides: Record<string, boolean>,
+  ) {
+    try {
+      const editableFields = fields.filter(field =>
+        field.editable && (field.has_local_override || Boolean(draftOverrides[field.key])),
+      )
+      const values = buildChangedValues(editableFields, form, t('plugins.settingsInvalidJson'))
+      return editableFields
+        .filter(field => Object.prototype.hasOwnProperty.call(values, field.key))
+        .map(field => ({
+          key: field.key,
+          current: displayFieldValue(field.current_value),
+          next: displayFieldValue(values[field.key]),
+        }))
+    } catch {
+      return []
+    }
+  }
+
+  function openPluginSettingsPreview () {
+    if (!settingsState.value) return
+    const items = buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
+    if (items.length === 0) return
+    previewMode.value = 'basic'
+    previewAction.value = 'plugin-basic'
+    previewDialogVisible.value = true
+  }
+
+  async function clearPluginField (field: PluginSettingField) {
+    if (!settingsPlugin.value) return
+    await pluginEditor.clearField(field)
+  }
+
+  async function saveCoreSettings () {
+    if (!coreSettings.value) return
+    await coreEditor.submit()
+  }
+
+  function openCoreSettingsPreview () {
+    if (!coreSettings.value) return
+    const items = buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
+    if (items.length === 0) return
+    previewMode.value = 'basic'
+    previewAction.value = 'core-basic'
+    previewDialogVisible.value = true
+  }
+
+  async function saveCoreRawSettings () {
+    if (!hasPendingCoreRawChanges.value) return
+    coreRawSaving.value = true
+    coreRawErrorMessage.value = ''
+    try {
+      const rawResponse = await updateCoreSettingsRaw({ text: coreRawText.value })
+      const settingsResponse = await getCoreSettings()
+      applyCoreRawState(rawResponse.data)
+      coreEditor.applyState(settingsResponse.data)
+      noticeStore.show(t('plugins.settingsRawSaved'), 'success')
+    } catch (error) {
+      const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))
+      coreRawErrorMessage.value = message
+      noticeStore.show(message, 'error')
+    } finally {
+      coreRawSaving.value = false
+    }
+  }
+
+  function openCoreRawPreview () {
+    if (!hasPendingCoreRawChanges.value) return
+    previewMode.value = 'raw'
+    previewAction.value = 'core-raw'
+    previewDialogVisible.value = true
+  }
+
+  async function clearCoreField (field: PluginSettingField) {
+    await coreEditor.clearField(field)
+  }
+
+  async function savePluginRawSettings () {
+    if (!settingsPlugin.value || !hasPendingPluginRawChanges.value) return
+    settingsRawSaving.value = true
+    settingsRawErrorMessage.value = ''
+    try {
+      const rawResponse = await updatePluginSettingsRaw(settingsPlugin.value.module_name, {
+        text: settingsRawText.value,
+      })
+      const settingsResponse = await getPluginSettings(settingsPlugin.value.module_name)
+      applyPluginRawState(rawResponse.data)
+      pluginEditor.applyState(settingsResponse.data)
+      noticeStore.show(t('plugins.settingsRawSaved'), 'success')
+    } catch (error) {
+      const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))
+      settingsRawErrorMessage.value = message
+      noticeStore.show(message, 'error')
+    } finally {
+      settingsRawSaving.value = false
+    }
+  }
+
+  function openPluginRawPreview () {
+    if (!hasPendingPluginRawChanges.value) return
+    previewMode.value = 'raw'
+    previewAction.value = 'plugin-raw'
+    previewDialogVisible.value = true
+  }
+
+  async function confirmPreviewSave () {
+    if (previewAction.value === 'plugin-basic') {
+      await saveSettings()
+    } else if (previewAction.value === 'plugin-raw') {
+      await savePluginRawSettings()
+    } else if (previewAction.value === 'core-basic') {
+      await saveCoreSettings()
+    } else {
+      await saveCoreRawSettings()
+    }
+
+    if (
+      !settingsErrorMessage.value
+      && !settingsRawErrorMessage.value
+      && !coreErrorMessage.value
+      && !coreRawErrorMessage.value
+    ) {
+      previewDialogVisible.value = false
+    }
+  }
+
+  async function savePluginConfig (modules: string[], dirs: string[]) {
+    configSaving.value = true
+    errorMessage.value = ''
+    try {
+      const response = await updatePluginConfig({ modules, dirs })
+      pluginModules.value = response.data.modules
+      pluginDirs.value = response.data.dirs
+      noticeStore.show(t('plugins.configSaved'), 'success')
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('plugins.configSaveFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      configSaving.value = false
+    }
+  }
+
+  async function addModule () {
+    if (!newModule.value) return
+    const nextModules = normalizeConfigEntries([
+      ...pluginModules.value.map(item => item.name),
+      newModule.value,
+    ])
+    newModule.value = ''
+    await savePluginConfig(nextModules, normalizeConfigEntries(pluginDirs.value.map(item => item.path)))
+  }
+
+  async function removeModule (moduleName: string) {
+    await savePluginConfig(
+      pluginModules.value.filter(item => item.name !== moduleName).map(item => item.name),
+      normalizeConfigEntries(pluginDirs.value.map(item => item.path)),
+    )
+  }
+
+  async function addDir () {
+    if (!newDir.value) return
+    const nextDirs = normalizeConfigEntries([
+      ...pluginDirs.value.map(item => item.path),
+      newDir.value,
+    ])
+    newDir.value = ''
+    await savePluginConfig(pluginModules.value.map(item => item.name), nextDirs)
+  }
+
+  async function removeDir (dirName: string) {
+    await savePluginConfig(
+      pluginModules.value.map(item => item.name),
+      normalizeConfigEntries(
+        pluginDirs.value.filter(item => item.path !== dirName).map(item => item.path),
+      ),
+    )
+  }
+
+  function moduleChipColor (item: ModuleConfigItem) {
+    if (item.is_loaded) return 'success'
+    if (item.is_importable) return 'warning'
+    return 'error'
+  }
+
+  function dirChipColor (item: DirConfigItem) {
+    if (!item.exists) return 'error'
+    if (item.is_loaded) return 'success'
+    return 'warning'
+  }
+
+  function moduleStatusText (item: ModuleConfigItem) {
+    if (item.is_loaded) return t('plugins.moduleLoaded')
+    if (item.is_importable) return t('plugins.moduleRegisteredOnly')
+    return t('plugins.moduleMissing')
+  }
+
+  function dirStatusText (item: DirConfigItem) {
+    if (!item.exists) return t('plugins.dirMissing')
+    if (item.is_loaded) return t('plugins.dirLoaded')
+    return t('plugins.dirRegisteredOnly')
+  }
+
+  function driverChipColor (item: DriverConfigItem) {
+    return item.is_active ? 'success' : 'warning'
+  }
+
+  function driverStatusText (item: DriverConfigItem) {
+    return item.is_active ? t('plugins.driverActive') : t('plugins.driverRegisteredOnly')
+  }
+
+  async function togglePlugin (item: PluginItem, nextValue: boolean | null) {
+    if (item.is_protected) {
+      noticeStore.show(item.protected_reason || t('plugins.cannotDisable'), 'warning')
+      return
+    }
+    const enabled = Boolean(nextValue)
+    if (shouldConfirmToggle(item, enabled)) {
+      item.is_global_enabled = !enabled
+      openToggleConfirm(item)
+      return
+    }
+    await executeToggle(item, enabled)
+  }
+
+  async function executeToggle (item: PluginItem, enabled: boolean) {
+    const previous = item.is_global_enabled
+    item.is_global_enabled = enabled
+    pendingModule.value = item.module_name
+    errorMessage.value = ''
+    try {
+      await updatePlugin(item.module_name, enabled)
+      noticeStore.show(
+        t('plugins.toggled', {
+          name: item.name || item.module_name,
+          action: enabled ? t('plugins.enabledAction') : t('plugins.disabledAction'),
+        }),
+        'success',
+      )
+    } catch (error) {
+      item.is_global_enabled = previous
+      errorMessage.value = getErrorMessage(error, t('plugins.updateFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      pendingModule.value = ''
+    }
+  }
+
+  async function confirmToggleAction () {
+    if (!toggleConfirmItem.value) return
+    toggleConfirmLoading.value = true
+    try {
+      await executeToggle(toggleConfirmItem.value, false)
+      closeToggleConfirm()
+    } finally {
+      toggleConfirmLoading.value = false
+    }
+  }
+
+  onMounted(() => {
+    void loadPlugins()
+  })
 </script>
 
 <style scoped>

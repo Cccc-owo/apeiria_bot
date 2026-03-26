@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Top-level NoneBot bootstrap used by bot.py and CLI entrypoints."""
 
+from typing import Any, cast
+
 import nonebot
 
 from apeiria.config import driver_config_service, project_config_service
@@ -22,13 +24,14 @@ def resolve_driver_kwargs(config_kwargs: dict[str, object]) -> dict[str, object]
 
     if project_driver_kwargs.get("driver"):
         config_kwargs.pop("driver", None)
-        return project_driver_kwargs
+        return cast("dict[str, object]", project_driver_kwargs)
     if "driver" in config_kwargs:
         return {}
 
     env_config = project_config_service.read_env_config()
-    if env_config.get("driver"):
-        return {"driver": env_config["driver"]}
+    env_driver = env_config.get("driver")
+    if isinstance(env_driver, str) and env_driver:
+        return {"driver": env_driver}
     return {}
 
 
@@ -47,7 +50,10 @@ def initialize_nonebot() -> None:
     config_kwargs = project_config_service.get_project_config_kwargs()
     driver_kwargs = resolve_driver_kwargs(config_kwargs)
 
-    nonebot.init(**config_kwargs, **driver_kwargs)
+    nonebot.init(
+        **cast("dict[str, Any]", config_kwargs),
+        **cast("dict[str, Any]", driver_kwargs),
+    )
     nonebot.load_from_toml("pyproject.toml")
 
     load_user_setup()

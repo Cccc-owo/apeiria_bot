@@ -121,3 +121,5 @@ pythonVersion = "3.10"
 pythonPlatform = "All"
 typeCheckingMode = "standard"
 extraPaths = ["."]
+venvPath = "."
+venv = ".venv"

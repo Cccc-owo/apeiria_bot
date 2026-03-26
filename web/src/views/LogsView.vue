@@ -14,17 +14,17 @@
           {{ connected ? t('logs.disconnect') : t('logs.connect') }}
         </v-btn>
         <v-btn
+          :disabled="filteredLogs.length === 0"
           prepend-icon="mdi-download-outline"
           variant="text"
-          :disabled="filteredLogs.length === 0"
           @click="exportLogs"
         >
           {{ t('logs.export') }}
         </v-btn>
         <v-btn
+          :disabled="logs.length === 0"
           prepend-icon="mdi-delete-sweep"
           variant="text"
-          :disabled="logs.length === 0"
           @click="logs = []"
         >
           {{ t('logs.clear') }}
@@ -35,37 +35,37 @@
     <div class="page-toolbar-form">
       <v-text-field
         v-model.trim="search"
-        :label="t('logs.search')"
         density="compact"
         hide-details
+        :label="t('logs.search')"
         prepend-inner-icon="mdi-magnify"
       />
       <v-select
         v-model="selectedLevels"
-        :items="levelOptions"
-        :label="t('logs.level')"
+        chips
+        class="logs-filter"
         density="compact"
         hide-details
-        chips
+        :items="levelOptions"
+        :label="t('logs.level')"
         multiple
-        class="logs-filter"
       />
       <v-select
         v-model="selectedSources"
-        :items="sourceOptions"
-        :label="t('logs.source')"
+        chips
+        class="logs-filter"
         density="compact"
         hide-details
-        chips
+        :items="sourceOptions"
+        :label="t('logs.source')"
         multiple
-        class="logs-filter"
       />
       <v-switch
         v-model="autoScroll"
-        :label="t('logs.autoScroll')"
         color="primary"
         hide-details
         inset
+        :label="t('logs.autoScroll')"
       />
     </div>
 
@@ -73,19 +73,19 @@
       <v-chip
         v-for="level in quickLevelFilters"
         :key="level"
+        class="logs-quick-filters__chip"
+        :color="levelColor(level)"
         size="small"
         :variant="selectedLevels.includes(level) ? 'flat' : 'tonal'"
-        :color="levelColor(level)"
-        class="logs-quick-filters__chip"
         @click="toggleQuickLevel(level)"
       >
         {{ level }}
       </v-chip>
       <v-btn
         v-if="selectedLevels.length"
+        class="logs-quick-filters__reset"
         size="small"
         variant="text"
-        class="logs-quick-filters__reset"
         @click="selectedLevels = []"
       >
         {{ t('logs.resetLevels') }}
@@ -109,10 +109,10 @@
 
     <v-alert
       v-if="historyError"
+      class="mb-4"
+      density="comfortable"
       type="warning"
       variant="tonal"
-      density="comfortable"
-      class="mb-4"
     >
       {{ historyError }}
     </v-alert>
@@ -120,9 +120,9 @@
     <v-card class="page-panel log-card">
       <div v-if="hasMoreHistory || loadingOlder" class="log-card__history">
         <v-btn
-          variant="text"
-          size="small"
           :loading="loadingOlder"
+          size="small"
+          variant="text"
           @click="loadOlderHistory"
         >
           {{ t('logs.loadOlder') }}
@@ -134,7 +134,7 @@
         <span>{{ t('logs.timestamp') }}</span>
         <span>{{ t('logs.source') }}</span>
         <span>{{ t('logs.message') }}</span>
-        <span></span>
+        <span />
       </div>
 
       <div v-if="filteredLogs.length === 0" class="text-medium-emphasis text-center pa-8">
@@ -151,17 +151,17 @@
             <v-expansion-panel-title v-slot="{ expanded }" hide-actions>
               <div class="log-entry__summary">
                 <v-chip
+                  class="log-entry__level-chip"
+                  :color="levelColor(entry.level)"
                   size="small"
                   variant="tonal"
-                  :color="levelColor(entry.level)"
-                  class="log-entry__level-chip"
                 >
                   {{ entry.level }}
                 </v-chip>
                 <span class="log-entry__time">{{ entry.timestamp }}</span>
                 <span class="log-entry__source" :title="entry.source">{{ entry.source }}</span>
                 <span class="log-entry__message">{{ entry.message }}</span>
-                <span class="log-entry__toggle" aria-hidden="true">
+                <span aria-hidden="true" class="log-entry__toggle">
                   <v-icon size="18">
                     {{ expanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
                   </v-icon>
@@ -186,286 +186,286 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { getLogHistory } from '@/api'
-import type { LogItem } from '@/api'
-import { getErrorMessage } from '@/api/client'
+  import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { getLogHistory } from '@/api'
+  import type { LogItem } from '@/api'
+  import { getErrorMessage } from '@/api/client'
 
-interface LogEntry {
-  id: string
-  timestamp: string
-  level: string
-  source: string
-  message: string
-  raw: string
-  extra: Record<string, unknown>
-}
-
-const logs = ref<LogEntry[]>([])
-const connected = ref(false)
-const autoScroll = ref(true)
-const search = ref('')
-const selectedLevels = ref<string[]>([])
-const selectedSources = ref<string[]>([])
-const logContainer = ref<HTMLElement>()
-const loadingHistory = ref(false)
-const loadingOlder = ref(false)
-const hasMoreHistory = ref(false)
-const nextBefore = ref<number | null>(0)
-const historyError = ref('')
-const historyLogCount = ref(0)
-const { t } = useI18n()
-let ws: WebSocket | null = null
-const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
-const pendingLiveLogs: LogEntry[] = []
-let primingHistory = false
-const MAX_LIVE_LOGS = 500
-
-const levelOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.level))).sort())
-const sourceOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.source))).sort())
-const highSignalCount = computed(() =>
-  logs.value.filter((entry) => entry.level === 'ERROR' || entry.level === 'CRITICAL' || entry.level === 'WARNING').length,
-)
-const filteredLogs = computed(() => logs.value.filter((entry) => {
-  if (selectedLevels.value.length > 0 && !selectedLevels.value.includes(entry.level)) {
-    return false
-  }
-  if (selectedSources.value.length > 0 && !selectedSources.value.includes(entry.source)) {
-    return false
-  }
-  const keyword = search.value.trim().toLowerCase()
-  if (!keyword) {
-    return true
-  }
-  const haystack = `${entry.timestamp} ${entry.level} ${entry.source} ${entry.message} ${entry.raw} ${JSON.stringify(entry.extra)}`.toLowerCase()
-  return haystack.includes(keyword)
-}))
-
-function connect() {
-  disconnect()
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = new WebSocket(`${proto}//${location.host}/api/logs/ws`)
-
-  ws.onopen = () => {
-    const token = localStorage.getItem('token')
-    if (token) ws?.send(token)
-    connected.value = true
+  interface LogEntry {
+    id: string
+    timestamp: string
+    level: string
+    source: string
+    message: string
+    raw: string
+    extra: Record<string, unknown>
   }
 
-  ws.onmessage = (event) => {
-    const entry = normalizeLogFrame(event.data)
-    if (primingHistory) {
-      pendingLiveLogs.push(entry)
-      return
+  const logs = ref<LogEntry[]>([])
+  const connected = ref(false)
+  const autoScroll = ref(true)
+  const search = ref('')
+  const selectedLevels = ref<string[]>([])
+  const selectedSources = ref<string[]>([])
+  const logContainer = ref<HTMLElement>()
+  const loadingHistory = ref(false)
+  const loadingOlder = ref(false)
+  const hasMoreHistory = ref(false)
+  const nextBefore = ref<number | null>(0)
+  const historyError = ref('')
+  const historyLogCount = ref(0)
+  const { t } = useI18n()
+  let ws: WebSocket | null = null
+  const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
+  const pendingLiveLogs: LogEntry[] = []
+  let primingHistory = false
+  const MAX_LIVE_LOGS = 500
+
+  const levelOptions = computed(() => Array.from(new Set(logs.value.map(item => item.level))).sort())
+  const sourceOptions = computed(() => Array.from(new Set(logs.value.map(item => item.source))).sort())
+  const highSignalCount = computed(() =>
+    logs.value.filter(entry => entry.level === 'ERROR' || entry.level === 'CRITICAL' || entry.level === 'WARNING').length,
+  )
+  const filteredLogs = computed(() => logs.value.filter(entry => {
+    if (selectedLevels.value.length > 0 && !selectedLevels.value.includes(entry.level)) {
+      return false
     }
-    appendLiveLog(entry)
-    if (!autoScroll.value) {
-      return
+    if (selectedSources.value.length > 0 && !selectedSources.value.includes(entry.source)) {
+      return false
     }
-    nextTick(() => {
-      logContainer.value?.scrollTo(0, logContainer.value.scrollHeight)
-    })
-  }
-
-  ws.onclose = () => { connected.value = false }
-}
-
-function disconnect() {
-  ws?.close()
-  ws = null
-  connected.value = false
-}
-
-function resetLogsView() {
-  logs.value = []
-  selectedLevels.value = []
-  selectedSources.value = []
-  search.value = ''
-  hasMoreHistory.value = false
-  nextBefore.value = 0
-  historyError.value = ''
-  historyLogCount.value = 0
-  pendingLiveLogs.length = 0
-  primingHistory = false
-}
-
-function toLogEntry(item: LogItem): LogEntry {
-  return {
-    timestamp: item.timestamp,
-    level: item.level,
-    source: item.source,
-    message: item.message,
-    raw: item.raw,
-    extra: item.extra,
-    id: `${item.timestamp}_${item.level}_${item.source}_${Math.random().toString(16).slice(2)}`,
-  }
-}
-
-async function loadInitialHistory() {
-  loadingHistory.value = true
-  historyError.value = ''
-  try {
-    const response = await getLogHistory({ before: 0, limit: 50 })
-    logs.value = response.data.items
-      .slice()
-      .reverse()
-      .map(item => toLogEntry(item))
-    historyLogCount.value = logs.value.length
-    hasMoreHistory.value = response.data.has_more
-    nextBefore.value = response.data.next_before
-    await nextTick()
-    logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })
-  } catch (error) {
-    historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
-  } finally {
-    loadingHistory.value = false
-  }
-}
-
-async function loadOlderHistory() {
-  if (loadingOlder.value || nextBefore.value === null) return
-  const container = logContainer.value
-  const previousHeight = container?.scrollHeight || 0
-  loadingOlder.value = true
-  try {
-    const response = await getLogHistory({ before: nextBefore.value, limit: 50 })
-    const olderEntries = response.data.items
-      .slice()
-      .reverse()
-      .map(item => toLogEntry(item))
-    logs.value = [...olderEntries, ...logs.value]
-    historyLogCount.value += olderEntries.length
-    hasMoreHistory.value = response.data.has_more
-    nextBefore.value = response.data.next_before
-    await nextTick()
-    if (container) {
-      const nextHeight = container.scrollHeight
-      container.scrollTop = nextHeight - previousHeight
+    const keyword = search.value.trim().toLowerCase()
+    if (!keyword) {
+      return true
     }
-  } catch (error) {
-    historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
-  } finally {
-    loadingOlder.value = false
-  }
-}
+    const haystack = `${entry.timestamp} ${entry.level} ${entry.source} ${entry.message} ${entry.raw} ${JSON.stringify(entry.extra)}`.toLowerCase()
+    return haystack.includes(keyword)
+  }))
 
-function handleLogScroll(event: Event) {
-  const target = event.target as HTMLElement | null
-  if (!target || loadingOlder.value || !hasMoreHistory.value) {
-    return
-  }
-  if (target.scrollTop <= 24) {
-    void loadOlderHistory()
-  }
-}
+  function connect () {
+    disconnect()
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    ws = new WebSocket(`${proto}//${location.host}/api/logs/ws`)
 
-async function initializeLogsView() {
-  resetLogsView()
-  primingHistory = true
-  connect()
-  try {
-    await loadInitialHistory()
-  } finally {
-    flushPendingLiveLogs()
+    ws.onopen = () => {
+      const token = localStorage.getItem('token')
+      if (token) ws?.send(token)
+      connected.value = true
+    }
+
+    ws.onmessage = event => {
+      const entry = normalizeLogFrame(event.data)
+      if (primingHistory) {
+        pendingLiveLogs.push(entry)
+        return
+      }
+      appendLiveLog(entry)
+      if (!autoScroll.value) {
+        return
+      }
+      nextTick(() => {
+        logContainer.value?.scrollTo(0, logContainer.value.scrollHeight)
+      })
+    }
+
+    ws.onclose = () => { connected.value = false }
+  }
+
+  function disconnect () {
+    ws?.close()
+    ws = null
+    connected.value = false
+  }
+
+  function resetLogsView () {
+    logs.value = []
+    selectedLevels.value = []
+    selectedSources.value = []
+    search.value = ''
+    hasMoreHistory.value = false
+    nextBefore.value = 0
+    historyError.value = ''
+    historyLogCount.value = 0
+    pendingLiveLogs.length = 0
     primingHistory = false
   }
-}
 
-async function toggleConnection() {
-  if (connected.value) {
-    disconnect()
-    return
-  }
-  if (logs.value.length === 0) {
-    await initializeLogsView()
-    return
-  }
-  connect()
-}
-
-function normalizeLogFrame(frame: string): LogEntry {
-  try {
-    const parsed = JSON.parse(frame) as Partial<LogEntry>
+  function toLogEntry (item: LogItem): LogEntry {
     return {
-      id: `${parsed.timestamp || Date.now()}_${Math.random().toString(16).slice(2)}`,
-      timestamp: parsed.timestamp || new Date().toISOString(),
-      level: parsed.level || 'INFO',
-      source: parsed.source || 'unknown',
-      message: parsed.message || parsed.raw || frame,
-      raw: parsed.raw || frame,
-      extra: (parsed.extra && typeof parsed.extra === 'object') ? parsed.extra as Record<string, unknown> : {},
-    }
-  } catch {
-    return {
-      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      timestamp: new Date().toISOString(),
-      level: 'INFO',
-      source: 'legacy',
-      message: frame,
-      raw: frame,
-      extra: {},
+      timestamp: item.timestamp,
+      level: item.level,
+      source: item.source,
+      message: item.message,
+      raw: item.raw,
+      extra: item.extra,
+      id: `${item.timestamp}_${item.level}_${item.source}_${Math.random().toString(16).slice(2)}`,
     }
   }
-}
 
-function levelColor(level: string) {
-  if (level === 'ERROR' || level === 'CRITICAL') return 'error'
-  if (level === 'WARNING') return 'warning'
-  if (level === 'SUCCESS') return 'success'
-  return 'info'
-}
-
-function toggleQuickLevel(level: string) {
-  if (selectedLevels.value.includes(level)) {
-    selectedLevels.value = selectedLevels.value.filter(item => item !== level)
-    return
-  }
-  selectedLevels.value = [...selectedLevels.value, level]
-}
-
-function flushPendingLiveLogs() {
-  const existingKeys = new Set(logs.value.map(item => buildLogKey(item)))
-  for (const entry of pendingLiveLogs.splice(0)) {
-    const entryKey = buildLogKey(entry)
-    if (existingKeys.has(entryKey)) {
-      continue
+  async function loadInitialHistory () {
+    loadingHistory.value = true
+    historyError.value = ''
+    try {
+      const response = await getLogHistory({ before: 0, limit: 50 })
+      logs.value = response.data.items
+        .slice()
+        .reverse()
+        .map(item => toLogEntry(item))
+      historyLogCount.value = logs.value.length
+      hasMoreHistory.value = response.data.has_more
+      nextBefore.value = response.data.next_before
+      await nextTick()
+      logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })
+    } catch (error) {
+      historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
+    } finally {
+      loadingHistory.value = false
     }
-    existingKeys.add(entryKey)
-    appendLiveLog(entry)
   }
-}
 
-function buildLogKey(entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
-  return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
-}
-
-function appendLiveLog(entry: LogEntry) {
-  logs.value.push(entry)
-  const maxLogs = historyLogCount.value + MAX_LIVE_LOGS
-  if (logs.value.length <= maxLogs) {
-    return
+  async function loadOlderHistory () {
+    if (loadingOlder.value || nextBefore.value === null) return
+    const container = logContainer.value
+    const previousHeight = container?.scrollHeight || 0
+    loadingOlder.value = true
+    try {
+      const response = await getLogHistory({ before: nextBefore.value, limit: 50 })
+      const olderEntries = response.data.items
+        .slice()
+        .reverse()
+        .map(item => toLogEntry(item))
+      logs.value = [...olderEntries, ...logs.value]
+      historyLogCount.value += olderEntries.length
+      hasMoreHistory.value = response.data.has_more
+      nextBefore.value = response.data.next_before
+      await nextTick()
+      if (container) {
+        const nextHeight = container.scrollHeight
+        container.scrollTop = nextHeight - previousHeight
+      }
+    } catch (error) {
+      historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
+    } finally {
+      loadingOlder.value = false
+    }
   }
-  logs.value.splice(historyLogCount.value, logs.value.length - maxLogs)
-}
 
-function exportLogs() {
-  const blob = new Blob(
-    [filteredLogs.value.map((entry) => JSON.stringify(entry)).join('\n')],
-    { type: 'application/jsonl;charset=utf-8' },
-  )
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `apeiria-logs-${Date.now()}.jsonl`
-  link.click()
-  URL.revokeObjectURL(url)
-}
+  function handleLogScroll (event: Event) {
+    const target = event.target as HTMLElement | null
+    if (!target || loadingOlder.value || !hasMoreHistory.value) {
+      return
+    }
+    if (target.scrollTop <= 24) {
+      void loadOlderHistory()
+    }
+  }
 
-onMounted(() => { void initializeLogsView() })
-onActivated(() => { void initializeLogsView() })
-onDeactivated(disconnect)
-onUnmounted(disconnect)
+  async function initializeLogsView () {
+    resetLogsView()
+    primingHistory = true
+    connect()
+    try {
+      await loadInitialHistory()
+    } finally {
+      flushPendingLiveLogs()
+      primingHistory = false
+    }
+  }
+
+  async function toggleConnection () {
+    if (connected.value) {
+      disconnect()
+      return
+    }
+    if (logs.value.length === 0) {
+      await initializeLogsView()
+      return
+    }
+    connect()
+  }
+
+  function normalizeLogFrame (frame: string): LogEntry {
+    try {
+      const parsed = JSON.parse(frame) as Partial<LogEntry>
+      return {
+        id: `${parsed.timestamp || Date.now()}_${Math.random().toString(16).slice(2)}`,
+        timestamp: parsed.timestamp || new Date().toISOString(),
+        level: parsed.level || 'INFO',
+        source: parsed.source || 'unknown',
+        message: parsed.message || parsed.raw || frame,
+        raw: parsed.raw || frame,
+        extra: (parsed.extra && typeof parsed.extra === 'object') ? parsed.extra as Record<string, unknown> : {},
+      }
+    } catch {
+      return {
+        id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        source: 'legacy',
+        message: frame,
+        raw: frame,
+        extra: {},
+      }
+    }
+  }
+
+  function levelColor (level: string) {
+    if (level === 'ERROR' || level === 'CRITICAL') return 'error'
+    if (level === 'WARNING') return 'warning'
+    if (level === 'SUCCESS') return 'success'
+    return 'info'
+  }
+
+  function toggleQuickLevel (level: string) {
+    if (selectedLevels.value.includes(level)) {
+      selectedLevels.value = selectedLevels.value.filter(item => item !== level)
+      return
+    }
+    selectedLevels.value = [...selectedLevels.value, level]
+  }
+
+  function flushPendingLiveLogs () {
+    const existingKeys = new Set(logs.value.map(item => buildLogKey(item)))
+    for (const entry of pendingLiveLogs.splice(0)) {
+      const entryKey = buildLogKey(entry)
+      if (existingKeys.has(entryKey)) {
+        continue
+      }
+      existingKeys.add(entryKey)
+      appendLiveLog(entry)
+    }
+  }
+
+  function buildLogKey (entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
+    return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
+  }
+
+  function appendLiveLog (entry: LogEntry) {
+    logs.value.push(entry)
+    const maxLogs = historyLogCount.value + MAX_LIVE_LOGS
+    if (logs.value.length <= maxLogs) {
+      return
+    }
+    logs.value.splice(historyLogCount.value, logs.value.length - maxLogs)
+  }
+
+  function exportLogs () {
+    const blob = new Blob(
+      [filteredLogs.value.map(entry => JSON.stringify(entry)).join('\n')],
+      { type: 'application/jsonl;charset=utf-8' },
+    )
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `apeiria-logs-${Date.now()}.jsonl`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  onMounted(() => { void initializeLogsView() })
+  onActivated(() => { void initializeLogsView() })
+  onDeactivated(disconnect)
+  onUnmounted(disconnect)
 </script>
 
 <style scoped>

@@ -3,11 +3,11 @@
     <div class="page-header">
       <h1 class="page-title">{{ t('permissions.title') }}</h1>
       <div class="page-actions">
-        <v-btn variant="tonal" :loading="loading" @click="loadAll">{{ t('common.refresh') }}</v-btn>
+        <v-btn :loading="loading" variant="tonal" @click="loadAll">{{ t('common.refresh') }}</v-btn>
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
       {{ errorMessage }}
     </v-alert>
 
@@ -37,20 +37,20 @@
           <v-card-text class="permission-filter-bar">
             <v-text-field
               v-model="banSearch"
-              :label="t('permissions.searchBans')"
-              prepend-inner-icon="mdi-magnify"
+              class="permission-filter-bar__search"
+              clearable
               density="compact"
               hide-details
-              clearable
-              class="permission-filter-bar__search"
+              :label="t('permissions.searchBans')"
+              prepend-inner-icon="mdi-magnify"
             />
             <v-select
               v-model="banFilter"
-              :items="banFilterOptions"
-              :label="t('permissions.banType')"
+              class="permission-filter-bar__select"
               density="compact"
               hide-details
-              class="permission-filter-bar__select"
+              :items="banFilterOptions"
+              :label="t('permissions.banType')"
             />
           </v-card-text>
         </v-card>
@@ -82,8 +82,8 @@
                 <v-text-field
                   id="permission-duration"
                   v-model.number="banForm.duration"
-                  type="number"
                   hide-details
+                  type="number"
                 />
               </div>
               <div class="compact-field compact-field--inline permission-field permission-field--wide">
@@ -104,7 +104,13 @@
         </v-card>
 
         <v-card class="page-panel">
-          <v-data-table :headers="banHeaders" :items="filteredBans" :loading="loading" density="compact" class="page-table permission-table">
+          <v-data-table
+            class="page-table permission-table"
+            density="compact"
+            :headers="banHeaders"
+            :items="filteredBans"
+            :loading="loading"
+          >
             <template #item.user_id="{ item }">
               <div class="permission-identity">
                 <span class="font-weight-medium">{{ item.user_id || t('common.none') }}</span>
@@ -121,11 +127,11 @@
             </template>
             <template #item.actions="{ item }">
               <v-btn
+                color="error"
                 icon="mdi-delete"
+                :loading="deletingBanId === item.id"
                 size="small"
                 variant="text"
-                color="error"
-                :loading="deletingBanId === item.id"
                 @click="handleDeleteBan(item.id)"
               />
             </template>
@@ -158,26 +164,32 @@
           <v-card-text class="permission-filter-bar">
             <v-text-field
               v-model="userSearch"
-              :label="t('permissions.searchUsers')"
-              prepend-inner-icon="mdi-magnify"
+              class="permission-filter-bar__search"
+              clearable
               density="compact"
               hide-details
-              clearable
-              class="permission-filter-bar__search"
+              :label="t('permissions.searchUsers')"
+              prepend-inner-icon="mdi-magnify"
             />
             <v-select
               v-model="levelFilter"
-              :items="levelFilterOptions"
-              :label="t('permissions.levelFilter')"
+              class="permission-filter-bar__select"
               density="compact"
               hide-details
-              class="permission-filter-bar__select"
+              :items="levelFilterOptions"
+              :label="t('permissions.levelFilter')"
             />
           </v-card-text>
         </v-card>
 
         <v-card class="page-panel">
-          <v-data-table :headers="userHeaders" :items="filteredUsers" :loading="loading" density="compact" class="page-table permission-table">
+          <v-data-table
+            class="page-table permission-table"
+            density="compact"
+            :headers="userHeaders"
+            :items="filteredUsers"
+            :loading="loading"
+          >
             <template #item.user_id="{ item }">
               <div class="permission-identity">
                 <span class="font-weight-medium">{{ item.user_id }}</span>
@@ -189,11 +201,11 @@
             <template #item.level="{ item }">
               <div class="d-flex align-center ga-2">
                 <v-select
-                  :model-value="item.level"
-                  :items="levelOptions"
+                  class="level-select"
                   density="compact"
                   hide-details
-                  class="level-select"
+                  :items="levelOptions"
+                  :model-value="item.level"
                   @update:model-value="updateLevel(item, $event)"
                 />
                 <v-progress-circular
@@ -217,198 +229,198 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { createBan, deleteBan, getBans, getUsers, updateUserLevel } from '@/api'
-import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
+  import { computed, onMounted, reactive, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { createBan, deleteBan, getBans, getUsers, updateUserLevel } from '@/api'
+  import { getErrorMessage } from '@/api/client'
+  import { useNoticeStore } from '@/stores/notice'
 
-interface BanRow {
-  id: number
-  user_id: string | null
-  group_id: string | null
-  duration: number
-  reason: string | null
-}
-
-interface UserLevelRow {
-  user_id: string
-  group_id: string
-  level: number
-}
-
-const tab = ref('bans')
-const bans = ref<BanRow[]>([])
-const users = ref<UserLevelRow[]>([])
-const loading = ref(false)
-const creatingBan = ref(false)
-const deletingBanId = ref<number | null>(null)
-const pendingUserKey = ref('')
-const errorMessage = ref('')
-const banSearch = ref('')
-const userSearch = ref('')
-const banFilter = ref<'all' | 'permanent' | 'temporary'>('all')
-const levelFilter = ref<string>('all')
-const noticeStore = useNoticeStore()
-const { t } = useI18n()
-
-const levelOptions = [0, 1, 2, 3, 4, 5, 6]
-const highLevelThreshold = 4
-
-const banForm = reactive({
-  user_id: '',
-  group_id: '',
-  duration: 0,
-  reason: '',
-})
-
-const banHeaders = computed(() => [
-  { title: t('permissions.user'), key: 'user_id' },
-  { title: t('permissions.durationHeader'), key: 'duration' },
-  { title: t('permissions.reasonHeader'), key: 'reason' },
-  { title: '', key: 'actions', sortable: false },
-])
-
-const userHeaders = computed(() => [
-  { title: t('permissions.user'), key: 'user_id' },
-  { title: t('permissions.level'), key: 'level', sortable: false },
-])
-
-const permanentBansCount = computed(() => bans.value.filter((item) => item.duration === 0).length)
-const highLevelUsersCount = computed(() => users.value.filter((item) => item.level >= highLevelThreshold).length)
-
-const banFilterOptions = computed(() => [
-  { title: t('permissions.banFilterAll'), value: 'all' },
-  { title: t('permissions.banFilterPermanent'), value: 'permanent' },
-  { title: t('permissions.banFilterTemporary'), value: 'temporary' },
-])
-
-const levelFilterOptions = computed(() => [
-  { title: t('permissions.levelFilterAll'), value: 'all' },
-  { title: t('permissions.levelFilterHigh'), value: 'high' },
-  ...levelOptions.map(level => ({ title: `${t('permissions.level')} ${level}`, value: String(level) })),
-])
-
-const filteredBans = computed(() => {
-  const keyword = banSearch.value.trim().toLowerCase()
-  return bans.value.filter((item) => {
-    const matchesKeyword = !keyword || [
-      item.user_id || '',
-      item.group_id || '',
-      item.reason || '',
-      item.duration === 0 ? t('permissions.permanent') : String(item.duration),
-    ].some(value => value.toLowerCase().includes(keyword))
-
-    const matchesFilter = banFilter.value === 'all'
-      || (banFilter.value === 'permanent' && item.duration === 0)
-      || (banFilter.value === 'temporary' && item.duration > 0)
-
-    return matchesKeyword && matchesFilter
-  })
-})
-
-const filteredUsers = computed(() => {
-  const keyword = userSearch.value.trim().toLowerCase()
-  return users.value.filter((item) => {
-    const matchesKeyword = !keyword || [
-      item.user_id,
-      item.group_id || '',
-      String(item.level),
-    ].some(value => value.toLowerCase().includes(keyword))
-
-    const matchesLevel = levelFilter.value === 'all'
-      || (levelFilter.value === 'high' && item.level >= highLevelThreshold)
-      || item.level === Number(levelFilter.value)
-
-    return matchesKeyword && matchesLevel
-  })
-})
-
-async function loadAll() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    const [b, u] = await Promise.all([getBans(), getUsers()])
-    bans.value = b.data
-    users.value = u.data
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('permissions.loadFailed'))
-  } finally {
-    loading.value = false
+  interface BanRow {
+    id: number
+    user_id: string | null
+    group_id: string | null
+    duration: number
+    reason: string | null
   }
-}
 
-async function handleCreateBan() {
-  if (!banForm.user_id.trim()) {
-    errorMessage.value = t('permissions.userIdRequired')
-    return
+  interface UserLevelRow {
+    user_id: string
+    group_id: string
+    level: number
   }
-  creatingBan.value = true
-  errorMessage.value = ''
-  try {
-    const response = await createBan({
-      user_id: banForm.user_id.trim(),
-      group_id: banForm.group_id.trim() || null,
-      duration: Number(banForm.duration) || 0,
-      reason: banForm.reason.trim() || null,
+
+  const tab = ref('bans')
+  const bans = ref<BanRow[]>([])
+  const users = ref<UserLevelRow[]>([])
+  const loading = ref(false)
+  const creatingBan = ref(false)
+  const deletingBanId = ref<number | null>(null)
+  const pendingUserKey = ref('')
+  const errorMessage = ref('')
+  const banSearch = ref('')
+  const userSearch = ref('')
+  const banFilter = ref<'all' | 'permanent' | 'temporary'>('all')
+  const levelFilter = ref<string>('all')
+  const noticeStore = useNoticeStore()
+  const { t } = useI18n()
+
+  const levelOptions = [0, 1, 2, 3, 4, 5, 6]
+  const highLevelThreshold = 4
+
+  const banForm = reactive({
+    user_id: '',
+    group_id: '',
+    duration: 0,
+    reason: '',
+  })
+
+  const banHeaders = computed(() => [
+    { title: t('permissions.user'), key: 'user_id' },
+    { title: t('permissions.durationHeader'), key: 'duration' },
+    { title: t('permissions.reasonHeader'), key: 'reason' },
+    { title: '', key: 'actions', sortable: false },
+  ])
+
+  const userHeaders = computed(() => [
+    { title: t('permissions.user'), key: 'user_id' },
+    { title: t('permissions.level'), key: 'level', sortable: false },
+  ])
+
+  const permanentBansCount = computed(() => bans.value.filter(item => item.duration === 0).length)
+  const highLevelUsersCount = computed(() => users.value.filter(item => item.level >= highLevelThreshold).length)
+
+  const banFilterOptions = computed(() => [
+    { title: t('permissions.banFilterAll'), value: 'all' },
+    { title: t('permissions.banFilterPermanent'), value: 'permanent' },
+    { title: t('permissions.banFilterTemporary'), value: 'temporary' },
+  ])
+
+  const levelFilterOptions = computed(() => [
+    { title: t('permissions.levelFilterAll'), value: 'all' },
+    { title: t('permissions.levelFilterHigh'), value: 'high' },
+    ...levelOptions.map(level => ({ title: `${t('permissions.level')} ${level}`, value: String(level) })),
+  ])
+
+  const filteredBans = computed(() => {
+    const keyword = banSearch.value.trim().toLowerCase()
+    return bans.value.filter(item => {
+      const matchesKeyword = !keyword || [
+        item.user_id || '',
+        item.group_id || '',
+        item.reason || '',
+        item.duration === 0 ? t('permissions.permanent') : String(item.duration),
+      ].some(value => value.toLowerCase().includes(keyword))
+
+      const matchesFilter = banFilter.value === 'all'
+        || (banFilter.value === 'permanent' && item.duration === 0)
+        || (banFilter.value === 'temporary' && item.duration > 0)
+
+      return matchesKeyword && matchesFilter
     })
-    bans.value.unshift(response.data)
-    banForm.user_id = ''
-    banForm.group_id = ''
-    banForm.duration = 0
-    banForm.reason = ''
-    noticeStore.show(t('permissions.created'), 'success')
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('permissions.createFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    creatingBan.value = false
-  }
-}
+  })
 
-async function handleDeleteBan(id: number) {
-  deletingBanId.value = id
-  errorMessage.value = ''
-  try {
-    await deleteBan(id)
-    bans.value = bans.value.filter((item) => item.id !== id)
-    noticeStore.show(t('permissions.deleted'), 'success')
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('permissions.deleteFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    deletingBanId.value = null
-  }
-}
+  const filteredUsers = computed(() => {
+    const keyword = userSearch.value.trim().toLowerCase()
+    return users.value.filter(item => {
+      const matchesKeyword = !keyword || [
+        item.user_id,
+        item.group_id || '',
+        String(item.level),
+      ].some(value => value.toLowerCase().includes(keyword))
 
-async function updateLevel(item: UserLevelRow, nextValue: unknown) {
-  const level = Number(nextValue)
-  if (Number.isNaN(level) || level === item.level) {
-    return
-  }
-  const previous = item.level
-  const key = `${item.user_id}:${item.group_id}`
-  item.level = level
-  pendingUserKey.value = key
-  errorMessage.value = ''
-  try {
-    await updateUserLevel(item.user_id, item.group_id, level)
-    noticeStore.show(
-      t('permissions.levelUpdated', { userId: item.user_id, groupId: item.group_id }),
-      'success',
-    )
-  } catch (error) {
-    item.level = previous
-    errorMessage.value = getErrorMessage(error, t('permissions.levelUpdateFailed'))
-    noticeStore.show(errorMessage.value, 'error')
-  } finally {
-    pendingUserKey.value = ''
-  }
-}
+      const matchesLevel = levelFilter.value === 'all'
+        || (levelFilter.value === 'high' && item.level >= highLevelThreshold)
+        || item.level === Number(levelFilter.value)
 
-onMounted(() => {
-  void loadAll()
-})
+      return matchesKeyword && matchesLevel
+    })
+  })
+
+  async function loadAll () {
+    loading.value = true
+    errorMessage.value = ''
+    try {
+      const [b, u] = await Promise.all([getBans(), getUsers()])
+      bans.value = b.data
+      users.value = u.data
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('permissions.loadFailed'))
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function handleCreateBan () {
+    if (!banForm.user_id.trim()) {
+      errorMessage.value = t('permissions.userIdRequired')
+      return
+    }
+    creatingBan.value = true
+    errorMessage.value = ''
+    try {
+      const response = await createBan({
+        user_id: banForm.user_id.trim(),
+        group_id: banForm.group_id.trim() || null,
+        duration: Number(banForm.duration) || 0,
+        reason: banForm.reason.trim() || null,
+      })
+      bans.value.unshift(response.data)
+      banForm.user_id = ''
+      banForm.group_id = ''
+      banForm.duration = 0
+      banForm.reason = ''
+      noticeStore.show(t('permissions.created'), 'success')
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('permissions.createFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      creatingBan.value = false
+    }
+  }
+
+  async function handleDeleteBan (id: number) {
+    deletingBanId.value = id
+    errorMessage.value = ''
+    try {
+      await deleteBan(id)
+      bans.value = bans.value.filter(item => item.id !== id)
+      noticeStore.show(t('permissions.deleted'), 'success')
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('permissions.deleteFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      deletingBanId.value = null
+    }
+  }
+
+  async function updateLevel (item: UserLevelRow, nextValue: unknown) {
+    const level = Number(nextValue)
+    if (Number.isNaN(level) || level === item.level) {
+      return
+    }
+    const previous = item.level
+    const key = `${item.user_id}:${item.group_id}`
+    item.level = level
+    pendingUserKey.value = key
+    errorMessage.value = ''
+    try {
+      await updateUserLevel(item.user_id, item.group_id, level)
+      noticeStore.show(
+        t('permissions.levelUpdated', { userId: item.user_id, groupId: item.group_id }),
+        'success',
+      )
+    } catch (error) {
+      item.level = previous
+      errorMessage.value = getErrorMessage(error, t('permissions.levelUpdateFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      pendingUserKey.value = ''
+    }
+  }
+
+  onMounted(() => {
+    void loadAll()
+  })
 </script>
 
 <style scoped>

@@ -1,5 +1,7 @@
 """Help command handler."""
 
+from collections.abc import Sequence
+
 from arclet.alconna import Args
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
@@ -7,6 +9,7 @@ from nonebot_plugin_alconna import Alconna, Match, on_alconna
 from nonebot_plugin_alconna.uniseg import UniMessage
 
 from apeiria.core.i18n import t
+from apeiria.plugins.help.generator import PluginHelpInfo
 
 _help = on_alconna(
     Alconna("help", Args["plugin_name?", str]),
@@ -21,7 +24,7 @@ def _is_console(bot: Bot) -> bool:
     return bot.adapter.get_name() == "Console"
 
 
-def _format_help_list_text(plugins: list[object]) -> str:
+def _format_help_list_text(plugins: Sequence[PluginHelpInfo]) -> str:
     lines = [t("help.list_title"), ""]
     for p in plugins:
         cmds = " ".join(f"/{c}" for c in p.commands) if p.commands else ""
@@ -34,7 +37,7 @@ def _format_help_list_text(plugins: list[object]) -> str:
     return "\n".join(lines)
 
 
-def _format_plugin_detail_text(plugin_info: object) -> str:
+def _format_plugin_detail_text(plugin_info: PluginHelpInfo) -> str:
     cmds = (
         " ".join(f"/{c}" for c in plugin_info.commands)
         if plugin_info.commands

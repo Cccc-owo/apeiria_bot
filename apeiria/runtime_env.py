@@ -6,6 +6,7 @@ import os
 import site
 import subprocess
 import sys
+from importlib import import_module
 from pathlib import Path
 from shutil import which
 from typing import Final
@@ -19,6 +20,18 @@ _PYTHON_VERSION_FALLBACK: Final = ">=3.10, <4.0"
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+def _load_toml_module():
+    try:
+        return import_module("tomllib")
+    except ModuleNotFoundError:
+        pass
+    try:
+        return import_module("tomli")
+    except ModuleNotFoundError:
+        pass
+    return None
 
 
 def plugin_project_root() -> Path:
@@ -48,12 +61,13 @@ def uv_cache_dir() -> Path:
 
 def _main_requires_python() -> str:
     pyproject_path = _project_root() / "pyproject.toml"
+    toml_module = _load_toml_module()
+    if toml_module is None:
+        return _PYTHON_VERSION_FALLBACK
     try:
-        import tomllib
-
         with pyproject_path.open("rb") as file:
-            data = tomllib.load(file)
-    except (ModuleNotFoundError, OSError, ValueError):
+            data = toml_module.load(file)
+    except (OSError, ValueError):
         return _PYTHON_VERSION_FALLBACK
 
     project = data.get("project")
@@ -149,12 +163,13 @@ def remove_plugin_requirement(
 def declared_plugin_requirements() -> dict[str, str]:
     """Return normalized dependency names mapped to declared requirement strings."""
     pyproject_path = plugin_project_pyproject_path()
+    toml_module = _load_toml_module()
+    if toml_module is None:
+        return {}
     try:
-        import tomllib
-
         with pyproject_path.open("rb") as file:
-            data = tomllib.load(file)
-    except (ModuleNotFoundError, OSError, ValueError):
+            data = toml_module.load(file)
+    except (OSError, ValueError):
         return {}
 
     project = data.get("project")

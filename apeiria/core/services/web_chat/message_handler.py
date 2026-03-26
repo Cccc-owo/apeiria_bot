@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
@@ -14,7 +14,12 @@ from apeiria.core.i18n import t
 from .adapter import WebChatAdapter
 from .bot import WebChatBot
 from .event import WebChatMessageEvent
-from .protocol import MessageAckPayload, MessageReceivePayload, MessageSendPayload
+from .protocol import (
+    ChatSegment,
+    MessageAckPayload,
+    MessageReceivePayload,
+    MessageSendPayload,
+)
 
 if TYPE_CHECKING:
     from .codec import MessageCodec
@@ -72,7 +77,7 @@ class WebChatMessageHandler:
                 message_id=payload.message_id,
                 role="user",
                 segments=payload.segments,
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(timezone.utc),
             ),
         )
 
@@ -108,12 +113,12 @@ class WebChatMessageHandler:
         self,
         session: "ChatSession",
         message_id: str,
-        segments: list[object],
+        segments: list[ChatSegment],
     ) -> WebChatMessageEvent:
         """Translate protocol segments into the NoneBot event consumed by handlers."""
         return WebChatMessageEvent(
             session=session,
             message=self._codec.decode_segments(segments),
             message_id=message_id,
-            timestamp=int(datetime.now(UTC).timestamp()),
+            timestamp=int(datetime.now(timezone.utc).timestamp()),
         )
