@@ -50,6 +50,8 @@ __all__ = [
     "DriverConfigItem",
     "DriverConfigRequest",
     "DriverConfigResponse",
+    "DashboardEventItem",
+    "DashboardEventsResponse",
     "EnvelopeVersion",
     "ErrorPayload",
     "GroupItem",
@@ -139,6 +141,21 @@ class StatusResponse(BaseModel):
     disabled_groups_count: int
     bans_count: int
     adapters: list[str]
+
+
+class DashboardEventItem(BaseModel):
+    """Recent dashboard event item."""
+
+    timestamp: str
+    level: str
+    source: str
+    message: str
+
+
+class DashboardEventsResponse(BaseModel):
+    """Recent dashboard events response."""
+
+    items: list[DashboardEventItem]
 
 
 class PluginItem(BaseModel):

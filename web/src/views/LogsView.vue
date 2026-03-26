@@ -75,6 +75,12 @@
       </div>
 
       <div v-else ref="logContainer" class="structured-log-list">
+        <div class="log-table-head">
+          <span>{{ t('logs.level') }}</span>
+          <span>{{ t('logs.timestamp') }}</span>
+          <span>{{ t('logs.source') }}</span>
+          <span>{{ t('logs.message') }}</span>
+        </div>
         <v-expansion-panels variant="accordion">
           <v-expansion-panel
             v-for="entry in filteredLogs"
@@ -83,7 +89,12 @@
           >
             <v-expansion-panel-title>
               <div class="log-entry__summary">
-                <v-chip size="x-small" variant="tonal" :color="levelColor(entry.level)">
+                <v-chip
+                  size="small"
+                  variant="tonal"
+                  :color="levelColor(entry.level)"
+                  class="log-entry__level-chip"
+                >
                   {{ entry.level }}
                 </v-chip>
                 <span class="log-entry__time">{{ entry.timestamp }}</span>
@@ -245,20 +256,47 @@ onUnmounted(disconnect)
 .structured-log-list {
   max-height: 70vh;
   overflow-y: auto;
+  padding: 12px;
+}
+
+.log-table-head {
+  display: grid;
+  grid-template-columns: 110px 176px 220px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 0 20px 10px 20px;
+  color: rgba(var(--v-theme-on-surface), 0.56);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.log-entry {
+  margin-bottom: 8px;
 }
 
 .log-entry__summary {
   display: grid;
-  grid-template-columns: auto 160px 180px minmax(0, 1fr);
+  grid-template-columns: 110px 176px 220px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 
 .log-entry__time,
 .log-entry__source {
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-size: 0.82rem;
   color: rgba(var(--v-theme-on-surface), 0.64);
+}
+
+.log-entry__level-chip {
+  width: 96px;
+  justify-content: center;
+  font-weight: 700;
 }
 
 .log-entry__message {
@@ -266,12 +304,31 @@ onUnmounted(disconnect)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
+}
+
+:deep(.log-entry .v-expansion-panel-title) {
+  min-height: 62px;
+  padding: 14px 18px;
+}
+
+:deep(.log-entry .v-expansion-panel-title__overlay) {
+  opacity: 0 !important;
+}
+
+:deep(.log-entry .v-expansion-panel-title__icon) {
+  margin-inline-start: 10px;
+}
+
+:deep(.log-entry .v-expansion-panel-text__wrapper) {
+  padding-top: 0;
 }
 
 .log-entry__details {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 0 18px 18px;
 }
 
 .log-entry__raw {
@@ -286,9 +343,17 @@ onUnmounted(disconnect)
 }
 
 @media (max-width: 960px) {
+  .log-table-head {
+    display: none;
+  }
+
   .log-entry__summary {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .log-entry__message {
+    white-space: normal;
   }
 }
 </style>

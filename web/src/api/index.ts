@@ -57,6 +57,24 @@ export interface DriverConfigItem {
   is_active: boolean
 }
 
+export interface DashboardStatus {
+  status: string
+  uptime: number
+  plugins_count: number
+  disabled_plugins_count: number
+  groups_count: number
+  disabled_groups_count: number
+  bans_count: number
+  adapters: string[]
+}
+
+export interface DashboardEventItem {
+  timestamp: string
+  level: string
+  source: string
+  message: string
+}
+
 export const login = (payload: {
   username: string
   password: string
@@ -74,16 +92,10 @@ export const getCurrentUser = () =>
   client.get<WebUIPrincipal>('/auth/me')
 
 export const getStatus = () =>
-  client.get<{
-    status: string
-    uptime: number
-    plugins_count: number
-    disabled_plugins_count: number
-    groups_count: number
-    disabled_groups_count: number
-    bans_count: number
-    adapters: string[]
-  }>('/dashboard/status')
+  client.get<DashboardStatus>('/dashboard/status')
+
+export const getDashboardEvents = () =>
+  client.get<{ items: DashboardEventItem[] }>('/dashboard/events')
 
 export const restartBot = () =>
   client.post<{ status: string; detail?: string | null }>('/dashboard/restart')

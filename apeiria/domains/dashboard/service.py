@@ -25,6 +25,16 @@ class DashboardStatusSnapshot:
     adapters: list[str]
 
 
+@dataclass(frozen=True)
+class DashboardEventSnapshot:
+    """Recent high-signal event shown on the dashboard."""
+
+    timestamp: str
+    level: str
+    source: str
+    message: str
+
+
 class DashboardService:
     """Provide dashboard data and runtime restart orchestration."""
 
@@ -34,6 +44,7 @@ class DashboardService:
         self._restart_task: asyncio.Task[None] | None = None
 
     async def get_status_snapshot(self) -> DashboardStatusSnapshot:
+        """Collect the current dashboard metrics snapshot."""
         from nonebot_plugin_orm import get_session
         from sqlalchemy import func, select
 
@@ -81,6 +92,27 @@ class DashboardService:
             bans_count=bans_count,
             adapters=adapters,
         )
+
+    def get_recent_events(
+        self,
+        *,
+        limit: int = 8,
+    ) -> list[DashboardEventSnapshot]:
+        """Return the most recent warning/error events for the dashboard."""
+        from apeiria.core.services.log import log_buffer
+
+        high_signal_levels = {"WARNING", "ERROR", "CRITICAL"}
+        entries = [
+            DashboardEventSnapshot(
+                timestamp=entry.timestamp,
+                level=entry.level,
+                source=entry.source,
+                message=entry.message,
+            )
+            for entry in log_buffer.get_recent(100)
+            if entry.level in high_signal_levels
+        ]
+        return entries[-limit:][::-1]
 
     def schedule_restart(self) -> None:
         if self._restart_task is None or self._restart_task.done():
