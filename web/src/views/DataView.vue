@@ -4,8 +4,21 @@
       <h1 class="page-title">{{ t('data.title') }}</h1>
       <v-spacer />
       <div class="page-toolbar-form">
+        <v-text-field
+          v-model.trim="search"
+          :label="t('data.search')"
+          :placeholder="t('data.searchPlaceholder')"
+          density="compact"
+          hide-details
+          prepend-inner-icon="mdi-magnify"
+          class="data-search-field"
+          @keydown.enter.prevent="applySearch"
+        />
         <v-btn variant="tonal" :loading="loading" @click="loadRecords">
           {{ t('common.refresh') }}
+        </v-btn>
+        <v-btn variant="text" :disabled="!search" @click="resetFilters">
+          {{ t('data.resetFilters') }}
         </v-btn>
         <div class="compact-field compact-field--toolbar data-table-select">
           <label class="compact-field__label" for="data-table-select">{{ t('data.table') }}</label>
@@ -33,6 +46,10 @@
       <v-sheet class="summary-card" rounded="lg">
         <div class="summary-card__label">{{ t('data.total') }}</div>
         <div class="summary-card__value">{{ total }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('data.primaryKey') }}</div>
+        <div class="summary-card__value summary-card__value--text">{{ primaryKey }}</div>
       </v-sheet>
       <v-sheet class="summary-card" rounded="lg">
         <div class="summary-card__label">{{ t('data.pageSize') }}</div>
@@ -120,42 +137,43 @@
           </div>
 
           <div v-else class="d-flex flex-column ga-4">
-            <template v-for="field in editableFields" :key="field">
-              <v-switch
+            <div class="d-flex justify-end">
+              <v-btn
+                variant="tonal"
+                size="small"
+                prepend-icon="mdi-content-copy"
+                @click="copyRecord"
+              >
+                {{ t('data.copyRecord') }}
+              </v-btn>
+            </div>
+            <div v-for="field in detailFields" :key="field" class="data-detail-row">
+              <div class="data-detail-row__head">
+                <div class="font-weight-medium">{{ field }}</div>
+                <v-btn
+                  icon="mdi-content-copy"
+                  size="x-small"
+                  variant="text"
+                  @click="copyField(field)"
+                />
+              </div>
+              <v-chip
                 v-if="fieldType(field) === 'boolean'"
-                v-model="booleanEditForm[field]"
-                :label="field"
-                color="primary"
-                hide-details
-                inset
-                readonly
-                density="compact"
-              />
-              <v-text-field
-                v-else-if="fieldType(field) === 'number'"
-                v-model="editForm[field]"
-                :label="field"
-                density="compact"
-                type="number"
-                readonly
-              />
-              <v-textarea
-                v-else-if="fieldType(field) === 'json'"
-                v-model="editForm[field]"
-                :label="field"
-                density="compact"
-                auto-grow
-                rows="4"
-                readonly
-              />
-              <v-text-field
-                v-else
-                v-model="editForm[field]"
-                :label="field"
-                density="compact"
-                readonly
-              />
-            </template>
+                size="small"
+                variant="tonal"
+                :color="originalRecord[field] ? 'success' : 'default'"
+              >
+                {{ String(originalRecord[field]) }}
+              </v-chip>
+              <pre v-else-if="fieldType(field) === 'json'" class="data-detail-row__code">{{ editForm[field] }}</pre>
+              <div v-else class="data-detail-row__value">
+                {{ editForm[field] }}
+              </div>
+            </div>
+            <div>
+              <div class="text-subtitle-2 mb-2">{{ t('data.rawJson') }}</div>
+              <pre class="data-detail-row__code">{{ JSON.stringify(originalRecord, null, 2) }}</pre>
+            </div>
           </div>
         </v-card-text>
         <v-card-actions>
@@ -171,6 +189,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getDataRecord, getDataRecords, getDataTables } from '@/api'
 import { getErrorMessage } from '@/api/client'
+import { useNoticeStore } from '@/stores/notice'
 
 interface DataTableInfo {
   name: string
@@ -188,6 +207,7 @@ const errorMessage = ref('')
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+const search = ref('')
 
 const recordDialogVisible = ref(false)
 const dialogLoading = ref(false)
@@ -195,14 +215,14 @@ const dialogErrorMessage = ref('')
 const editingRecordId = ref('')
 const originalRecord = ref<Record<string, unknown>>({})
 const editForm = ref<Record<string, string>>({})
-const booleanEditForm = ref<Record<string, boolean>>({})
 const { t } = useI18n()
+const noticeStore = useNoticeStore()
 
 const tableOptions = computed(() => tables.value)
 const selectedTableLabel = computed(
   () => tables.value.find((item) => item.name === selectedTable.value)?.label || '',
 )
-const editableFields = computed(() => Object.keys(editForm.value))
+const detailFields = computed(() => Object.keys(editForm.value))
 
 function formatCell(value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
@@ -238,7 +258,7 @@ async function loadRecords() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const response = await getDataRecords(selectedTable.value, page.value, pageSize.value)
+    const response = await getDataRecords(selectedTable.value, page.value, pageSize.value, search.value.trim())
     primaryKey.value = response.data.primary_key
     headers.value = [
       ...response.data.columns.map((column) => ({
@@ -273,11 +293,6 @@ async function openRecordDialog(row: Record<string, unknown>) {
     editForm.value = Object.fromEntries(
       Object.entries(response.data.record).map(([key, value]) => [key, stringifyValue(value)]),
     )
-    booleanEditForm.value = Object.fromEntries(
-      Object.entries(response.data.record)
-        .filter(([, value]) => typeof value === 'boolean')
-        .map(([key, value]) => [key, Boolean(value)]),
-    )
   } catch (error) {
     dialogErrorMessage.value = getErrorMessage(error, t('data.loadRecordFailed'))
   } finally {
@@ -285,8 +300,25 @@ async function openRecordDialog(row: Record<string, unknown>) {
   }
 }
 
-async function saveRecord() {
-  return
+function applySearch() {
+  page.value = 1
+  void loadRecords()
+}
+
+function resetFilters() {
+  search.value = ''
+  page.value = 1
+  void loadRecords()
+}
+
+async function copyRecord() {
+  await navigator.clipboard.writeText(JSON.stringify(originalRecord.value, null, 2))
+  noticeStore.show(t('data.copied'), 'success')
+}
+
+async function copyField(field: string) {
+  await navigator.clipboard.writeText(editForm.value[field] || '')
+  noticeStore.show(t('data.copied'), 'success')
 }
 
 function handleOptionsChange(options: { page: number; itemsPerPage: number }) {
@@ -316,6 +348,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.data-search-field {
+  width: 240px;
+  min-width: 240px;
+}
+
 .data-table-select {
   width: 180px;
   min-width: 180px;
@@ -345,5 +382,41 @@ onMounted(async () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.data-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.data-detail-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.data-detail-row__value,
+.data-detail-row__code {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.data-detail-row__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .data-search-field,
+  .data-table-select {
+    width: 100%;
+    min-width: 0;
+  }
 }
 </style>

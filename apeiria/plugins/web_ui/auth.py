@@ -49,12 +49,12 @@ def verify_token(token: str) -> dict[str, Any]:
 async def require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(_security),
 ) -> dict[str, Any]:
-    """FastAPI dependency: require valid JWT token."""
+    """Require a valid JWT bearer token."""
     return verify_token(credentials.credentials)
 
 
 async def require_optional_auth(request: Request) -> dict[str, Any]:
-    """FastAPI dependency: require a bearer token when headers are handled manually."""
+    """Require a bearer token when headers are handled manually."""
     authorization = request.headers.get("Authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:

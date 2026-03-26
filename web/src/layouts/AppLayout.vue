@@ -46,6 +46,12 @@
       <div class="app-drawer__footer">
         <div v-if="!rail" class="app-drawer__section-label">System</div>
         <v-list density="compact" nav class="app-drawer__list">
+          <v-list-item
+            prepend-icon="mdi-account-circle-outline"
+            :title="authStore.principal?.username || t('layout.unknownUser')"
+            :subtitle="authStore.principal?.role || t('layout.adminRole')"
+            rounded="lg"
+          />
           <v-menu location="top" offset="8">
             <template #activator="{ props }">
               <v-list-item
@@ -95,7 +101,7 @@
     </v-container>
   </v-main>
 
-  <v-snackbar
+    <v-snackbar
     v-model="noticeStore.visible"
     :color="noticeStore.color"
     timeout="2400"
