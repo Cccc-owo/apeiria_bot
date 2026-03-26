@@ -33,6 +33,8 @@ const zhCN = {
     lightTheme: '亮色主题',
     pageTitle: '{page} - Apeiria 管理面板',
     defaultTitle: 'Apeiria 管理面板',
+    navigation: '管理面板',
+    systemSection: '系统',
   },
   login: {
     description: '使用账号密码登录',

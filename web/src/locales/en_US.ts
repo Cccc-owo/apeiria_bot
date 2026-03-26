@@ -11,8 +11,8 @@ const enUS = {
     unknownError: 'Unknown error',
   },
   layout: {
-    brand: 'Apeiria Console',
-    subtitle: 'Console',
+    brand: 'Apeiria Panel',
+    subtitle: 'Panel',
     language: 'Language',
     switchLanguage: 'Switch to {locale}',
     chinese: 'Chinese',
@@ -31,8 +31,10 @@ const enUS = {
     toDark: 'Switch to dark',
     darkTheme: 'Dark theme',
     lightTheme: 'Light theme',
-    pageTitle: '{page} - Apeiria Console',
-    defaultTitle: 'Apeiria Console',
+    pageTitle: '{page} - Apeiria Panel',
+    defaultTitle: 'Apeiria Panel',
+    navigation: 'Panel',
+    systemSection: 'System',
   },
   login: {
     description: 'Sign in with username and password',

@@ -6,7 +6,7 @@
           <v-card-title class="auth-card__title">
             <v-icon size="40" color="primary">mdi-robot-happy</v-icon>
             <div class="auth-card__brand">
-              <div class="auth-card__name">Apeiria Console</div>
+              <div class="auth-card__name">{{ t('layout.brand') }}</div>
               <div class="auth-card__subtitle">{{ t('login.description') }}</div>
             </div>
           </v-card-title>

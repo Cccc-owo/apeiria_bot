@@ -29,7 +29,7 @@
     <v-divider />
 
     <div class="app-drawer__nav">
-      <div v-if="!rail" class="app-drawer__section-label">Console</div>
+      <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.navigation') }}</div>
       <v-list density="compact" nav class="app-drawer__list">
         <v-list-item
           v-for="item in navItems"
@@ -44,7 +44,7 @@
 
     <template #append>
       <div class="app-drawer__footer">
-        <div v-if="!rail" class="app-drawer__section-label">System</div>
+        <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.systemSection') }}</div>
         <v-list density="compact" nav class="app-drawer__list">
           <v-list-item
             prepend-icon="mdi-account-circle-outline"
