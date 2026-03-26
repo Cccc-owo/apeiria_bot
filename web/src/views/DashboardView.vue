@@ -67,7 +67,7 @@
 
     <section class="dashboard-section">
       <div class="dashboard-section__header">
-        <div class="dashboard-section__title">概览</div>
+        <div class="dashboard-section__title">{{ t('dashboard.overview') }}</div>
       </div>
       <v-row class="dashboard-overview">
         <v-col cols="12" sm="6" md="3">

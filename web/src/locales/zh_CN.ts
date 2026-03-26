@@ -60,11 +60,11 @@ const zhCN = {
   },
   dashboard: {
     title: '仪表盘',
+    overview: '概览',
     restart: '重启',
     restartConfirm: '确认重启？连接会短暂中断。',
     restartScheduled: '已发送重启请求。',
     restartFailed: '重启失败',
-    autoRefresh: '自动刷新',
     lastUpdated: '最近更新 {time}',
     noEvents: '最近没有高优先级事件',
     recentEvents: '最近异常',
