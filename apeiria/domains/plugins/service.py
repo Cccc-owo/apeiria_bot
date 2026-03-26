@@ -7,8 +7,11 @@ from dataclasses import dataclass
 import nonebot
 
 from apeiria.core.utils.helpers import (
+    get_plugin_extra,
+    get_plugin_dependents,
     get_plugin_name,
     get_plugin_protection_reason,
+    get_plugin_required_plugins,
     get_plugin_source,
 )
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
@@ -26,6 +29,12 @@ class PluginCatalogItem:
     is_global_enabled: bool
     is_protected: bool
     protected_reason: str | None
+    plugin_type: str
+    admin_level: int
+    author: str | None
+    version: str | None
+    required_plugins: list[str]
+    dependent_plugins: list[str]
 
 
 class PluginCatalogService:
@@ -46,6 +55,7 @@ class PluginCatalogService:
         items: list[PluginCatalogItem] = []
         for plugin in nonebot.get_loaded_plugins():
             meta = plugin.metadata
+            extra = get_plugin_extra(plugin)
             protected_reason = get_plugin_protection_reason(plugin.module_name)
             items.append(
                 PluginCatalogItem(
@@ -56,6 +66,12 @@ class PluginCatalogService:
                     is_global_enabled=enabled_map.get(plugin.module_name, True),
                     is_protected=protected_reason is not None,
                     protected_reason=protected_reason,
+                    plugin_type=extra.plugin_type.value if extra else "normal",
+                    admin_level=extra.admin_level if extra else 0,
+                    author=extra.author if extra else None,
+                    version=extra.version if extra else None,
+                    required_plugins=get_plugin_required_plugins(plugin),
+                    dependent_plugins=get_plugin_dependents(plugin.module_name),
                 )
             )
         return items

@@ -166,6 +166,12 @@ class PluginItem(BaseModel):
     is_global_enabled: bool
     is_protected: bool = False
     protected_reason: str | None = None
+    plugin_type: str = "normal"
+    admin_level: int = 0
+    author: str | None = None
+    version: str | None = None
+    required_plugins: list[str] = []
+    dependent_plugins: list[str] = []
 
 
 class OperationStatusResponse(BaseModel):
