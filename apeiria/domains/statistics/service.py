@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from nonebot.log import logger
@@ -11,6 +12,14 @@ from apeiria.domains.permissions import permission_service
 if TYPE_CHECKING:
     from nonebot.adapters import Event
     from nonebot.matcher import Matcher
+
+
+@dataclass(frozen=True)
+class StatsContext:
+    """Execution context required for statistics persistence."""
+
+    user_id: str
+    group_id: str | None
 
 
 class StatisticsService:
@@ -52,7 +61,7 @@ class StatisticsService:
         except Exception:  # noqa: BLE001
             logger.debug("Failed to record command statistics")
 
-    async def _build_context_for_stats(self, event: Event):
+    async def _build_context_for_stats(self, event: Event) -> StatsContext | None:
         try:
             user_id = event.get_user_id()
         except Exception:  # noqa: BLE001
@@ -68,14 +77,10 @@ class StatisticsService:
             except Exception:  # noqa: BLE001
                 group_id = None
 
-        return type(
-            "StatsContext",
-            (),
-            {
-                "user_id": user_id,
-                "group_id": str(group_id) if group_id is not None else None,
-            },
-        )()
+        return StatsContext(
+            user_id=user_id,
+            group_id=str(group_id) if group_id is not None else None,
+        )
 
     def _extract_command_name(self, matcher: Matcher) -> str:
         if hasattr(matcher, "state") and matcher.state:

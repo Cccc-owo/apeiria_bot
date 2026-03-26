@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException, status
@@ -41,7 +41,7 @@ class WebChatStateManager:
         """Create or resume a session for the same principal/target pair."""
         if session := self.find_session(principal.id, payload.target_user_id):
             session.status = SessionStatus.READY
-            session.updated_at = datetime.now(UTC)
+            session.updated_at = datetime.now(timezone.utc)
             self.persist()
             return session.to_state()
 
@@ -66,12 +66,12 @@ class WebChatStateManager:
             resumed_session = self.find_session(principal.id, payload.target_user_id)
             if resumed_session:
                 resumed_session.status = SessionStatus.READY
-                resumed_session.updated_at = datetime.now(UTC)
+                resumed_session.updated_at = datetime.now(timezone.utc)
                 self.persist()
                 return resumed_session.to_state()
             session.target_user_id = payload.target_user_id
             self._history[session.session_id] = []
-        session.updated_at = datetime.now(UTC)
+        session.updated_at = datetime.now(timezone.utc)
         self.persist()
         return session.to_state()
 
@@ -80,7 +80,7 @@ class WebChatStateManager:
         if session is None:
             return
         session.status = SessionStatus.CLOSED
-        session.updated_at = datetime.now(UTC)
+        session.updated_at = datetime.now(timezone.utc)
         self.persist()
 
     def clear_history(
@@ -91,7 +91,7 @@ class WebChatStateManager:
         session = self.get_session(session_id)
         self.ensure_owner(session, principal)
         self._history[session_id] = []
-        session.updated_at = datetime.now(UTC)
+        session.updated_at = datetime.now(timezone.utc)
         self.persist()
         return session.to_state()
 

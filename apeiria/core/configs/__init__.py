@@ -9,11 +9,9 @@ from .registry import (
 )
 
 __all__ = [
-    "BotConfig",
     "PluginExtraData",
     "PluginType",
     "RegisterConfig",
-    "bot_config",
     "configs_from_model",
     "get_registered_plugin_config",
     "iter_registered_plugin_configs",

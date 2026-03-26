@@ -1,16 +1,16 @@
 import type {
   AuthHelloPayload,
   ChatEnvelope,
+  MessageSendPayload,
   SessionCreatePayload,
   SessionDeletePayload,
   SessionUpdatePayload,
-  MessageSendPayload,
 } from '@/types/chat'
 
 type EnvelopeHandler = (event: ChatEnvelope) => void
 type VoidHandler = () => void
 
-function makeRequestId(prefix: string) {
+function makeRequestId (prefix: string) {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}_${crypto.randomUUID()}`
   }
@@ -23,24 +23,24 @@ export class ChatClient {
   private openHandlers = new Set<VoidHandler>()
   private closeHandlers = new Set<VoidHandler>()
 
-  connect() {
+  connect () {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     this.ws = new WebSocket(`${proto}//${location.host}/api/chat/ws`)
 
     this.ws.onopen = () => {
-      this.openHandlers.forEach((handler) => handler())
+      this.openHandlers.forEach(handler => handler())
     }
 
     this.ws.onclose = () => {
-      this.closeHandlers.forEach((handler) => handler())
+      this.closeHandlers.forEach(handler => handler())
     }
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = event => {
       try {
         const parsed = JSON.parse(event.data) as ChatEnvelope
-        this.messageHandlers.forEach((handler) => handler(parsed))
+        this.messageHandlers.forEach(handler => handler(parsed))
       } catch {
-        this.messageHandlers.forEach((handler) =>
+        this.messageHandlers.forEach(handler =>
           handler({
             version: '1.0',
             type: 'system.error',
@@ -51,26 +51,26 @@ export class ChatClient {
     }
   }
 
-  disconnect() {
+  disconnect () {
     this.ws?.close()
     this.ws = null
   }
 
-  isConnected() {
+  isConnected () {
     return this.ws?.readyState === WebSocket.OPEN
   }
 
-  onMessage(handler: EnvelopeHandler) {
+  onMessage (handler: EnvelopeHandler) {
     this.messageHandlers.add(handler)
     return () => this.messageHandlers.delete(handler)
   }
 
-  onOpen(handler: VoidHandler) {
+  onOpen (handler: VoidHandler) {
     this.openHandlers.add(handler)
     return () => this.openHandlers.delete(handler)
   }
 
-  onClose(handler: VoidHandler) {
+  onClose (handler: VoidHandler) {
     this.closeHandlers.add(handler)
     return () => this.closeHandlers.delete(handler)
   }
@@ -85,40 +85,40 @@ export class ChatClient {
     return requestId
   }
 
-  authenticate(token: string) {
+  authenticate (token: string) {
     const payload: AuthHelloPayload = { token }
     return this.send('auth.hello', payload)
   }
 
-  requestCapabilities() {
+  requestCapabilities () {
     return this.send('capabilities.request', {})
   }
 
-  createSession(payload: SessionCreatePayload) {
+  createSession (payload: SessionCreatePayload) {
     return this.send('session.create', payload)
   }
 
-  updateSession(payload: SessionUpdatePayload) {
+  updateSession (payload: SessionUpdatePayload) {
     return this.send('session.update', payload)
   }
 
-  sendMessage(payload: MessageSendPayload) {
+  sendMessage (payload: MessageSendPayload) {
     return this.send('message.send', payload)
   }
 
-  closeSession() {
+  closeSession () {
     return this.send('session.close', {})
   }
 
-  clearHistory() {
+  clearHistory () {
     return this.send('session.clear_history', {})
   }
 
-  listSessions() {
+  listSessions () {
     return this.send('session.list', {})
   }
 
-  deleteSession(payload: SessionDeletePayload) {
+  deleteSession (payload: SessionDeletePayload) {
     return this.send('session.delete', payload)
   }
 }

@@ -126,6 +126,27 @@ export interface PluginItem {
   dependent_plugins: string[]
 }
 
+export interface BanItem {
+  id: number
+  user_id: string | null
+  group_id: string | null
+  duration: number
+  reason: string | null
+}
+
+export interface GroupItem {
+  group_id: string
+  group_name: string | null
+  bot_status: boolean
+  disabled_plugins: string[]
+}
+
+export interface UserLevelItem {
+  user_id: string
+  group_id: string
+  level: number
+}
+
 export const login = (payload: {
   username: string
   password: string
@@ -154,7 +175,7 @@ export const getWebUIBuildStatus = () =>
 export const rebuildWebUI = () =>
   client.post<WebUIBuildRunResult>('/dashboard/webui-build')
 
-export async function streamRebuildWebUI(
+export async function streamRebuildWebUI (
   onEvent: (event: WebUIBuildStreamEvent) => void | Promise<void>,
 ) {
   const token = localStorage.getItem('token')
@@ -292,7 +313,7 @@ export const updatePlugin = (moduleName: string, enabled: boolean) =>
   })
 
 export const getBans = () =>
-  client.get<any[]>('/permissions/bans')
+  client.get<BanItem[]>('/permissions/bans')
 
 export const createBan = (payload: {
   user_id: string
@@ -306,7 +327,7 @@ export const deleteBan = (banId: number) =>
   client.delete(`/permissions/bans/${banId}`)
 
 export const getGroups = () =>
-  client.get<any[]>('/groups/')
+  client.get<GroupItem[]>('/groups/')
 
 export const updateGroup = (groupId: string, botStatus: boolean) =>
   client.patch(`/groups/${groupId}`, null, {
@@ -317,7 +338,7 @@ export const updateGroupPlugins = (groupId: string, disabledPlugins: string[]) =
   client.patch(`/groups/${groupId}/plugins`, disabledPlugins)
 
 export const getUsers = () =>
-  client.get<any[]>('/permissions/users')
+  client.get<UserLevelItem[]>('/permissions/users')
 
 export const updateUserLevel = (userId: string, groupId: string, level: number) =>
   client.patch(`/permissions/users/${userId}`, { level }, {

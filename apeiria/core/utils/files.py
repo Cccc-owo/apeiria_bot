@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import logging
     from pathlib import Path
 
-try:
-    import tomllib
-except ModuleNotFoundError:
+
+def _load_toml_module():
     try:
-        import tomli as tomllib  # type: ignore[import-not-found]
+        return import_module("tomllib")
     except ModuleNotFoundError:
-        tomllib = None
+        pass
+    try:
+        return import_module("tomli")
+    except ModuleNotFoundError:
+        pass
+    return None
 
 
 def atomic_write_text(target: Path, text: str) -> None:
@@ -28,7 +33,8 @@ def load_toml_dict(
     logger: logging.Logger,
     missing_dependency_message: str,
 ) -> dict[str, Any]:
-    if tomllib is None:
+    toml_module = _load_toml_module()
+    if toml_module is None:
         logger.warning(missing_dependency_message)
         return {}
     if not config_path.is_file():
@@ -36,11 +42,11 @@ def load_toml_dict(
 
     try:
         with config_path.open("rb") as file:
-            data = tomllib.load(file)
+            data = toml_module.load(file)
     except OSError as exc:
         logger.warning("Skip loading %s: %s", config_path.name, exc)
         return {}
-    except tomllib.TOMLDecodeError as exc:
+    except ValueError as exc:
         logger.warning("Skip loading %s: invalid TOML (%s)", config_path.name, exc)
         return {}
 

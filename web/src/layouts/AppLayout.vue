@@ -1,27 +1,27 @@
 <template>
   <v-navigation-drawer
     v-model="drawer"
+    class="app-drawer"
+    :class="{ 'app-drawer--rail': rail }"
+    permanent
     :rail="rail"
     :rail-width="56"
     :width="208"
-    permanent
-    class="app-drawer"
-    :class="{ 'app-drawer--rail': rail }"
   >
     <div class="app-drawer__header">
       <v-list-item
         v-if="!rail"
-        prepend-icon="mdi-robot-happy"
-        :title="t('layout.brand')"
-        :subtitle="t('layout.subtitle')"
-        nav
         class="app-drawer__brand"
+        nav
+        prepend-icon="mdi-robot-happy"
+        :subtitle="t('layout.subtitle')"
+        :title="t('layout.brand')"
       />
       <v-btn
-        :icon="rail ? 'mdi-chevron-right' : 'mdi-chevron-left'"
-        variant="text"
-        size="small"
         class="app-drawer__toggle"
+        :icon="rail ? 'mdi-chevron-right' : 'mdi-chevron-left'"
+        size="small"
+        variant="text"
         @click="rail = !rail"
       />
     </div>
@@ -30,14 +30,14 @@
 
     <div class="app-drawer__nav">
       <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.navigation') }}</div>
-      <v-list density="compact" nav class="app-drawer__list">
+      <v-list class="app-drawer__list" density="compact" nav>
         <v-list-item
           v-for="item in navItems"
           :key="item.to"
           :prepend-icon="item.icon"
+          rounded="lg"
           :title="item.title"
           :to="item.to"
-          rounded="lg"
         />
       </v-list>
     </div>
@@ -45,50 +45,50 @@
     <template #append>
       <div class="app-drawer__footer">
         <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.systemSection') }}</div>
-        <v-list density="compact" nav class="app-drawer__list">
+        <v-list class="app-drawer__list" density="compact" nav>
           <v-list-item
             prepend-icon="mdi-account-circle-outline"
-            :title="authStore.principal?.username || t('layout.unknownUser')"
-            :subtitle="authStore.principal?.role || t('layout.adminRole')"
             rounded="lg"
+            :subtitle="authStore.principal?.role || t('layout.adminRole')"
+            :title="authStore.principal?.username || t('layout.unknownUser')"
           />
           <v-menu location="top" offset="8">
             <template #activator="{ props }">
               <v-list-item
                 v-bind="props"
                 prepend-icon="mdi-translate"
-                :title="t('layout.language')"
-                :subtitle="currentLocaleLabel"
                 rounded="lg"
+                :subtitle="currentLocaleLabel"
+                :title="t('layout.language')"
               />
             </template>
-            <v-list density="compact" class="locale-menu">
+            <v-list class="locale-menu" density="compact">
               <v-list-item
                 :active="locale === 'zh_CN'"
-                :title="t('layout.chinese')"
                 rounded="lg"
+                :title="t('layout.chinese')"
                 @click="setLocale('zh_CN')"
               />
               <v-list-item
                 :active="locale === 'en_US'"
-                :title="t('layout.english')"
                 rounded="lg"
+                :title="t('layout.english')"
                 @click="setLocale('en_US')"
               />
             </v-list>
           </v-menu>
           <v-list-item
             prepend-icon="mdi-theme-light-dark"
-            :title="themeToggleLabel"
-            :subtitle="themeToggleSubtitle"
-            @click="toggleTheme"
             rounded="lg"
+            :subtitle="themeToggleSubtitle"
+            :title="themeToggleLabel"
+            @click="toggleTheme"
           />
           <v-list-item
             prepend-icon="mdi-logout"
+            rounded="lg"
             :title="t('layout.logout')"
             @click="handleLogout"
-            rounded="lg"
           />
         </v-list>
       </div>
@@ -96,79 +96,79 @@
   </v-navigation-drawer>
 
   <v-main class="app-main">
-    <v-container fluid class="app-container">
+    <v-container class="app-container" fluid>
       <router-view />
     </v-container>
   </v-main>
 
-    <v-snackbar
+  <v-snackbar
     v-model="noticeStore.visible"
     :color="noticeStore.color"
-    timeout="2400"
     location="top right"
+    timeout="2400"
   >
     {{ noticeStore.message }}
   </v-snackbar>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from 'vuetify'
-import { useAuthStore } from '@/stores/auth'
-import { useNoticeStore } from '@/stores/notice'
-import type { SupportedLocale } from '@/plugins/i18n'
+  import { computed, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { useRoute, useRouter } from 'vue-router'
+  import { useTheme } from 'vuetify'
+  import { useAuthStore } from '@/stores/auth'
+  import { useNoticeStore } from '@/stores/notice'
+  import type { SupportedLocale } from '@/plugins/i18n'
 
-const drawer = ref(true)
-const rail = ref(false)
-const { t, locale } = useI18n()
-const theme = useTheme()
-const router = useRouter()
-const route = useRoute()
-const authStore = useAuthStore()
-const noticeStore = useNoticeStore()
+  const drawer = ref(true)
+  const rail = ref(false)
+  const { t, locale } = useI18n()
+  const theme = useTheme()
+  const router = useRouter()
+  const route = useRoute()
+  const authStore = useAuthStore()
+  const noticeStore = useNoticeStore()
 
-const navItems = computed(() => [
-  { icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
-  { icon: 'mdi-puzzle', title: t('layout.plugins'), to: '/core' },
-  { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
-  { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
-  { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
-  { icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
-  { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
-])
+  const navItems = computed(() => [
+    { icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
+    { icon: 'mdi-puzzle', title: t('layout.plugins'), to: '/core' },
+    { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
+    { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
+    { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
+    { icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
+    { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
+  ])
 
-const themeToggleLabel = computed(() => theme.global.current.value.dark ? t('layout.toLight') : t('layout.toDark'))
-const themeToggleSubtitle = computed(() => theme.global.current.value.dark ? t('layout.darkTheme') : t('layout.lightTheme'))
-const currentLocaleLabel = computed(() => (
-  locale.value === 'zh_CN' ? t('layout.chinese') : t('layout.english')
-))
+  const themeToggleLabel = computed(() => theme.global.current.value.dark ? t('layout.toLight') : t('layout.toDark'))
+  const themeToggleSubtitle = computed(() => theme.global.current.value.dark ? t('layout.darkTheme') : t('layout.lightTheme'))
+  const currentLocaleLabel = computed(() => (
+    locale.value === 'zh_CN' ? t('layout.chinese') : t('layout.english')
+  ))
 
-function toggleTheme() {
-  const nextTheme = theme.global.current.value.dark ? 'light' : 'dark'
-  theme.global.name.value = nextTheme
-  localStorage.setItem('apeiria-theme', nextTheme)
-}
-
-function setLocale(nextLocale: SupportedLocale) {
-  if (locale.value === nextLocale) {
-    return
+  function toggleTheme () {
+    const nextTheme = theme.global.current.value.dark ? 'light' : 'dark'
+    theme.global.name.value = nextTheme
+    localStorage.setItem('apeiria-theme', nextTheme)
   }
-  locale.value = nextLocale
-  localStorage.setItem('apeiria-locale', locale.value)
 
-  const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : ''
-  document.title = titleKey
-    ? t('layout.pageTitle', { page: t(titleKey) })
-    : t('layout.defaultTitle')
-  document.documentElement.lang = locale.value === 'zh_CN' ? 'zh-CN' : 'en-US'
-}
+  function setLocale (nextLocale: SupportedLocale) {
+    if (locale.value === nextLocale) {
+      return
+    }
+    locale.value = nextLocale
+    localStorage.setItem('apeiria-locale', locale.value)
 
-function handleLogout() {
-  authStore.logout()
-  router.push('/login')
-}
+    const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : ''
+    document.title = titleKey
+      ? t('layout.pageTitle', { page: t(titleKey) })
+      : t('layout.defaultTitle')
+    document.documentElement.lang = locale.value === 'zh_CN' ? 'zh-CN' : 'en-US'
+  }
+
+  function handleLogout () {
+    authStore.logout()
+    router.push('/login')
+  }
 </script>
 
 <style scoped>

@@ -10,7 +10,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncIterator
+from typing import TYPE_CHECKING
 
 import nonebot
 
@@ -19,6 +19,9 @@ from apeiria.core.utils.webui_build import (
     web_dir,
     write_frontend_build_meta,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 @dataclass(frozen=True)
@@ -162,7 +165,9 @@ class DashboardService:
     def get_web_ui_build_status(self) -> WebUIBuildStatusSnapshot:
         """Return whether frontend assets match the current source fingerprint."""
         build_tool = shutil.which("pnpm") or shutil.which("npm")
-        can_build = build_tool is not None and (self._web_dir / "package.json").is_file()
+        can_build = build_tool is not None and (
+            self._web_dir / "package.json"
+        ).is_file()
         status = read_frontend_build_status(self._project_root)
         return WebUIBuildStatusSnapshot(
             is_built=status.is_built,
@@ -178,7 +183,11 @@ class DashboardService:
         if not status.can_build:
             raise RuntimeError("build_tool_unavailable")
 
-        command = ["pnpm", "build"] if status.build_tool == "pnpm" else ["npm", "run", "build"]
+        command = (
+            ["pnpm", "build"]
+            if status.build_tool == "pnpm"
+            else ["npm", "run", "build"]
+        )
         process = await asyncio.create_subprocess_exec(
             *command,
             cwd=str(self._web_dir),
@@ -209,7 +218,11 @@ class DashboardService:
         if not status.can_build:
             raise RuntimeError("build_tool_unavailable")
 
-        command = ["pnpm", "build"] if status.build_tool == "pnpm" else ["npm", "run", "build"]
+        command = (
+            ["pnpm", "build"]
+            if status.build_tool == "pnpm"
+            else ["npm", "run", "build"]
+        )
         process = await asyncio.create_subprocess_exec(
             *command,
             cwd=str(self._web_dir),

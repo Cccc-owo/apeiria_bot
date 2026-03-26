@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
 
-from apeiria.plugins.web_ui.auth import verify_token
-from apeiria.plugins.web_ui.auth import require_auth
+from apeiria.plugins.web_ui.auth import require_auth, verify_token
 from apeiria.plugins.web_ui.models import LogHistoryResponse, LogItem
 
 router = APIRouter()
@@ -16,8 +22,8 @@ router = APIRouter()
 @router.get("/history", response_model=LogHistoryResponse)
 async def get_log_history(
     _: Annotated[Any, Depends(require_auth)],
-    before: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
+    before: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> LogHistoryResponse:
     from apeiria.core.services.log import load_history_logs
 

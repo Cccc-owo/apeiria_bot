@@ -6,9 +6,9 @@
       </div>
       <div class="page-actions">
         <v-btn
-          variant="tonal"
           :disabled="!authenticated"
           prepend-icon="mdi-plus"
+          variant="tonal"
           @click="startNewSession"
         >
           {{ t('chat.newSession') }}
@@ -24,18 +24,18 @@
               v-for="recent in recentSessions"
               :key="recent.session.session_id"
               :active="session?.session_id === recent.session.session_id"
+              class="chat-session-list__item"
               :disabled="!authenticated"
               rounded="lg"
-              class="chat-session-list__item"
               @click="switchToSession(recent)"
             >
               <template #append>
                 <v-btn
+                  color="error"
+                  :disabled="!authenticated"
                   icon="mdi-delete-outline"
                   size="small"
                   variant="text"
-                  color="error"
-                  :disabled="!authenticated"
                   @click.stop="deleteSessionItem(recent)"
                 />
               </template>
@@ -68,14 +68,14 @@
             :data-message-id="message.message_id"
           >
             <div v-if="message.role === 'system'" class="chat-message-row chat-message-row--system">
-              <v-chip size="small" color="grey" variant="tonal">
+              <v-chip color="grey" size="small" variant="tonal">
                 {{ getTextContent(message.segments) }}
               </v-chip>
             </div>
 
             <div v-else-if="message.role === 'error'" class="chat-message-row chat-message-row--bot">
               <div class="chat-message-stack chat-message-stack--bot">
-                <v-card color="error" variant="tonal" class="chat-bubble chat-bubble--error" rounded="lg">
+                <v-card class="chat-bubble chat-bubble--error" color="error" rounded="lg" variant="tonal">
                   <template v-for="(segment, index) in message.segments" :key="index">
                     <div v-if="segment.type === 'text'" class="text-body-2">{{ segment.text }}</div>
                   </template>
@@ -95,8 +95,8 @@
                     'chat-bubble--bot': message.role === 'bot',
                     'chat-bubble--image': hasImageSegment(message.segments),
                   }"
-                  :variant="message.role === 'user' ? 'flat' : 'flat'"
                   rounded="lg"
+                  :variant="message.role === 'user' ? 'flat' : 'flat'"
                 >
                   <div class="chat-bubble__content">
                     <template v-for="(segment, index) in message.segments" :key="index">
@@ -104,8 +104,8 @@
                         <div class="reply-segment__head">
                           <div class="reply-segment__label">{{ t('chat.replyMessage') }}</div>
                           <button
-                            type="button"
                             class="reply-segment__jump"
+                            type="button"
                             @click="scrollToMessage(segment.message_id)"
                           >
                             {{ t('chat.viewOriginalMessage') }}
@@ -118,29 +118,29 @@
                       </div>
                       <v-chip
                         v-else-if="segment.type === 'mention'"
+                        class="align-self-start"
+                        color="secondary"
                         size="small"
                         variant="tonal"
-                        color="secondary"
-                        class="align-self-start"
                       >
                         @{{ segment.display || segment.target }}
                       </v-chip>
                       <img
                         v-else-if="segment.type === 'image' && resolveImageUrl(segment)"
-                        :src="resolveImageUrl(segment)"
                         :alt="segment.alt || t('chat.imageAlt')"
                         class="chat-image"
+                        :src="resolveImageUrl(segment)"
                         @click="openImagePreview(segment)"
-                      />
+                      >
                       <pre v-else-if="segment.type === 'raw'" class="chat-raw">{{ JSON.stringify(segment.data, null, 2) }}</pre>
                     </template>
                   </div>
 
                   <div class="chat-bubble__actions">
                     <v-btn
+                      prepend-icon="mdi-reply-outline"
                       size="x-small"
                       variant="text"
-                      prepend-icon="mdi-reply-outline"
                       @click="startReplyToMessage(message)"
                     >
                       {{ t('chat.replyButton') }}
@@ -159,8 +159,8 @@
               <div class="pending-reply__text">{{ summarizeReplyMessage(pendingReply) }}</div>
             </div>
             <button
-              type="button"
               class="pending-reply__jump"
+              type="button"
               @click="scrollToMessage(pendingReply.message_id)"
             >
               {{ t('chat.viewOriginalMessage') }}
@@ -178,11 +178,11 @@
             >
               <div class="composer-attachment-index">{{ t('chat.imageIndex', { index: index + 1 }) }}</div>
               <img
-                :src="image.previewUrl"
                 :alt="image.name"
                 class="composer-attachment-thumb"
+                :src="image.previewUrl"
                 @click="openImagePreviewFromPending(image)"
-              />
+              >
               <div class="composer-attachment-meta">
                 <div class="composer-attachment-name">{{ image.name }}</div>
                 <div class="composer-attachment-size">{{ formatBytes(image.size) || t('chat.imageFallback') }}</div>
@@ -207,30 +207,30 @@
             class="composer"
             :class="{ 'composer--disabled': !chatReady }"
             contenteditable="true"
-            spellcheck="false"
             :data-placeholder="t('chat.composerPlaceholder')"
+            spellcheck="false"
+            @click="handleComposerClick"
+            @focus="captureComposerSelection"
             @input="handleComposerInput"
             @keydown="handleComposerKeydown"
-            @mouseup="captureComposerSelection"
             @keyup="captureComposerSelection"
-            @focus="captureComposerSelection"
-            @click="handleComposerClick"
+            @mouseup="captureComposerSelection"
             @paste="handleComposerPaste"
           />
 
           <input
             ref="imageInputRef"
-            type="file"
             accept="image/*"
-            multiple
             class="d-none"
+            multiple
+            type="file"
             @change="handleImageSelection"
-          />
+          >
 
           <div class="chat-composer-actions">
             <v-btn
-              variant="text"
               :disabled="!chatReady || isPreparingImages || autoCreatingSession"
+              variant="text"
               @click="pickImages"
             >
               {{ t('chat.pickImage') }}
@@ -238,8 +238,8 @@
             <v-spacer />
             <v-btn
               color="primary"
-              :loading="isPreparingImages || autoCreatingSession"
               :disabled="!chatReady || autoCreatingSession || !composerHasContent"
+              :loading="isPreparingImages || autoCreatingSession"
               @click="send"
             >
               {{ t('common.send') }}
@@ -275,17 +275,17 @@
           <img
             v-if="imagePreviewSrc"
             ref="previewImageRef"
-            :src="imagePreviewSrc"
             :alt="imagePreviewAlt"
-            draggable="false"
             class="preview-image"
+            draggable="false"
+            :src="imagePreviewSrc"
             :style="previewImageStyle"
-            @mousedown="startImageDrag"
+            @dblclick="togglePreviewZoom"
             @dragstart.prevent
             @load="handlePreviewImageLoad"
-            @dblclick="togglePreviewZoom"
+            @mousedown="startImageDrag"
             @wheel.prevent="handlePreviewWheel"
-          />
+          >
         </div>
       </v-card>
     </v-dialog>
@@ -293,1071 +293,1022 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { ChatClient } from '@/api/chat'
-import type {
-  CapabilitiesResponsePayload,
-  ChatCapabilities,
-  ChatEnvelope,
-  ChatSegment,
-  ChatSessionState,
-  ImageSegment,
-  MessageReceivePayload,
-  MessageRole,
-  SessionDeletedPayload,
-  SessionListItem,
-  SessionListPayload,
-  SessionCreatePayload,
-  SessionStatePayload,
-  WebUIPrincipal,
-} from '@/types/chat'
+  import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { ChatClient } from '@/api/chat'
+  import type {
+    CapabilitiesResponsePayload,
+    ChatCapabilities,
+    ChatEnvelope,
+    ChatSegment,
+    ChatSessionState,
+    ImageSegment,
+    MessageReceivePayload,
+    SessionCreatePayload,
+    SessionDeletedPayload,
+    SessionListItem,
+    SessionListPayload,
+    SessionStatePayload,
+    WebUIPrincipal,
+  } from '@/types/chat'
 
-const client = new ChatClient()
-let composerRange: Range | null = null
-const { t } = useI18n()
+  const client = new ChatClient()
+  let composerRange: Range | null = null
+  const { t } = useI18n()
 
-interface PendingImage {
-  id: string
-  name: string
-  size: number
-  mime: string
-  base64: string
-  previewUrl: string
-}
-
-interface PendingMention {
-  id: string
-  target: string
-  display: string
-}
-
-const socketConnected = ref(false)
-const authenticated = ref(false)
-const principal = ref<WebUIPrincipal | null>(null)
-const capabilities = ref<ChatCapabilities | null>(null)
-const session = ref<ChatSessionState | null>(null)
-const recentSessions = ref<SessionListItem[]>([])
-const messages = ref<MessageReceivePayload[]>([])
-const pendingReply = ref<MessageReceivePayload | null>(null)
-const messagesContainer = ref<HTMLElement>()
-const composerRef = ref<HTMLDivElement>()
-const imageInputRef = ref<HTMLInputElement>()
-const isPreparingImages = ref(false)
-const composerVersion = ref(0)
-const selectedComposerImageId = ref<string | null>(null)
-const imagePreviewVisible = ref(false)
-const imagePreviewSrc = ref('')
-const imagePreviewAlt = ref(t('chat.imageAlt'))
-const previewScale = ref(1)
-const previewOffsetX = ref(0)
-const previewOffsetY = ref(0)
-const previewImageRef = ref<HTMLImageElement>()
-const previewWrapRef = ref<HTMLElement>()
-const previewBaseScale = ref(1)
-const previewImageNaturalWidth = ref(0)
-const previewImageNaturalHeight = ref(0)
-const previewImageSizeText = ref('')
-const isDraggingPreview = ref(false)
-const dragStartX = ref(0)
-const dragStartY = ref(0)
-const dragOriginX = ref(0)
-const dragOriginY = ref(0)
-const autoCreatingSession = ref(false)
-const pendingSessionMessage = ref<{
-  message_id: string
-  segments: ChatSegment[]
-} | null>(null)
-const protectedAssetUrls = ref<Record<string, string>>({})
-const composerImages = new Map<string, PendingImage>()
-const composerMentions = new Map<string, PendingMention>()
-const loadingProtectedAssets = new Set<string>()
-
-const connected = computed(() => socketConnected.value && authenticated.value)
-const chatReady = computed(() => connected.value)
-
-function appendMessage(message: MessageReceivePayload) {
-  messages.value.push(message)
-  scrollToBottom()
-}
-
-function appendSimpleMessage(role: 'system' | 'error', text: string) {
-  appendMessage({
-    session_id: session.value?.session_id ?? 'system',
-    message_id: `${role}_${Date.now()}`,
-    role,
-    segments: [{ type: 'text', text }],
-    timestamp: new Date().toISOString(),
-  })
-}
-
-function summarizeReplyMessage(message: MessageReceivePayload) {
-  const text = getTextContent(message.segments).trim()
-  return text || t('chat.imageSummary')
-}
-
-function startReplyToMessage(message: MessageReceivePayload) {
-  pendingReply.value = message
-  focusComposer(true)
-}
-
-function clearPendingReply() {
-  pendingReply.value = null
-}
-
-function clearCurrentSessionHistory() {
-  if (!session.value) return
-  client.clearHistory()
-  clearPendingReply()
-}
-
-function resetActiveSessionState() {
-  session.value = null
-  messages.value = []
-  clearPendingReply()
-  closeImagePreview()
-  revokeProtectedAssetUrls()
-  clearComposer()
-}
-
-function resetConnectionState() {
-  socketConnected.value = false
-  authenticated.value = false
-  autoCreatingSession.value = false
-  pendingSessionMessage.value = null
-  principal.value = null
-  capabilities.value = null
-  resetActiveSessionState()
-}
-
-function startNewSession() {
-  autoCreatingSession.value = false
-  pendingSessionMessage.value = null
-  if (connected.value && session.value) {
-    client.closeSession()
+  interface PendingImage {
+    id: string
+    name: string
+    size: number
+    mime: string
+    base64: string
+    previewUrl: string
   }
-  resetActiveSessionState()
-}
 
-function switchToSession(target: SessionListItem) {
-  if (!authenticated.value) return
-  if (session.value?.session_id === target.session.session_id) return
-  client.updateSession({
-    session_id: target.session.session_id,
-    target_user_id: target.session.target_user_id,
-  })
-}
-
-function deleteSessionItem(target: SessionListItem) {
-  if (!authenticated.value) return
-  const confirmed = window.confirm(t('chat.confirmDelete'))
-  if (!confirmed) return
-  client.deleteSession({ session_id: target.session.session_id })
-}
-
-function formatSessionTitle(item: SessionListItem) {
-  const sessionId = item.session.session_id
-  const shortId = sessionId.slice(-4)
-  return t('chat.sessionLabel', { id: shortId })
-}
-
-function createSessionKey() {
-  return `${Date.now()}`
-}
-
-function formatSessionTime(value?: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString()
-}
-
-const composerHasContent = computed(() => {
-  const segments = buildComposerSegments()
-  return segments.length > 0 && segments.some((segment) => {
-    if (segment.type === 'text') {
-      return segment.text.trim().length > 0
-    }
-    return true
-  })
-})
-
-const orderedComposerImages = computed(() => {
-  composerVersion.value
-  const composer = composerRef.value
-  if (!composer) return [] as PendingImage[]
-
-  const ids = Array.from(
-    composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
-  )
-    .map((node) => node.dataset.imageId || '')
-    .filter(Boolean)
-
-  return ids
-    .map((id) => composerImages.get(id))
-    .filter((image): image is PendingImage => Boolean(image))
-})
-
-function pickImages() {
-  imageInputRef.value?.click()
-}
-
-async function handleImageSelection(event: Event) {
-  const target = event.target as HTMLInputElement | null
-  const files = Array.from(target?.files || [])
-  if (!files.length) return
-
-  isPreparingImages.value = true
-  try {
-    const images = await Promise.all(files.map(readImageFile))
-    for (const image of images) {
-      composerImages.set(image.id, image)
-      insertImageIntoComposer(image)
-    }
-  } finally {
-    isPreparingImages.value = false
-    if (target) {
-      target.value = ''
-    }
+  interface PendingMention {
+    id: string
+    target: string
+    display: string
   }
-}
 
-function getTextContent(segments: ChatSegment[]) {
-  return segments
-    .map((segment) => {
-      if (segment.type === 'text') return segment.text
-      if (segment.type === 'image') return t('chat.imageToken')
-      if (segment.type === 'mention') return `@${segment.display || segment.target}`
-      if (segment.type === 'reply') return t('chat.replySummary', { messageId: segment.message_id })
-      return `[${segment.segment_type}]`
+  const socketConnected = ref(false)
+  const authenticated = ref(false)
+  const principal = ref<WebUIPrincipal | null>(null)
+  const capabilities = ref<ChatCapabilities | null>(null)
+  const session = ref<ChatSessionState | null>(null)
+  const recentSessions = ref<SessionListItem[]>([])
+  const messages = ref<MessageReceivePayload[]>([])
+  const pendingReply = ref<MessageReceivePayload | null>(null)
+  const messagesContainer = ref<HTMLElement>()
+  const composerRef = ref<HTMLDivElement>()
+  const imageInputRef = ref<HTMLInputElement>()
+  const isPreparingImages = ref(false)
+  const composerVersion = ref(0)
+  const selectedComposerImageId = ref<string | null>(null)
+  const imagePreviewVisible = ref(false)
+  const imagePreviewSrc = ref('')
+  const imagePreviewAlt = ref(t('chat.imageAlt'))
+  const previewScale = ref(1)
+  const previewOffsetX = ref(0)
+  const previewOffsetY = ref(0)
+  const previewImageRef = ref<HTMLImageElement>()
+  const previewWrapRef = ref<HTMLElement>()
+  const previewBaseScale = ref(1)
+  const previewImageNaturalWidth = ref(0)
+  const previewImageNaturalHeight = ref(0)
+  const previewImageSizeText = ref('')
+  const isDraggingPreview = ref(false)
+  const dragStartX = ref(0)
+  const dragStartY = ref(0)
+  const dragOriginX = ref(0)
+  const dragOriginY = ref(0)
+  const autoCreatingSession = ref(false)
+  const pendingSessionMessage = ref<{
+    message_id: string
+    segments: ChatSegment[]
+  } | null>(null)
+  const protectedAssetUrls = ref<Record<string, string>>({})
+  const composerImages = new Map<string, PendingImage>()
+  const composerMentions = new Map<string, PendingMention>()
+  const loadingProtectedAssets = new Set<string>()
+
+  const connected = computed(() => socketConnected.value && authenticated.value)
+  const chatReady = computed(() => connected.value)
+
+  function appendMessage (message: MessageReceivePayload) {
+    messages.value.push(message)
+    scrollToBottom()
+  }
+
+  function appendSimpleMessage (role: 'system' | 'error', text: string) {
+    appendMessage({
+      session_id: session.value?.session_id ?? 'system',
+      message_id: `${role}_${Date.now()}`,
+      role,
+      segments: [{ type: 'text', text }],
+      timestamp: new Date().toISOString(),
     })
-    .join(' ')
-}
+  }
 
-function hasImageSegment(segments: ChatSegment[]) {
-  return segments.some((segment) => segment.type === 'image')
-}
+  function summarizeReplyMessage (message: MessageReceivePayload) {
+    const text = getTextContent(message.segments).trim()
+    return text || t('chat.imageSummary')
+  }
 
-async function ensureProtectedAssetUrl(rawUrl: string) {
-  if (protectedAssetUrls.value[rawUrl] || loadingProtectedAssets.has(rawUrl)) return
-  const token = localStorage.getItem('token')
-  if (!token) return
+  function startReplyToMessage (message: MessageReceivePayload) {
+    pendingReply.value = message
+    focusComposer(true)
+  }
 
-  loadingProtectedAssets.add(rawUrl)
-  try {
-    const response = await fetch(rawUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  function clearPendingReply () {
+    pendingReply.value = null
+  }
+
+  function resetActiveSessionState () {
+    session.value = null
+    messages.value = []
+    clearPendingReply()
+    closeImagePreview()
+    revokeProtectedAssetUrls()
+    clearComposer()
+  }
+
+  function resetConnectionState () {
+    socketConnected.value = false
+    authenticated.value = false
+    autoCreatingSession.value = false
+    pendingSessionMessage.value = null
+    principal.value = null
+    capabilities.value = null
+    resetActiveSessionState()
+  }
+
+  function startNewSession () {
+    autoCreatingSession.value = false
+    pendingSessionMessage.value = null
+    if (connected.value && session.value) {
+      client.closeSession()
+    }
+    resetActiveSessionState()
+  }
+
+  function switchToSession (target: SessionListItem) {
+    if (!authenticated.value) return
+    if (session.value?.session_id === target.session.session_id) return
+    client.updateSession({
+      session_id: target.session.session_id,
+      target_user_id: target.session.target_user_id,
     })
-    if (!response.ok) {
-      throw new Error(`Failed to load asset: ${response.status}`)
-    }
-    const blob = await response.blob()
-    protectedAssetUrls.value = {
-      ...protectedAssetUrls.value,
-      [rawUrl]: URL.createObjectURL(blob),
-    }
-  } catch {
-    protectedAssetUrls.value = { ...protectedAssetUrls.value }
-  } finally {
-    loadingProtectedAssets.delete(rawUrl)
   }
-}
 
-function revokeProtectedAssetUrls() {
-  Object.values(protectedAssetUrls.value).forEach((url) => {
-    URL.revokeObjectURL(url)
+  function deleteSessionItem (target: SessionListItem) {
+    if (!authenticated.value) return
+    const confirmed = window.confirm(t('chat.confirmDelete'))
+    if (!confirmed) return
+    client.deleteSession({ session_id: target.session.session_id })
+  }
+
+  function formatSessionTitle (item: SessionListItem) {
+    const sessionId = item.session.session_id
+    const shortId = sessionId.slice(-4)
+    return t('chat.sessionLabel', { id: shortId })
+  }
+
+  function createSessionKey () {
+    return `${Date.now()}`
+  }
+
+  function formatSessionTime (value?: string | null) {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString()
+  }
+
+  const composerHasContent = computed(() => {
+    const segments = buildComposerSegments()
+    return segments.length > 0 && segments.some(segment => {
+      if (segment.type === 'text') {
+        return segment.text.trim().length > 0
+      }
+      return true
+    })
   })
-  protectedAssetUrls.value = {}
-  loadingProtectedAssets.clear()
-}
 
-function resolveImageUrl(segment: ImageSegment) {
-  if (segment.base64) {
-    return `data:${segment.mime || 'image/png'};base64,${segment.base64}`
-  }
-  const rawUrl = segment.url
-  if (!rawUrl) return ''
-  if (!rawUrl.startsWith('/api/chat/assets/')) return rawUrl
-  void ensureProtectedAssetUrl(rawUrl)
-  return protectedAssetUrls.value[rawUrl] || ''
-}
+  const orderedComposerImages = computed(() => {
+    void composerVersion.value
+    const composer = composerRef.value
+    if (!composer) return [] as PendingImage[]
 
-async function openImagePreview(segment: ImageSegment) {
-  let src = resolveImageUrl(segment)
-  if (!src && segment.url?.startsWith('/api/chat/assets/')) {
-    await ensureProtectedAssetUrl(segment.url)
-    src = protectedAssetUrls.value[segment.url] || ''
-  }
-  if (!src) return
-  imagePreviewSrc.value = src
-  imagePreviewAlt.value = segment.alt || t('chat.imageAlt')
-  previewImageNaturalWidth.value = 0
-  previewImageNaturalHeight.value = 0
-  previewImageSizeText.value = estimateImageSize(segment)
-  resetPreviewTransform()
-  imagePreviewVisible.value = true
-}
+    const ids = Array.from(
+      composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
+    )
+      .map(node => node.dataset.imageId || '')
+      .filter(Boolean)
 
-function closeImagePreview() {
-  imagePreviewVisible.value = false
-  imagePreviewSrc.value = ''
-  stopImageDrag()
-  resetPreviewTransform()
-}
+    return ids
+      .map(id => composerImages.get(id))
+      .filter((image): image is PendingImage => Boolean(image))
+  })
 
-function resetPreviewTransform() {
-  previewScale.value = previewBaseScale.value
-  previewOffsetX.value = 0
-  previewOffsetY.value = 0
-}
-
-function zoomInPreview() {
-  setPreviewScale(previewScale.value + 0.2)
-}
-
-function zoomOutPreview() {
-  setPreviewScale(previewScale.value - 0.2)
-}
-
-function handlePreviewWheel(event: WheelEvent) {
-  setPreviewScale(previewScale.value + (event.deltaY < 0 ? 0.12 : -0.12))
-}
-
-const previewBounds = computed(() => {
-  const img = previewImageRef.value
-  const wrap = previewWrapRef.value
-  if (!img || !wrap) {
-    return { maxX: 0, maxY: 0 }
+  function pickImages () {
+    imageInputRef.value?.click()
   }
 
-  const scaledWidth = img.clientWidth * previewScale.value
-  const scaledHeight = img.clientHeight * previewScale.value
-  const maxX = Math.max(0, (scaledWidth - wrap.clientWidth) / 2)
-  const maxY = Math.max(0, (scaledHeight - wrap.clientHeight) / 2)
-  return { maxX, maxY }
-})
+  async function handleImageSelection (event: Event) {
+    const target = event.target as HTMLInputElement | null
+    const files = Array.from(target?.files || [])
+    if (!files.length) return
 
-const canDragPreview = computed(() => previewBounds.value.maxX > 0 || previewBounds.value.maxY > 0)
+    isPreparingImages.value = true
+    try {
+      const images = await Promise.all(files.map(readImageFile))
+      for (const image of images) {
+        composerImages.set(image.id, image)
+        insertImageIntoComposer(image)
+      }
+    } finally {
+      isPreparingImages.value = false
+      if (target) {
+        target.value = ''
+      }
+    }
+  }
 
-const previewImageStyle = computed(() => ({
-  transform: `translate(${previewOffsetX.value}px, ${previewOffsetY.value}px) scale(${previewScale.value})`,
-  transformOrigin: 'center center',
-  cursor: isDraggingPreview.value ? 'grabbing' : canDragPreview.value ? 'grab' : 'zoom-in',
-}))
+  function getTextContent (segments: ChatSegment[]) {
+    return segments
+      .map(segment => {
+        if (segment.type === 'text') return segment.text
+        if (segment.type === 'image') return t('chat.imageToken')
+        if (segment.type === 'mention') return `@${segment.display || segment.target}`
+        if (segment.type === 'reply') return t('chat.replySummary', { messageId: segment.message_id })
+        return `[${segment.segment_type}]`
+      })
+      .join(' ')
+  }
 
-function startImageDrag(event: MouseEvent) {
-  if (event.button !== 0) return
-  if (!canDragPreview.value) return
-  event.preventDefault()
-  isDraggingPreview.value = true
-  dragStartX.value = event.clientX
-  dragStartY.value = event.clientY
-  dragOriginX.value = previewOffsetX.value
-  dragOriginY.value = previewOffsetY.value
-  window.addEventListener('mousemove', onImageDrag)
-  window.addEventListener('mouseup', stopImageDrag)
-  window.addEventListener('mouseleave', stopImageDrag)
-  window.addEventListener('blur', stopImageDrag)
-}
+  function hasImageSegment (segments: ChatSegment[]) {
+    return segments.some(segment => segment.type === 'image')
+  }
 
-function onImageDrag(event: MouseEvent) {
-  if (!isDraggingPreview.value) return
-  event.preventDefault()
-  previewOffsetX.value = dragOriginX.value + event.clientX - dragStartX.value
-  previewOffsetY.value = dragOriginY.value + event.clientY - dragStartY.value
-  clampPreviewOffset()
-}
+  async function ensureProtectedAssetUrl (rawUrl: string) {
+    if (protectedAssetUrls.value[rawUrl] || loadingProtectedAssets.has(rawUrl)) return
+    const token = localStorage.getItem('token')
+    if (!token) return
 
-function stopImageDrag() {
-  if (!isDraggingPreview.value) {
+    loadingProtectedAssets.add(rawUrl)
+    try {
+      const response = await fetch(rawUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to load asset: ${response.status}`)
+      }
+      const blob = await response.blob()
+      protectedAssetUrls.value = {
+        ...protectedAssetUrls.value,
+        [rawUrl]: URL.createObjectURL(blob),
+      }
+    } catch {
+      protectedAssetUrls.value = { ...protectedAssetUrls.value }
+    } finally {
+      loadingProtectedAssets.delete(rawUrl)
+    }
+  }
+
+  function revokeProtectedAssetUrls () {
+    Object.values(protectedAssetUrls.value).forEach(url => {
+      URL.revokeObjectURL(url)
+    })
+    protectedAssetUrls.value = {}
+    loadingProtectedAssets.clear()
+  }
+
+  function resolveImageUrl (segment: ImageSegment) {
+    if (segment.base64) {
+      return `data:${segment.mime || 'image/png'};base64,${segment.base64}`
+    }
+    const rawUrl = segment.url
+    if (!rawUrl) return ''
+    if (!rawUrl.startsWith('/api/chat/assets/')) return rawUrl
+    void ensureProtectedAssetUrl(rawUrl)
+    return protectedAssetUrls.value[rawUrl] || ''
+  }
+
+  async function openImagePreview (segment: ImageSegment) {
+    let src = resolveImageUrl(segment)
+    if (!src && segment.url?.startsWith('/api/chat/assets/')) {
+      await ensureProtectedAssetUrl(segment.url)
+      src = protectedAssetUrls.value[segment.url] || ''
+    }
+    if (!src) return
+    imagePreviewSrc.value = src
+    imagePreviewAlt.value = segment.alt || t('chat.imageAlt')
+    previewImageNaturalWidth.value = 0
+    previewImageNaturalHeight.value = 0
+    previewImageSizeText.value = estimateImageSize(segment)
+    resetPreviewTransform()
+    imagePreviewVisible.value = true
+  }
+
+  function closeImagePreview () {
+    imagePreviewVisible.value = false
+    imagePreviewSrc.value = ''
+    stopImageDrag()
+    resetPreviewTransform()
+  }
+
+  function resetPreviewTransform () {
+    previewScale.value = previewBaseScale.value
+    previewOffsetX.value = 0
+    previewOffsetY.value = 0
+  }
+
+  function zoomInPreview () {
+    setPreviewScale(previewScale.value + 0.2)
+  }
+
+  function zoomOutPreview () {
+    setPreviewScale(previewScale.value - 0.2)
+  }
+
+  function handlePreviewWheel (event: WheelEvent) {
+    setPreviewScale(previewScale.value + (event.deltaY < 0 ? 0.12 : -0.12))
+  }
+
+  const previewBounds = computed(() => {
+    const img = previewImageRef.value
+    const wrap = previewWrapRef.value
+    if (!img || !wrap) {
+      return { maxX: 0, maxY: 0 }
+    }
+
+    const scaledWidth = img.clientWidth * previewScale.value
+    const scaledHeight = img.clientHeight * previewScale.value
+    const maxX = Math.max(0, (scaledWidth - wrap.clientWidth) / 2)
+    const maxY = Math.max(0, (scaledHeight - wrap.clientHeight) / 2)
+    return { maxX, maxY }
+  })
+
+  const canDragPreview = computed(() => previewBounds.value.maxX > 0 || previewBounds.value.maxY > 0)
+
+  const previewImageStyle = computed(() => ({
+    transform: `translate(${previewOffsetX.value}px, ${previewOffsetY.value}px) scale(${previewScale.value})`,
+    transformOrigin: 'center center',
+    cursor: isDraggingPreview.value ? 'grabbing' : canDragPreview.value ? 'grab' : 'zoom-in',
+  }))
+
+  function startImageDrag (event: MouseEvent) {
+    if (event.button !== 0) return
+    if (!canDragPreview.value) return
+    event.preventDefault()
+    isDraggingPreview.value = true
+    dragStartX.value = event.clientX
+    dragStartY.value = event.clientY
+    dragOriginX.value = previewOffsetX.value
+    dragOriginY.value = previewOffsetY.value
+    window.addEventListener('mousemove', onImageDrag)
+    window.addEventListener('mouseup', stopImageDrag)
+    window.addEventListener('mouseleave', stopImageDrag)
+    window.addEventListener('blur', stopImageDrag)
+  }
+
+  function onImageDrag (event: MouseEvent) {
+    if (!isDraggingPreview.value) return
+    event.preventDefault()
+    previewOffsetX.value = dragOriginX.value + event.clientX - dragStartX.value
+    previewOffsetY.value = dragOriginY.value + event.clientY - dragStartY.value
+    clampPreviewOffset()
+  }
+
+  function stopImageDrag () {
+    if (!isDraggingPreview.value) {
+      window.removeEventListener('mousemove', onImageDrag)
+      window.removeEventListener('mouseup', stopImageDrag)
+      window.removeEventListener('mouseleave', stopImageDrag)
+      window.removeEventListener('blur', stopImageDrag)
+      return
+    }
+    isDraggingPreview.value = false
     window.removeEventListener('mousemove', onImageDrag)
     window.removeEventListener('mouseup', stopImageDrag)
     window.removeEventListener('mouseleave', stopImageDrag)
     window.removeEventListener('blur', stopImageDrag)
-    return
-  }
-  isDraggingPreview.value = false
-  window.removeEventListener('mousemove', onImageDrag)
-  window.removeEventListener('mouseup', stopImageDrag)
-  window.removeEventListener('mouseleave', stopImageDrag)
-  window.removeEventListener('blur', stopImageDrag)
-}
-
-function setPreviewScale(next: number) {
-  previewScale.value = Math.min(5, Math.max(0.5, Number(next.toFixed(2))))
-  clampPreviewOffset()
-}
-
-function clampPreviewOffset() {
-  const { maxX, maxY } = previewBounds.value
-  previewOffsetX.value = Math.min(maxX, Math.max(-maxX, previewOffsetX.value))
-  previewOffsetY.value = Math.min(maxY, Math.max(-maxY, previewOffsetY.value))
-}
-
-function downloadPreviewImage() {
-  if (!imagePreviewSrc.value) return
-  const link = document.createElement('a')
-  link.href = imagePreviewSrc.value
-  link.download = 'chat-image.png'
-  link.click()
-}
-
-function handlePreviewImageLoad() {
-  const img = previewImageRef.value
-  const wrap = previewWrapRef.value
-  if (!img || !wrap) return
-
-  previewImageNaturalWidth.value = img.naturalWidth
-  previewImageNaturalHeight.value = img.naturalHeight
-
-  const fitScale = Math.min(
-    1,
-    wrap.clientWidth / img.naturalWidth,
-    wrap.clientHeight / img.naturalHeight,
-  )
-  previewBaseScale.value = Number(Math.max(0.5, fitScale).toFixed(2))
-  resetPreviewTransform()
-}
-
-function togglePreviewZoom() {
-  const fit = previewBaseScale.value
-  const current = previewScale.value
-  if (Math.abs(current - fit) < 0.05) {
-    setPreviewScale(1)
-    return
-  }
-  if (Math.abs(current - 1) < 0.05) {
-    setPreviewScale(2)
-    return
-  }
-  resetPreviewTransform()
-}
-
-function estimateImageSize(segment: ImageSegment) {
-  if (segment.base64) {
-    const padding = segment.base64.endsWith('==') ? 2 : segment.base64.endsWith('=') ? 1 : 0
-    const bytes = Math.max(0, Math.floor(segment.base64.length * 3 / 4) - padding)
-    return formatBytes(bytes)
-  }
-  return ''
-}
-
-function formatBytes(bytes: number) {
-  if (bytes <= 0) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-async function readImageFile(file: File): Promise<PendingImage> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error || new Error(t('chat.imageReadFailed')))
-    reader.readAsDataURL(file)
-  })
-
-  const [prefix, base64 = ''] = dataUrl.split(',', 2)
-  const mimeMatch = prefix.match(/^data:(.+);base64$/)
-
-  return {
-    id: `${file.name}_${file.lastModified}_${Math.random().toString(16).slice(2)}`,
-    name: file.name,
-    size: file.size,
-    mime: mimeMatch?.[1] || file.type || 'image/png',
-    base64,
-    previewUrl: dataUrl,
-  }
-}
-
-function touchComposer() {
-  composerVersion.value += 1
-}
-
-function captureComposerSelection() {
-  const composer = composerRef.value
-  if (!composer) return
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-  const range = selection.getRangeAt(0)
-  if (!composer.contains(range.commonAncestorContainer)) return
-  composerRange = range.cloneRange()
-}
-
-function focusComposer(placeAtEnd = false) {
-  const composer = composerRef.value
-  if (!composer) return
-  composer.focus()
-  const selection = window.getSelection()
-  if (!selection) return
-
-  let range = composerRange
-  if (placeAtEnd || !range || !composer.contains(range.commonAncestorContainer)) {
-    range = document.createRange()
-    range.selectNodeContents(composer)
-    range.collapse(false)
   }
 
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-}
-
-function insertTextAtCursor(text: string) {
-  focusComposer()
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-  const range = selection.getRangeAt(0)
-  range.deleteContents()
-  const node = document.createTextNode(text)
-  range.insertNode(node)
-  range.setStartAfter(node)
-  range.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-  touchComposer()
-}
-
-function createComposerImageNode(image: PendingImage) {
-  const wrapper = document.createElement('span')
-  wrapper.className = 'composer-image-token'
-  wrapper.contentEditable = 'false'
-  wrapper.dataset.imageId = image.id
-  wrapper.dataset.kind = 'image-token'
-
-  const label = document.createElement('span')
-  label.className = 'composer-image-token__label'
-  label.dataset.role = 'token-label'
-  label.textContent = t('chat.imageToken')
-
-  const remove = document.createElement('button')
-  remove.type = 'button'
-  remove.className = 'composer-image-token__remove'
-  remove.dataset.action = 'remove-image'
-  remove.dataset.imageId = image.id
-  remove.textContent = '×'
-
-  wrapper.append(label, remove)
-  return wrapper
-}
-
-function createComposerMentionNode(mention: PendingMention) {
-  const wrapper = document.createElement('span')
-  wrapper.className = 'composer-mention-token'
-  wrapper.contentEditable = 'false'
-  wrapper.dataset.mentionId = mention.id
-  wrapper.dataset.kind = 'mention-token'
-
-  const label = document.createElement('span')
-  label.className = 'composer-mention-token__label'
-  label.textContent = `@${mention.display}`
-
-  const remove = document.createElement('button')
-  remove.type = 'button'
-  remove.className = 'composer-mention-token__remove'
-  remove.dataset.action = 'remove-mention'
-  remove.dataset.mentionId = mention.id
-  remove.textContent = '×'
-
-  wrapper.append(label, remove)
-  return wrapper
-}
-
-function getComposerImageToken(id: string) {
-  return composerRef.value?.querySelector<HTMLElement>(`[data-kind="image-token"][data-image-id="${id}"]`) || null
-}
-
-function syncComposerImageTokenState() {
-  const composer = composerRef.value
-  if (!composer) return
-  const tokens = Array.from(
-    composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
-  )
-  tokens.forEach((token) => {
-    const active = token.dataset.imageId === selectedComposerImageId.value
-    token.classList.toggle('composer-image-token--selected', active)
-  })
-}
-
-function selectComposerImage(id: string | null) {
-  selectedComposerImageId.value = id
-  syncComposerImageTokenState()
-}
-
-function insertImageIntoComposer(image: PendingImage) {
-  focusComposer()
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-  const range = selection.getRangeAt(0)
-  range.deleteContents()
-
-  const token = createComposerImageNode(image)
-  const caretAnchor = document.createTextNode('')
-  range.insertNode(caretAnchor)
-  range.insertNode(token)
-
-  range.setStart(caretAnchor, 0)
-  range.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-  syncComposerImageTokenLabels()
-  selectComposerImage(image.id)
-  touchComposer()
-}
-
-function insertMentionIntoComposer(mention: PendingMention) {
-  focusComposer()
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-  const range = selection.getRangeAt(0)
-  range.deleteContents()
-
-  const token = createComposerMentionNode(mention)
-  const caretAnchor = document.createTextNode('')
-  range.insertNode(caretAnchor)
-  range.insertNode(token)
-
-  range.setStart(caretAnchor, 0)
-  range.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-  touchComposer()
-}
-
-function removeComposerImage(id: string) {
-  const composer = composerRef.value
-  if (!composer) return
-  const node = composer.querySelector<HTMLElement>(`[data-image-id="${id}"]`)
-  node?.remove()
-  composerImages.delete(id)
-  if (selectedComposerImageId.value === id) {
-    selectComposerImage(null)
+  function setPreviewScale (next: number) {
+    previewScale.value = Math.min(5, Math.max(0.5, Number(next.toFixed(2))))
+    clampPreviewOffset()
   }
-  focusComposer(true)
-  syncComposerImageTokenLabels()
-  touchComposer()
-}
 
-function removeComposerMention(id: string) {
-  const composer = composerRef.value
-  if (!composer) return
-  const node = composer.querySelector<HTMLElement>(`[data-kind="mention-token"][data-mention-id="${id}"]`)
-  node?.remove()
-  composerMentions.delete(id)
-  focusComposer(true)
-  touchComposer()
-}
+  function clampPreviewOffset () {
+    const { maxX, maxY } = previewBounds.value
+    previewOffsetX.value = Math.min(maxX, Math.max(-maxX, previewOffsetX.value))
+    previewOffsetY.value = Math.min(maxY, Math.max(-maxY, previewOffsetY.value))
+  }
 
-function placeCaretAroundToken(node: HTMLElement, direction: 'before' | 'after') {
-  const selection = window.getSelection()
-  if (!selection) return
-  const range = document.createRange()
-  if (direction === 'before') {
-    range.setStartBefore(node)
-  } else {
+  function downloadPreviewImage () {
+    if (!imagePreviewSrc.value) return
+    const link = document.createElement('a')
+    link.href = imagePreviewSrc.value
+    link.download = 'chat-image.png'
+    link.click()
+  }
+
+  function handlePreviewImageLoad () {
+    const img = previewImageRef.value
+    const wrap = previewWrapRef.value
+    if (!img || !wrap) return
+
+    previewImageNaturalWidth.value = img.naturalWidth
+    previewImageNaturalHeight.value = img.naturalHeight
+
+    const fitScale = Math.min(
+      1,
+      wrap.clientWidth / img.naturalWidth,
+      wrap.clientHeight / img.naturalHeight,
+    )
+    previewBaseScale.value = Number(Math.max(0.5, fitScale).toFixed(2))
+    resetPreviewTransform()
+  }
+
+  function togglePreviewZoom () {
+    const fit = previewBaseScale.value
+    const current = previewScale.value
+    if (Math.abs(current - fit) < 0.05) {
+      setPreviewScale(1)
+      return
+    }
+    if (Math.abs(current - 1) < 0.05) {
+      setPreviewScale(2)
+      return
+    }
+    resetPreviewTransform()
+  }
+
+  function estimateImageSize (segment: ImageSegment) {
+    if (segment.base64) {
+      const padding = segment.base64.endsWith('==') ? 2 : segment.base64.endsWith('=') ? 1 : 0
+      const bytes = Math.max(0, Math.floor(segment.base64.length * 3 / 4) - padding)
+      return formatBytes(bytes)
+    }
+    return ''
+  }
+
+  function formatBytes (bytes: number) {
+    if (bytes <= 0) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  }
+
+  async function readImageFile (file: File): Promise<PendingImage> {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(reader.error || new Error(t('chat.imageReadFailed')))
+      reader.readAsDataURL(file)
+    })
+
+    const [prefix, base64 = ''] = dataUrl.split(',', 2)
+    const mimeMatch = prefix.match(/^data:(.+);base64$/)
+
+    return {
+      id: `${file.name}_${file.lastModified}_${Math.random().toString(16).slice(2)}`,
+      name: file.name,
+      size: file.size,
+      mime: mimeMatch?.[1] || file.type || 'image/png',
+      base64,
+      previewUrl: dataUrl,
+    }
+  }
+
+  function touchComposer () {
+    composerVersion.value += 1
+  }
+
+  function captureComposerSelection () {
+    const composer = composerRef.value
+    if (!composer) return
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    if (!composer.contains(range.commonAncestorContainer)) return
+    composerRange = range.cloneRange()
+  }
+
+  function focusComposer (placeAtEnd = false) {
+    const composer = composerRef.value
+    if (!composer) return
+    composer.focus()
+    const selection = window.getSelection()
+    if (!selection) return
+
+    let range = composerRange
+    if (placeAtEnd || !range || !composer.contains(range.commonAncestorContainer)) {
+      range = document.createRange()
+      range.selectNodeContents(composer)
+      range.collapse(false)
+    }
+
+    selection.removeAllRanges()
+    selection.addRange(range)
+    composerRange = range.cloneRange()
+  }
+
+  function insertTextAtCursor (text: string) {
+    focusComposer()
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    const node = document.createTextNode(text)
+    range.insertNode(node)
     range.setStartAfter(node)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    composerRange = range.cloneRange()
+    touchComposer()
   }
-  range.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-}
 
-function moveComposerImageToCursor(id: string) {
-  const token = getComposerImageToken(id)
-  if (!token) return
-  focusComposer()
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-  const range = selection.getRangeAt(0)
-  if (token.contains(range.commonAncestorContainer)) {
-    return
+  function createComposerImageNode (image: PendingImage) {
+    const wrapper = document.createElement('span')
+    wrapper.className = 'composer-image-token'
+    wrapper.contentEditable = 'false'
+    wrapper.dataset.imageId = image.id
+    wrapper.dataset.kind = 'image-token'
+
+    const label = document.createElement('span')
+    label.className = 'composer-image-token__label'
+    label.dataset.role = 'token-label'
+    label.textContent = t('chat.imageToken')
+
+    const remove = document.createElement('button')
+    remove.type = 'button'
+    remove.className = 'composer-image-token__remove'
+    remove.dataset.action = 'remove-image'
+    remove.dataset.imageId = image.id
+    remove.textContent = '×'
+
+    wrapper.append(label, remove)
+    return wrapper
   }
-  token.remove()
-  range.deleteContents()
-  const caretAnchor = document.createTextNode('')
-  range.insertNode(caretAnchor)
-  range.insertNode(token)
-  range.setStart(caretAnchor, 0)
-  range.collapse(true)
-  selection.removeAllRanges()
-  selection.addRange(range)
-  composerRange = range.cloneRange()
-  syncComposerImageTokenLabels()
-  selectComposerImage(id)
-  touchComposer()
-}
 
-function handleComposerInput() {
-  syncComposerImageTokenLabels()
-  syncComposerImageTokenState()
-  touchComposer()
-  captureComposerSelection()
-}
+  function getComposerImageToken (id: string) {
+    return composerRef.value?.querySelector<HTMLElement>(`[data-kind="image-token"][data-image-id="${id}"]`) || null
+  }
 
-function handleComposerKeydown(event: KeyboardEvent) {
-  if (!chatReady.value && event.key === 'Enter' && !event.shiftKey) {
+  function syncComposerImageTokenState () {
+    const composer = composerRef.value
+    if (!composer) return
+    const tokens = Array.from(
+      composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
+    )
+    tokens.forEach(token => {
+      const active = token.dataset.imageId === selectedComposerImageId.value
+      token.classList.toggle('composer-image-token--selected', active)
+    })
+  }
+
+  function selectComposerImage (id: string | null) {
+    selectedComposerImageId.value = id
+    syncComposerImageTokenState()
+  }
+
+  function insertImageIntoComposer (image: PendingImage) {
+    focusComposer()
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+
+    const token = createComposerImageNode(image)
+    const caretAnchor = document.createTextNode('')
+    range.insertNode(caretAnchor)
+    range.insertNode(token)
+
+    range.setStart(caretAnchor, 0)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    composerRange = range.cloneRange()
+    syncComposerImageTokenLabels()
+    selectComposerImage(image.id)
+    touchComposer()
+  }
+
+  function removeComposerImage (id: string) {
+    const composer = composerRef.value
+    if (!composer) return
+    const node = composer.querySelector<HTMLElement>(`[data-image-id="${id}"]`)
+    node?.remove()
+    composerImages.delete(id)
+    if (selectedComposerImageId.value === id) {
+      selectComposerImage(null)
+    }
+    focusComposer(true)
+    syncComposerImageTokenLabels()
+    touchComposer()
+  }
+
+  function removeComposerMention (id: string) {
+    const composer = composerRef.value
+    if (!composer) return
+    const node = composer.querySelector<HTMLElement>(`[data-kind="mention-token"][data-mention-id="${id}"]`)
+    node?.remove()
+    composerMentions.delete(id)
+    focusComposer(true)
+    touchComposer()
+  }
+
+  function placeCaretAroundToken (node: HTMLElement, direction: 'before' | 'after') {
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    if (direction === 'before') {
+      range.setStartBefore(node)
+    } else {
+      range.setStartAfter(node)
+    }
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    composerRange = range.cloneRange()
+  }
+
+  function moveComposerImageToCursor (id: string) {
+    const token = getComposerImageToken(id)
+    if (!token) return
+    focusComposer()
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    if (token.contains(range.commonAncestorContainer)) {
+      return
+    }
+    token.remove()
+    range.deleteContents()
+    const caretAnchor = document.createTextNode('')
+    range.insertNode(caretAnchor)
+    range.insertNode(token)
+    range.setStart(caretAnchor, 0)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    composerRange = range.cloneRange()
+    syncComposerImageTokenLabels()
+    selectComposerImage(id)
+    touchComposer()
+  }
+
+  function handleComposerInput () {
+    syncComposerImageTokenLabels()
+    syncComposerImageTokenState()
+    touchComposer()
+    captureComposerSelection()
+  }
+
+  function handleComposerKeydown (event: KeyboardEvent) {
+    if (!chatReady.value && event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      return
+    }
+    const selectedId = selectedComposerImageId.value
+    if (selectedId) {
+      const token = getComposerImageToken(selectedId)
+      if (token) {
+        if (event.key === 'Backspace' || event.key === 'Delete') {
+          event.preventDefault()
+          removeComposerImage(selectedId)
+          return
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          selectComposerImage(null)
+          placeCaretAroundToken(token, 'before')
+          return
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault()
+          selectComposerImage(null)
+          placeCaretAroundToken(token, 'after')
+          return
+        }
+      }
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      send()
+    }
+  }
+
+  function handleComposerClick (event: MouseEvent) {
+    const target = event.target as HTMLElement | null
+    if (!target) return
+    const removeButton = target.closest<HTMLElement>('[data-action="remove-image"]')
+    if (removeButton?.dataset.imageId) {
+      event.preventDefault()
+      removeComposerImage(removeButton.dataset.imageId)
+      return
+    }
+    const removeMentionButton = target.closest<HTMLElement>('[data-action="remove-mention"]')
+    if (removeMentionButton?.dataset.mentionId) {
+      event.preventDefault()
+      removeComposerMention(removeMentionButton.dataset.mentionId)
+      return
+    }
+    const imageToken = target.closest<HTMLElement>('[data-kind="image-token"][data-image-id]')
+    if (imageToken?.dataset.imageId) {
+      event.preventDefault()
+      selectComposerImage(imageToken.dataset.imageId)
+      return
+    }
+    const mentionToken = target.closest<HTMLElement>('[data-kind="mention-token"][data-mention-id]')
+    if (mentionToken) {
+      event.preventDefault()
+      return
+    }
+    selectComposerImage(null)
+    captureComposerSelection()
+  }
+
+  function handleComposerPaste (event: ClipboardEvent) {
     event.preventDefault()
-    return
+    const text = event.clipboardData?.getData('text/plain') || ''
+    if (text) {
+      insertTextAtCursor(text)
+    }
   }
-  const selectedId = selectedComposerImageId.value
-  if (selectedId) {
-    const token = getComposerImageToken(selectedId)
-    if (token) {
-      if (event.key === 'Backspace' || event.key === 'Delete') {
-        event.preventDefault()
-        removeComposerImage(selectedId)
+
+  function syncComposerImageTokenLabels () {
+    const composer = composerRef.value
+    if (!composer) return
+    const tokens = Array.from(
+      composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
+    )
+    tokens.forEach((token, index) => {
+      const label = token.querySelector<HTMLElement>('[data-role="token-label"]')
+      if (label) {
+        label.textContent = t('chat.imageIndexedToken', { index: index + 1 })
+      }
+    })
+  }
+
+  function buildComposerSegments (): ChatSegment[] {
+    void composerVersion.value
+    const composer = composerRef.value
+    if (!composer) return []
+
+    const segments: ChatSegment[] = []
+    let textBuffer = ''
+
+    const flushText = () => {
+      if (textBuffer) {
+        segments.push({ type: 'text', text: textBuffer })
+        textBuffer = ''
+      }
+    }
+
+    const walkNode = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        textBuffer += node.textContent || ''
         return
       }
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        selectComposerImage(null)
-        placeCaretAroundToken(token, 'before')
+
+      if (!(node instanceof HTMLElement)) {
         return
       }
-      if (event.key === 'ArrowRight') {
-        event.preventDefault()
-        selectComposerImage(null)
-        placeCaretAroundToken(token, 'after')
+
+      if (node.dataset.kind === 'image-token' && node.dataset.imageId) {
+        const image = composerImages.get(node.dataset.imageId)
+        if (image) {
+          flushText()
+          segments.push({
+            type: 'image',
+            base64: image.base64,
+            mime: image.mime,
+            alt: image.name,
+          })
+        }
         return
       }
+
+      if (node.dataset.kind === 'mention-token' && node.dataset.mentionId) {
+        const mention = composerMentions.get(node.dataset.mentionId)
+        if (mention) {
+          flushText()
+          segments.push({
+            type: 'mention',
+            target: mention.target,
+            display: mention.display,
+            mention_type: 'user',
+          })
+        }
+        return
+      }
+
+      if (node.tagName === 'BR') {
+        textBuffer += '\n'
+        return
+      }
+
+      const isBlock = ['DIV', 'P'].includes(node.tagName)
+      if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
+        textBuffer += '\n'
+      }
+      node.childNodes.forEach(walkNode)
+      if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
+        textBuffer += '\n'
+      }
+    }
+
+    composer.childNodes.forEach(walkNode)
+    flushText()
+
+    return segments
+      .map(segment => {
+        if (segment.type !== 'text') return segment
+        return { ...segment, text: segment.text.replace(/\u00A0/g, ' ') }
+      })
+      .filter(segment => segment.type !== 'text' || segment.text.length > 0)
+  }
+
+  function clearComposer () {
+    const composer = composerRef.value
+    if (composer) {
+      composer.innerHTML = ''
+    }
+    composerImages.forEach(image => {
+      URL.revokeObjectURL(image.previewUrl)
+    })
+    composerImages.clear()
+    composerMentions.clear()
+    composerRange = null
+    selectComposerImage(null)
+    touchComposer()
+  }
+
+  function openImagePreviewFromPending (image: PendingImage) {
+    imagePreviewSrc.value = image.previewUrl
+    imagePreviewAlt.value = image.name
+    previewImageNaturalWidth.value = 0
+    previewImageNaturalHeight.value = 0
+    previewImageSizeText.value = formatBytes(image.size)
+    resetPreviewTransform()
+    imagePreviewVisible.value = true
+  }
+
+  function handleWindowKeydown (event: KeyboardEvent) {
+    if (event.key === 'Escape' && imagePreviewVisible.value) {
+      closeImagePreview()
     }
   }
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    send()
-  }
-}
 
-function handleComposerClick(event: MouseEvent) {
-  const target = event.target as HTMLElement | null
-  if (!target) return
-  const removeButton = target.closest<HTMLElement>('[data-action="remove-image"]')
-  if (removeButton?.dataset.imageId) {
-    event.preventDefault()
-    removeComposerImage(removeButton.dataset.imageId)
-    return
-  }
-  const removeMentionButton = target.closest<HTMLElement>('[data-action="remove-mention"]')
-  if (removeMentionButton?.dataset.mentionId) {
-    event.preventDefault()
-    removeComposerMention(removeMentionButton.dataset.mentionId)
-    return
-  }
-  const imageToken = target.closest<HTMLElement>('[data-kind="image-token"][data-image-id]')
-  if (imageToken?.dataset.imageId) {
-    event.preventDefault()
-    selectComposerImage(imageToken.dataset.imageId)
-    return
-  }
-  const mentionToken = target.closest<HTMLElement>('[data-kind="mention-token"][data-mention-id]')
-  if (mentionToken) {
-    event.preventDefault()
-    return
-  }
-  selectComposerImage(null)
-  captureComposerSelection()
-}
-
-function handleComposerPaste(event: ClipboardEvent) {
-  event.preventDefault()
-  const text = event.clipboardData?.getData('text/plain') || ''
-  if (text) {
-    insertTextAtCursor(text)
-  }
-}
-
-function syncComposerImageTokenLabels() {
-  const composer = composerRef.value
-  if (!composer) return
-  const tokens = Array.from(
-    composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
-  )
-  tokens.forEach((token, index) => {
-    const label = token.querySelector<HTMLElement>('[data-role="token-label"]')
-    if (label) {
-      label.textContent = t('chat.imageIndexedToken', { index: index + 1 })
+  function handleEnvelope (event: ChatEnvelope) {
+    switch (event.type) {
+      case 'auth.ok':
+        authenticated.value = true
+        principal.value = (event.payload as { principal: WebUIPrincipal }).principal
+        client.requestCapabilities()
+        client.listSessions()
+        break
+      case 'capabilities.response':
+        capabilities.value = (event.payload as CapabilitiesResponsePayload).capabilities
+        break
+      case 'session.list':
+        recentSessions.value = (event.payload as SessionListPayload).sessions
+        break
+      case 'session.deleted': {
+        const payload = event.payload as SessionDeletedPayload
+        recentSessions.value = recentSessions.value.filter(
+          item => item.session.session_id !== payload.session_id,
+        )
+        if (session.value?.session_id === payload.session_id) {
+          resetActiveSessionState()
+        }
+        break
+      }
+      case 'session.state': {
+        const payload = event.payload as SessionStatePayload
+        autoCreatingSession.value = false
+        session.value = payload.session
+        messages.value = payload.history
+        scrollToBottom()
+        if (pendingSessionMessage.value) {
+          const pending = pendingSessionMessage.value
+          pendingSessionMessage.value = null
+          client.sendMessage({
+            session_id: payload.session.session_id,
+            message_id: pending.message_id,
+            segments: pending.segments,
+          })
+        }
+        break
+      }
+      case 'session.history_cleared': {
+        const payload = event.payload as SessionStatePayload
+        session.value = payload.session
+        messages.value = payload.history
+        clearPendingReply()
+        scrollToBottom()
+        break
+      }
+      case 'message.receive':
+        appendMessage(event.payload as MessageReceivePayload)
+        break
+      case 'message.error':
+      case 'auth.error':
+      case 'system.error': {
+        const payload = event.payload as { message?: string; code?: string }
+        appendSimpleMessage('error', payload.message || payload.code || t('common.unknownError'))
+        break
+      }
+      case 'system.info':
+      case 'system.warning': {
+        break
+      }
     }
+  }
+
+  function connect () {
+    client.connect()
+  }
+
+  function saveSession () {
+    if (!authenticated.value) return
+    const payload: SessionCreatePayload = {
+      target_user_id: createSessionKey(),
+    }
+    client.createSession(payload)
+  }
+
+  function send () {
+    if (!chatReady.value) return
+    const segments = buildComposerSegments()
+    if (pendingReply.value) {
+      segments.unshift({
+        type: 'reply',
+        message_id: pendingReply.value.message_id,
+        text: summarizeReplyMessage(pendingReply.value),
+      })
+    }
+    if (!segments.length) return
+    const messageId = `cli_${Date.now()}`
+    if (session.value) {
+      client.sendMessage({
+        session_id: session.value.session_id,
+        message_id: messageId,
+        segments,
+      })
+    } else {
+      autoCreatingSession.value = true
+      pendingSessionMessage.value = {
+        message_id: messageId,
+        segments,
+      }
+      saveSession()
+    }
+    clearComposer()
+    clearPendingReply()
+  }
+
+  function scrollToMessage (messageId: string) {
+    const container = messagesContainer.value
+    if (!container) return
+
+    const target = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+    if (!target) return
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.classList.add('chat-message--flash')
+    window.setTimeout(() => {
+      target.classList.remove('chat-message--flash')
+    }, 1600)
+  }
+
+  function scrollToBottom () {
+    nextTick(() => {
+      messagesContainer.value?.scrollTo({
+        top: messagesContainer.value.scrollHeight,
+        behavior: 'smooth',
+      })
+    })
+  }
+
+  const unsubscribeMessage = client.onMessage(handleEnvelope)
+  const unsubscribeOpen = client.onOpen(() => {
+    socketConnected.value = true
+    const token = localStorage.getItem('token')
+    if (!token) {
+      return
+    }
+    client.authenticate(token)
   })
-}
-
-function buildComposerSegments(): ChatSegment[] {
-  composerVersion.value
-  const composer = composerRef.value
-  if (!composer) return []
-
-  const segments: ChatSegment[] = []
-  let textBuffer = ''
-
-  const flushText = () => {
-    if (textBuffer) {
-      segments.push({ type: 'text', text: textBuffer })
-      textBuffer = ''
-    }
-  }
-
-  const walkNode = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      textBuffer += node.textContent || ''
-      return
-    }
-
-    if (!(node instanceof HTMLElement)) {
-      return
-    }
-
-    if (node.dataset.kind === 'image-token' && node.dataset.imageId) {
-      const image = composerImages.get(node.dataset.imageId)
-      if (image) {
-        flushText()
-        segments.push({
-          type: 'image',
-          base64: image.base64,
-          mime: image.mime,
-          alt: image.name,
-        })
-      }
-      return
-    }
-
-    if (node.dataset.kind === 'mention-token' && node.dataset.mentionId) {
-      const mention = composerMentions.get(node.dataset.mentionId)
-      if (mention) {
-        flushText()
-        segments.push({
-          type: 'mention',
-          target: mention.target,
-          display: mention.display,
-          mention_type: 'user',
-        })
-      }
-      return
-    }
-
-    if (node.tagName === 'BR') {
-      textBuffer += '\n'
-      return
-    }
-
-    const isBlock = ['DIV', 'P'].includes(node.tagName)
-    if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
-      textBuffer += '\n'
-    }
-    node.childNodes.forEach(walkNode)
-    if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
-      textBuffer += '\n'
-    }
-  }
-
-  composer.childNodes.forEach(walkNode)
-  flushText()
-
-  return segments
-    .map((segment) => {
-      if (segment.type !== 'text') return segment
-      return { ...segment, text: segment.text.replace(/\u00A0/g, ' ') }
-    })
-    .filter((segment) => segment.type !== 'text' || segment.text.length > 0)
-}
-
-function clearComposer() {
-  const composer = composerRef.value
-  if (composer) {
-    composer.innerHTML = ''
-  }
-  composerImages.forEach((image) => {
-    URL.revokeObjectURL(image.previewUrl)
+  const unsubscribeClose = client.onClose(() => {
+    resetConnectionState()
   })
-  composerImages.clear()
-  composerMentions.clear()
-  composerRange = null
-  selectComposerImage(null)
-  touchComposer()
-}
 
-function openImagePreviewFromPending(image: PendingImage) {
-  imagePreviewSrc.value = image.previewUrl
-  imagePreviewAlt.value = image.name
-  previewImageNaturalWidth.value = 0
-  previewImageNaturalHeight.value = 0
-  previewImageSizeText.value = formatBytes(image.size)
-  resetPreviewTransform()
-  imagePreviewVisible.value = true
-}
-
-function handleWindowKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && imagePreviewVisible.value) {
-    closeImagePreview()
-  }
-}
-
-function handleEnvelope(event: ChatEnvelope) {
-  switch (event.type) {
-    case 'auth.ok':
-      authenticated.value = true
-      principal.value = (event.payload as { principal: WebUIPrincipal }).principal
-      client.requestCapabilities()
-      client.listSessions()
-      break
-    case 'capabilities.response':
-      capabilities.value = (event.payload as CapabilitiesResponsePayload).capabilities
-      break
-    case 'session.list':
-      recentSessions.value = (event.payload as SessionListPayload).sessions
-      break
-    case 'session.deleted': {
-      const payload = event.payload as SessionDeletedPayload
-      recentSessions.value = recentSessions.value.filter(
-        (item) => item.session.session_id !== payload.session_id,
-      )
-      if (session.value?.session_id === payload.session_id) {
-        resetActiveSessionState()
-      }
-      break
-    }
-    case 'session.state': {
-      const payload = event.payload as SessionStatePayload
-      autoCreatingSession.value = false
-      session.value = payload.session
-      messages.value = payload.history
-      scrollToBottom()
-      if (pendingSessionMessage.value) {
-        const pending = pendingSessionMessage.value
-        pendingSessionMessage.value = null
-        client.sendMessage({
-          session_id: payload.session.session_id,
-          message_id: pending.message_id,
-          segments: pending.segments,
-        })
-      }
-      break
-    }
-    case 'session.history_cleared': {
-      const payload = event.payload as SessionStatePayload
-      session.value = payload.session
-      messages.value = payload.history
-      clearPendingReply()
-      scrollToBottom()
-      break
-    }
-    case 'message.receive':
-      appendMessage(event.payload as MessageReceivePayload)
-      break
-    case 'message.error':
-    case 'auth.error':
-    case 'system.error': {
-      const payload = event.payload as { message?: string; code?: string }
-      appendSimpleMessage('error', payload.message || payload.code || t('common.unknownError'))
-      break
-    }
-    case 'system.info':
-    case 'system.warning': {
-      break
-    }
-  }
-}
-
-function connect() {
-  client.connect()
-}
-
-function saveSession() {
-  if (!authenticated.value) return
-  const payload: SessionCreatePayload = {
-    target_user_id: createSessionKey(),
-  }
-  client.createSession(payload)
-}
-
-function send() {
-  if (!chatReady.value) return
-  const segments = buildComposerSegments()
-  if (pendingReply.value) {
-    segments.unshift({
-      type: 'reply',
-      message_id: pendingReply.value.message_id,
-      text: summarizeReplyMessage(pendingReply.value),
-    })
-  }
-  if (!segments.length) return
-  const messageId = `cli_${Date.now()}`
-  if (session.value) {
-    client.sendMessage({
-      session_id: session.value.session_id,
-      message_id: messageId,
-      segments,
-    })
-  } else {
-    autoCreatingSession.value = true
-    pendingSessionMessage.value = {
-      message_id: messageId,
-      segments,
-    }
-    saveSession()
-  }
-  clearComposer()
-  clearPendingReply()
-}
-
-function scrollToMessage(messageId: string) {
-  const container = messagesContainer.value
-  if (!container) return
-
-  const target = container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
-  if (!target) return
-
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  target.classList.add('chat-message--flash')
-  window.setTimeout(() => {
-    target.classList.remove('chat-message--flash')
-  }, 1600)
-}
-
-function scrollToBottom() {
-  nextTick(() => {
-    messagesContainer.value?.scrollTo({
-      top: messagesContainer.value.scrollHeight,
-      behavior: 'smooth',
-    })
+  onMounted(() => {
+    connect()
+    window.addEventListener('keydown', handleWindowKeydown)
   })
-}
 
-const unsubscribeMessage = client.onMessage(handleEnvelope)
-const unsubscribeOpen = client.onOpen(() => {
-  socketConnected.value = true
-  const token = localStorage.getItem('token')
-  if (!token) {
-    return
-  }
-  client.authenticate(token)
-})
-const unsubscribeClose = client.onClose(() => {
-  resetConnectionState()
-})
-
-onMounted(() => {
-  connect()
-  window.addEventListener('keydown', handleWindowKeydown)
-})
-
-onUnmounted(() => {
-  if (connected.value && session.value) {
-    client.closeSession()
-  }
-  stopImageDrag()
-  unsubscribeMessage()
-  unsubscribeOpen()
-  unsubscribeClose()
-  client.disconnect()
-  revokeProtectedAssetUrls()
-  clearComposer()
-  window.removeEventListener('keydown', handleWindowKeydown)
-})
+  onUnmounted(() => {
+    if (connected.value && session.value) {
+      client.closeSession()
+    }
+    stopImageDrag()
+    unsubscribeMessage()
+    unsubscribeOpen()
+    unsubscribeClose()
+    client.disconnect()
+    revokeProtectedAssetUrls()
+    clearComposer()
+    window.removeEventListener('keydown', handleWindowKeydown)
+  })
 </script>
 
 <style scoped>

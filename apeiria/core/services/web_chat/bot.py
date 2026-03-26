@@ -2,25 +2,29 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from nonebot.adapters import Bot
+from nonebot.adapters import Bot, Event, Message, MessageSegment
 from nonebot.log import logger
 
+from .message import WebChatMessage, WebChatMessageSegment
 from .protocol import ErrorPayload, MessageReceivePayload
 
 if TYPE_CHECKING:
     from .codec import MessageCodec
     from .connection import WebChatConnection
     from .emitter import WebChatEmitter
-    from .event import WebChatMessageEvent
-    from .message import WebChatMessage, WebChatMessageSegment
     from .session import ChatSession
 
 
 class WebChatBot(Bot):
+    _session: "ChatSession"
+    _connection: "WebChatConnection"
+    _codec: "MessageCodec"
+    _emitter: "WebChatEmitter"
+
     def __init__(
         self,
         adapter: Any,
@@ -37,17 +41,22 @@ class WebChatBot(Bot):
 
     async def send(
         self,
-        event: "WebChatMessageEvent",  # noqa: ARG002
-        message: str | "WebChatMessage" | "WebChatMessageSegment",
+        event: Event,  # noqa: ARG002
+        message: str | Message | MessageSegment,
         **kwargs: Any,  # noqa: ARG002
     ) -> Any:
-        segments = await self._codec.encode_message(message)
+        if isinstance(message, (str, WebChatMessage, WebChatMessageSegment)):
+            encoded_message = message
+        else:
+            encoded_message = str(message)
+
+        segments = await self._codec.encode_message(encoded_message)
         payload = MessageReceivePayload(
             session_id=self._session.session_id,
             message_id=f"srv_{uuid4().hex}",
             role="bot",
             segments=segments,
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
         )
         await self._emitter.emit_message(self._connection, payload)
         return {"status": "ok"}

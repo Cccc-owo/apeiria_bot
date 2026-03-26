@@ -38,6 +38,11 @@ async def get_chat_asset(
 
     if asset.remote_url:
         return RedirectResponse(asset.remote_url)
+    if asset.local_path is None:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.chat.asset_file_missing"),
+        )
     return FileResponse(
         asset.local_path,
         media_type=asset.content_type,

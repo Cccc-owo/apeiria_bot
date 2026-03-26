@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from .protocol import ChatSessionState, SessionStatus, WebUIPrincipal
 
@@ -25,7 +25,7 @@ class ChatSession:
         created_by: WebUIPrincipal,
         target_user_id: str,
     ) -> "ChatSession":
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         return cls(
             session_id=session_id,
             created_by=created_by,
@@ -53,6 +53,6 @@ class ChatSession:
             or WebUIPrincipal(id="webui", username="webui", role="admin"),
             target_user_id=state.target_user_id,
             status=state.status,
-            created_at=state.created_at or datetime.now(UTC),
-            updated_at=state.updated_at or datetime.now(UTC),
+            created_at=state.created_at or datetime.now(timezone.utc),
+            updated_at=state.updated_at or datetime.now(timezone.utc),
         )

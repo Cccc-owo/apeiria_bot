@@ -7,8 +7,8 @@ from dataclasses import dataclass
 import nonebot
 
 from apeiria.core.utils.helpers import (
-    get_plugin_extra,
     get_plugin_dependents,
+    get_plugin_extra,
     get_plugin_name,
     get_plugin_protection_reason,
     get_plugin_required_plugins,

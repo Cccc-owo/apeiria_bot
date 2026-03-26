@@ -1,13 +1,14 @@
 """Alconna / UniSeg compatibility for WebChat."""
 
 import base64
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from nonebot.adapters import Bot, Event
+from nonebot.adapters import Bot, Event, Message
 from nonebot_plugin_alconna.uniseg.builder import MessageBuilder, build
 from nonebot_plugin_alconna.uniseg.constraint import SupportAdapter, SupportScope
 from nonebot_plugin_alconna.uniseg.exporter import MessageExporter, Target, export
-from nonebot_plugin_alconna.uniseg.segment import At, Image, Reply, Segment, Text
+from nonebot_plugin_alconna.uniseg.segment import At, Emoji, Image, Reply, Segment, Text
 
 from .event import WebChatMessageEvent
 from .message import WebChatMessage, WebChatMessageSegment
@@ -34,8 +35,14 @@ class WebChatMessageBuilder(MessageBuilder[WebChatMessageSegment]):
         target = data.get("target")
         if not isinstance(target, str) or not target:
             return None
+        mention_type = data.get("mention_type")
+        flag = (
+            mention_type
+            if mention_type in {"user", "role", "channel"}
+            else "user"
+        )
         return At(
-            flag=str(data.get("mention_type") or "user"),
+            flag=flag,
             target=target,
             display=data.get("display"),
         )
@@ -60,7 +67,7 @@ class WebChatMessageExporter(MessageExporter[WebChatMessage]):
     def get_target(self, event: Event, bot: Bot | None = None) -> Target:
         assert isinstance(event, WebChatMessageEvent)
         return Target(
-            event.user_id,
+            event.get_user_id(),
             private=True,
             adapter=self.get_adapter(),
             self_id=bot.self_id if bot else None,
@@ -69,7 +76,7 @@ class WebChatMessageExporter(MessageExporter[WebChatMessage]):
 
     def get_message_id(self, event: Event) -> str:
         assert isinstance(event, WebChatMessageEvent)
-        return event.message_id
+        return str(event.message_id)
 
     @export
     async def text(self, seg: Text, _bot: Bot | None) -> WebChatMessageSegment:
@@ -107,7 +114,7 @@ class WebChatMessageExporter(MessageExporter[WebChatMessage]):
         self,
         target: Target | Event,
         bot: Bot,
-        message: WebChatMessage,
+        message: Message,
         **kwargs: Any,
     ) -> Any:
         if TYPE_CHECKING:
@@ -121,7 +128,7 @@ class WebChatMessageExporter(MessageExporter[WebChatMessage]):
 
     async def edit(
         self,
-        new: list[Segment],
+        new: Sequence[Segment],
         mid: Any,
         bot: Bot,
         context: Target | Event,
@@ -130,12 +137,11 @@ class WebChatMessageExporter(MessageExporter[WebChatMessage]):
 
     async def reaction(
         self,
-        emoji: Any,
+        emoji: Emoji,
         mid: Any,
         bot: Bot,
         context: Target | Event,
-        *,
-        delete: bool = False,
+        delete: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         raise NotImplementedError
 

@@ -10,10 +10,10 @@
           </div>
         </div>
         <div class="page-actions">
-          <v-btn color="warning" variant="tonal" :loading="restarting" @click="handleRestart">
+          <v-btn color="warning" :loading="restarting" variant="tonal" @click="handleRestart">
             {{ t('dashboard.restart') }}
           </v-btn>
-          <v-btn variant="tonal" :loading="loading" @click="refreshDashboard">
+          <v-btn :loading="loading" variant="tonal" @click="refreshDashboard">
             {{ t('common.refresh') }}
           </v-btn>
         </div>
@@ -29,9 +29,9 @@
           </div>
           <v-btn
             color="warning"
-            variant="tonal"
             :disabled="!webuiBuildStatus?.can_build"
             :loading="rebuildingWebUI"
+            variant="tonal"
             @click="handleRebuildWebUI"
           >
             {{ t('dashboard.rebuildWebUI') }}
@@ -49,8 +49,8 @@
           </div>
           <v-progress-linear
             v-if="rebuildingWebUI"
-            indeterminate
             color="warning"
+            indeterminate
           />
           <div ref="buildLogCardRef" class="build-log-card">
             <pre class="build-log-card__content">{{ buildLogs || t('dashboard.webuiBuildWaiting') }}</pre>
@@ -58,7 +58,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" :disabled="rebuildingWebUI" @click="buildDialogVisible = false">
+          <v-btn :disabled="rebuildingWebUI" variant="text" @click="buildDialogVisible = false">
             {{ t('common.close') }}
           </v-btn>
         </v-card-actions>
@@ -70,7 +70,7 @@
         <div class="dashboard-section__title">{{ t('dashboard.overview') }}</div>
       </div>
       <v-row class="dashboard-overview">
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" md="3" sm="6">
           <v-card class="metric-card metric-card--status">
             <v-card-text class="metric-card__body">
               <div class="metric-card__topline">
@@ -84,7 +84,7 @@
           </v-card>
         </v-col>
 
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" md="3" sm="6">
           <v-card class="metric-card">
             <v-card-text class="metric-card__body">
               <div class="metric-card__topline">
@@ -98,7 +98,7 @@
           </v-card>
         </v-col>
 
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" md="3" sm="6">
           <v-card class="metric-card">
             <v-card-text class="metric-card__body">
               <div class="metric-card__topline">
@@ -112,7 +112,7 @@
           </v-card>
         </v-col>
 
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" md="3" sm="6">
           <v-card class="metric-card">
             <v-card-text class="metric-card__body">
               <div class="metric-card__topline">
@@ -136,9 +136,9 @@
             <v-chip
               v-for="adapter in status.adapters"
               :key="adapter"
+              color="info"
               size="small"
               variant="tonal"
-              color="info"
             >
               {{ adapter }}
             </v-chip>
@@ -151,7 +151,7 @@
           <div class="dashboard-section__title">附加统计</div>
         </div>
         <v-row>
-          <v-col cols="12" sm="6" md="6">
+          <v-col cols="12" md="6" sm="6">
             <v-card class="compact-metric-card">
               <v-card-text class="compact-metric-card__body">
                 <div class="compact-metric-card__label">{{ t('dashboard.disabledPlugins') }}</div>
@@ -160,7 +160,7 @@
             </v-card>
           </v-col>
 
-          <v-col cols="12" sm="6" md="6">
+          <v-col cols="12" md="6" sm="6">
             <v-card class="compact-metric-card">
               <v-card-text class="compact-metric-card__body">
                 <div class="compact-metric-card__label">{{ t('dashboard.groups') }}</div>
@@ -169,7 +169,7 @@
             </v-card>
           </v-col>
 
-          <v-col cols="12" sm="6" md="6">
+          <v-col cols="12" md="6" sm="6">
             <v-card class="compact-metric-card">
               <v-card-text class="compact-metric-card__body">
                 <div class="compact-metric-card__label">{{ t('dashboard.disabledGroups') }}</div>
@@ -178,7 +178,7 @@
             </v-card>
           </v-col>
 
-          <v-col cols="12" sm="6" md="6">
+          <v-col cols="12" md="6" sm="6">
             <v-card class="compact-metric-card">
               <v-card-text class="compact-metric-card__body">
                 <div class="compact-metric-card__label">{{ t('dashboard.bans') }}</div>
@@ -206,10 +206,10 @@
           >
             <div class="dashboard-event__badge">
               <v-chip
+                class="dashboard-event__chip"
+                :color="eventColor(event.level)"
                 size="small"
                 variant="tonal"
-                :color="eventColor(event.level)"
-                class="dashboard-event__chip"
               >
                 {{ event.level }}
               </v-chip>
@@ -229,223 +229,223 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
-import { getDashboardEvents, getStatus, getWebUIBuildStatus, restartBot, streamRebuildWebUI } from '@/api'
-import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
+  import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
+  import { getDashboardEvents, getStatus, getWebUIBuildStatus, restartBot, streamRebuildWebUI } from '@/api'
+  import { getErrorMessage } from '@/api/client'
+  import { useNoticeStore } from '@/stores/notice'
 
-const status = ref<DashboardStatus | null>(null)
-const recentEvents = ref<DashboardEventItem[]>([])
-const webuiBuildStatus = ref<WebUIBuildStatus | null>(null)
-const loading = ref(false)
-const restarting = ref(false)
-const rebuildingWebUI = ref(false)
-const buildDialogVisible = ref(false)
-const buildLogs = ref('')
-const buildDialogStatus = ref('')
-const buildLogCardRef = ref<HTMLElement | null>(null)
-const lastUpdatedAt = ref<Date | null>(null)
-const { t, locale } = useI18n()
-const noticeStore = useNoticeStore()
-let refreshTimer: number | null = null
+  const status = ref<DashboardStatus | null>(null)
+  const recentEvents = ref<DashboardEventItem[]>([])
+  const webuiBuildStatus = ref<WebUIBuildStatus | null>(null)
+  const loading = ref(false)
+  const restarting = ref(false)
+  const rebuildingWebUI = ref(false)
+  const buildDialogVisible = ref(false)
+  const buildLogs = ref('')
+  const buildDialogStatus = ref('')
+  const buildLogCardRef = ref<HTMLElement | null>(null)
+  const lastUpdatedAt = ref<Date | null>(null)
+  const { t, locale } = useI18n()
+  const noticeStore = useNoticeStore()
+  let refreshTimer: number | null = null
 
-const statusColor = computed(() => status.value?.status === 'running' ? 'success' : 'warning')
-const statusIcon = computed(() => status.value?.status === 'running' ? 'mdi-check-circle' : 'mdi-alert-circle')
-const lastUpdatedText = computed(() => {
-  if (!lastUpdatedAt.value) {
-    return t('common.loading')
-  }
-  return t('dashboard.lastUpdated', {
-    time: lastUpdatedAt.value.toLocaleTimeString(locale.value === 'zh_CN' ? 'zh-CN' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }),
-  })
-})
-const webuiBuildHeadline = computed(() => {
-  if (!webuiBuildStatus.value) return ''
-  if (!webuiBuildStatus.value.is_built) return t('dashboard.webuiBuildMissing')
-  return t('dashboard.webuiBuildOutdated')
-})
-const webuiBuildDescription = computed(() => {
-  if (!webuiBuildStatus.value) return ''
-  if (!webuiBuildStatus.value.can_build) return t('dashboard.webuiBuildUnavailable')
-  return t('dashboard.webuiBuildDetail', {
-    tool: webuiBuildStatus.value.build_tool || 'pnpm',
-  })
-})
-const showWebUIBuildCard = computed(() =>
-  Boolean(webuiBuildStatus.value && (!webuiBuildStatus.value.is_built || webuiBuildStatus.value.is_stale)),
-)
-
-async function refreshDashboard () {
-  loading.value = true
-  try {
-    const [statusResponse, eventsResponse, buildStatusResponse] = await Promise.all([
-      getStatus(),
-      getDashboardEvents(),
-      getWebUIBuildStatus(),
-    ])
-    status.value = statusResponse.data
-    recentEvents.value = eventsResponse.data.items
-    webuiBuildStatus.value = buildStatusResponse.data
-    lastUpdatedAt.value = new Date()
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleRebuildWebUI () {
-  buildDialogVisible.value = true
-  buildLogs.value = ''
-  buildDialogStatus.value = t('dashboard.webuiBuildRunning')
-  rebuildingWebUI.value = true
-  try {
-    let buildSucceeded = false
-    let buildFailedMessage = ''
-
-    await streamRebuildWebUI(async (event) => {
-      if (event.event === 'chunk') {
-        appendBuildLogs(event.chunk || '')
-        return
-      }
-
-      if (event.event === 'error') {
-        buildFailedMessage = event.detail || t('dashboard.webuiBuildFailed')
-        return
-      }
-
-      if (event.event === 'done' && event.status) {
-        buildSucceeded = true
-        webuiBuildStatus.value = event.status
-      }
+  const statusColor = computed(() => status.value?.status === 'running' ? 'success' : 'warning')
+  const statusIcon = computed(() => status.value?.status === 'running' ? 'mdi-check-circle' : 'mdi-alert-circle')
+  const lastUpdatedText = computed(() => {
+    if (!lastUpdatedAt.value) {
+      return t('common.loading')
+    }
+    return t('dashboard.lastUpdated', {
+      time: lastUpdatedAt.value.toLocaleTimeString(locale.value === 'zh_CN' ? 'zh-CN' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
     })
-
-    if (!buildSucceeded) {
-      throw new Error(buildFailedMessage || t('dashboard.webuiBuildFailed'))
-    }
-
-    rebuildingWebUI.value = false
-    noticeStore.show(t('dashboard.webuiBuildUpdated'), 'success')
-    buildDialogStatus.value = t('dashboard.webuiBuildUpdated')
-    await waitForWebUIBuildRefresh()
-  } catch (error) {
-    const message = getErrorMessage(error, t('dashboard.webuiBuildFailed'))
-    if (!buildLogs.value.trim()) {
-      buildLogs.value = message
-    } else if (!buildLogs.value.includes(message)) {
-      appendBuildLogs(`\n${message}\n`)
-    }
-    buildDialogStatus.value = t('dashboard.webuiBuildFailed')
-    noticeStore.show(message, 'error')
-  } finally {
-    rebuildingWebUI.value = false
-  }
-}
-
-function appendBuildLogs (chunk: string) {
-  buildLogs.value += chunk
-  void nextTick(() => {
-    const container = buildLogCardRef.value
-    if (!container) return
-    container.scrollTop = container.scrollHeight
   })
-}
+  const webuiBuildHeadline = computed(() => {
+    if (!webuiBuildStatus.value) return ''
+    if (!webuiBuildStatus.value.is_built) return t('dashboard.webuiBuildMissing')
+    return t('dashboard.webuiBuildOutdated')
+  })
+  const webuiBuildDescription = computed(() => {
+    if (!webuiBuildStatus.value) return ''
+    if (!webuiBuildStatus.value.can_build) return t('dashboard.webuiBuildUnavailable')
+    return t('dashboard.webuiBuildDetail', {
+      tool: webuiBuildStatus.value.build_tool || 'pnpm',
+    })
+  })
+  const showWebUIBuildCard = computed(() =>
+    Boolean(webuiBuildStatus.value && (!webuiBuildStatus.value.is_built || webuiBuildStatus.value.is_stale)),
+  )
 
-async function waitForWebUIBuildRefresh () {
-  for (let attempt = 0; attempt < 15; attempt += 1) {
+  async function refreshDashboard () {
+    loading.value = true
     try {
-      const response = await getWebUIBuildStatus()
-      webuiBuildStatus.value = response.data
-      if (response.data.is_built && !response.data.is_stale) {
-        await sleep(3000)
-        window.location.reload()
-        return
+      const [statusResponse, eventsResponse, buildStatusResponse] = await Promise.all([
+        getStatus(),
+        getDashboardEvents(),
+        getWebUIBuildStatus(),
+      ])
+      status.value = statusResponse.data
+      recentEvents.value = eventsResponse.data.items
+      webuiBuildStatus.value = buildStatusResponse.data
+      lastUpdatedAt.value = new Date()
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function handleRebuildWebUI () {
+    buildDialogVisible.value = true
+    buildLogs.value = ''
+    buildDialogStatus.value = t('dashboard.webuiBuildRunning')
+    rebuildingWebUI.value = true
+    try {
+      let buildSucceeded = false
+      let buildFailedMessage = ''
+
+      await streamRebuildWebUI(async event => {
+        if (event.event === 'chunk') {
+          appendBuildLogs(event.chunk || '')
+          return
+        }
+
+        if (event.event === 'error') {
+          buildFailedMessage = event.detail || t('dashboard.webuiBuildFailed')
+          return
+        }
+
+        if (event.event === 'done' && event.status) {
+          buildSucceeded = true
+          webuiBuildStatus.value = event.status
+        }
+      })
+
+      if (!buildSucceeded) {
+        throw new Error(buildFailedMessage || t('dashboard.webuiBuildFailed'))
       }
-    } catch {
+
+      rebuildingWebUI.value = false
+      noticeStore.show(t('dashboard.webuiBuildUpdated'), 'success')
+      buildDialogStatus.value = t('dashboard.webuiBuildUpdated')
+      await waitForWebUIBuildRefresh()
+    } catch (error) {
+      const message = getErrorMessage(error, t('dashboard.webuiBuildFailed'))
+      if (!buildLogs.value.trim()) {
+        buildLogs.value = message
+      } else if (!buildLogs.value.includes(message)) {
+        appendBuildLogs(`\n${message}\n`)
+      }
+      buildDialogStatus.value = t('dashboard.webuiBuildFailed')
+      noticeStore.show(message, 'error')
+    } finally {
+      rebuildingWebUI.value = false
+    }
+  }
+
+  function appendBuildLogs (chunk: string) {
+    buildLogs.value += chunk
+    void nextTick(() => {
+      const container = buildLogCardRef.value
+      if (!container) return
+      container.scrollTop = container.scrollHeight
+    })
+  }
+
+  async function waitForWebUIBuildRefresh () {
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      try {
+        const response = await getWebUIBuildStatus()
+        webuiBuildStatus.value = response.data
+        if (response.data.is_built && !response.data.is_stale) {
+          await sleep(3000)
+          window.location.reload()
+          return
+        }
+      } catch {
       // Ignore transient polling failures while waiting for the new assets.
+      }
+      await sleep(1000)
     }
-    await sleep(1000)
   }
-}
 
-async function handleRestart () {
-  if (!window.confirm(t('dashboard.restartConfirm'))) return
-  restarting.value = true
-  try {
-    const res = await restartBot()
-    noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
-    await waitForRestartTransition()
-    window.location.reload()
-  } catch (error) {
-    const message = getErrorMessage(error, t('dashboard.restartFailed'))
-    noticeStore.show(message, 'error')
-  } finally {
-    restarting.value = false
-  }
-}
-
-async function waitForRestartTransition () {
-  await waitForStatus(false, 30, 1000)
-  await waitForStatus(true, 60, 1000)
-}
-
-async function waitForStatus (expectedOnline: boolean, maxAttempts: number, delayMs: number) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    await sleep(delayMs)
+  async function handleRestart () {
+    if (!window.confirm(t('dashboard.restartConfirm'))) return
+    restarting.value = true
     try {
-      await getStatus()
-      if (expectedOnline) return
-    } catch {
-      if (!expectedOnline) return
+      const res = await restartBot()
+      noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
+      await waitForRestartTransition()
+      window.location.reload()
+    } catch (error) {
+      const message = getErrorMessage(error, t('dashboard.restartFailed'))
+      noticeStore.show(message, 'error')
+    } finally {
+      restarting.value = false
     }
   }
 
-  throw new Error(t('dashboard.restartFailed'))
-}
-
-function sleep (ms: number) {
-  return new Promise(resolve => window.setTimeout(resolve, ms))
-}
-
-function formatUptime (seconds?: number): string {
-  if (!seconds) return '...'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  return `${h}h ${m}m`
-}
-
-function eventColor (level: string) {
-  if (level === 'ERROR' || level === 'CRITICAL') return 'error'
-  if (level === 'WARNING') return 'warning'
-  return 'info'
-}
-
-function startAutoRefresh () {
-  stopAutoRefresh()
-  refreshTimer = window.setInterval(() => {
-    void refreshDashboard()
-  }, 15000)
-}
-
-function stopAutoRefresh () {
-  if (refreshTimer !== null) {
-    window.clearInterval(refreshTimer)
-    refreshTimer = null
+  async function waitForRestartTransition () {
+    await waitForStatus(false, 30, 1000)
+    await waitForStatus(true, 60, 1000)
   }
-}
 
-onMounted(() => {
-  void refreshDashboard()
-  startAutoRefresh()
-})
+  async function waitForStatus (expectedOnline: boolean, maxAttempts: number, delayMs: number) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await sleep(delayMs)
+      try {
+        await getStatus()
+        if (expectedOnline) return
+      } catch {
+        if (!expectedOnline) return
+      }
+    }
 
-onUnmounted(() => {
-  stopAutoRefresh()
-})
+    throw new Error(t('dashboard.restartFailed'))
+  }
+
+  function sleep (ms: number) {
+    return new Promise(resolve => window.setTimeout(resolve, ms))
+  }
+
+  function formatUptime (seconds?: number): string {
+    if (!seconds) return '...'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    return `${h}h ${m}m`
+  }
+
+  function eventColor (level: string) {
+    if (level === 'ERROR' || level === 'CRITICAL') return 'error'
+    if (level === 'WARNING') return 'warning'
+    return 'info'
+  }
+
+  function startAutoRefresh () {
+    stopAutoRefresh()
+    refreshTimer = window.setInterval(() => {
+      void refreshDashboard()
+    }, 15000)
+  }
+
+  function stopAutoRefresh () {
+    if (refreshTimer !== null) {
+      window.clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
+
+  onMounted(() => {
+    void refreshDashboard()
+    startAutoRefresh()
+  })
+
+  onUnmounted(() => {
+    stopAutoRefresh()
+  })
 </script>
 
 <style scoped>

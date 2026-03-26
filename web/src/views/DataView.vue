@@ -6,18 +6,18 @@
       <div class="page-toolbar-form">
         <v-text-field
           v-model.trim="search"
-          :label="t('data.search')"
-          :placeholder="t('data.searchPlaceholder')"
+          class="data-search-field"
           density="compact"
           hide-details
+          :label="t('data.search')"
+          :placeholder="t('data.searchPlaceholder')"
           prepend-inner-icon="mdi-magnify"
-          class="data-search-field"
           @keydown.enter.prevent="applySearch"
         />
-        <v-btn variant="tonal" :loading="loading" @click="loadRecords">
+        <v-btn :loading="loading" variant="tonal" @click="loadRecords">
           {{ t('common.refresh') }}
         </v-btn>
-        <v-btn variant="text" :disabled="!search" @click="resetFilters">
+        <v-btn :disabled="!search" variant="text" @click="resetFilters">
           {{ t('data.resetFilters') }}
         </v-btn>
         <div class="compact-field compact-field--toolbar data-table-select">
@@ -25,16 +25,16 @@
           <v-select
             id="data-table-select"
             v-model="selectedTable"
-            :items="tableOptions"
+            hide-details
             item-title="label"
             item-value="name"
-            hide-details
+            :items="tableOptions"
           />
         </div>
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable">
+    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
       {{ errorMessage }}
     </v-alert>
 
@@ -74,14 +74,14 @@
       <v-data-table-server
         v-model:items-per-page="pageSize"
         v-model:page="page"
+        class="page-table data-table"
+        density="compact"
         :headers="headers"
         :items="rows"
         :items-length="total"
-        :loading="loading"
-        density="compact"
-        :loading-text="t('data.loadingText')"
         :items-per-page-text="t('data.itemsPerPage')"
-        class="page-table data-table"
+        :loading="loading"
+        :loading-text="t('data.loadingText')"
         @update:options="handleOptionsChange"
       >
         <template #no-data>
@@ -91,9 +91,9 @@
         </template>
         <template #item.actions="{ item }">
           <v-btn
+            color="primary"
             size="small"
             variant="tonal"
-            color="primary"
             @click="openRecordDialog(item)"
           >
             {{ t('data.viewDetail') }}
@@ -109,9 +109,9 @@
             >
               <template v-if="String(column.key) === 'actions'">
                 <v-btn
+                  color="primary"
                   size="small"
                   variant="tonal"
-                  color="primary"
                   @click="openRecordDialog(item)"
                 >
                   {{ t('data.viewDetail') }}
@@ -138,16 +138,16 @@
         <v-card-text>
           <v-alert
             v-if="dialogErrorMessage"
+            class="mb-4"
+            density="comfortable"
             type="error"
             variant="tonal"
-            density="comfortable"
-            class="mb-4"
           >
             {{ dialogErrorMessage }}
           </v-alert>
 
           <div v-if="dialogLoading" class="py-8 d-flex justify-center">
-            <v-progress-circular indeterminate color="primary" />
+            <v-progress-circular color="primary" indeterminate />
           </div>
 
           <div v-else class="d-flex flex-column ga-4">
@@ -156,9 +156,9 @@
                 {{ t('data.fieldCount', { count: detailFields.length }) }}
               </v-chip>
               <v-btn
-                variant="tonal"
-                size="small"
                 prepend-icon="mdi-content-copy"
+                size="small"
+                variant="tonal"
                 @click="copyRecord"
               >
                 {{ t('data.copyRecord') }}
@@ -176,9 +176,9 @@
               </div>
               <v-chip
                 v-if="fieldType(field) === 'boolean'"
+                :color="originalRecord[field] ? 'success' : 'default'"
                 size="small"
                 variant="tonal"
-                :color="originalRecord[field] ? 'success' : 'default'"
               >
                 {{ String(originalRecord[field]) }}
               </v-chip>
@@ -203,177 +203,177 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { getDataRecord, getDataRecords, getDataTables } from '@/api'
-import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { getDataRecord, getDataRecords, getDataTables } from '@/api'
+  import { getErrorMessage } from '@/api/client'
+  import { useNoticeStore } from '@/stores/notice'
 
-interface DataTableInfo {
-  name: string
-  label: string
-  primary_key: string
-}
+  interface DataTableInfo {
+    name: string
+    label: string
+    primary_key: string
+  }
 
-const tables = ref<DataTableInfo[]>([])
-const selectedTable = ref('')
-const primaryKey = ref('id')
-const headers = ref<{ title: string; key: string; sortable: boolean }[]>([])
-const rows = ref<Record<string, unknown>[]>([])
-const loading = ref(false)
-const errorMessage = ref('')
-const total = ref(0)
-const page = ref(1)
-const pageSize = ref(20)
-const search = ref('')
+  const tables = ref<DataTableInfo[]>([])
+  const selectedTable = ref('')
+  const primaryKey = ref('id')
+  const headers = ref<{ title: string; key: string; sortable: boolean }[]>([])
+  const rows = ref<Record<string, unknown>[]>([])
+  const loading = ref(false)
+  const errorMessage = ref('')
+  const total = ref(0)
+  const page = ref(1)
+  const pageSize = ref(20)
+  const search = ref('')
 
-const recordDialogVisible = ref(false)
-const dialogLoading = ref(false)
-const dialogErrorMessage = ref('')
-const editingRecordId = ref('')
-const originalRecord = ref<Record<string, unknown>>({})
-const editForm = ref<Record<string, string>>({})
-const { t } = useI18n()
-const noticeStore = useNoticeStore()
+  const recordDialogVisible = ref(false)
+  const dialogLoading = ref(false)
+  const dialogErrorMessage = ref('')
+  const editingRecordId = ref('')
+  const originalRecord = ref<Record<string, unknown>>({})
+  const editForm = ref<Record<string, string>>({})
+  const { t } = useI18n()
+  const noticeStore = useNoticeStore()
 
-const tableOptions = computed(() => tables.value)
-const selectedTableLabel = computed(
-  () => tables.value.find((item) => item.name === selectedTable.value)?.label || '',
-)
-const detailFields = computed(() => Object.keys(editForm.value))
-const activeSearchText = computed(() => search.value.trim() || t('data.searchIdle'))
+  const tableOptions = computed(() => tables.value)
+  const selectedTableLabel = computed(
+    () => tables.value.find(item => item.name === selectedTable.value)?.label || '',
+  )
+  const detailFields = computed(() => Object.keys(editForm.value))
+  const activeSearchText = computed(() => search.value.trim() || t('data.searchIdle'))
 
-function formatCell(value: unknown) {
-  if (value === null || value === undefined || value === '') return '-'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
+  function formatCell (value: unknown) {
+    if (value === null || value === undefined || value === '') return '-'
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
 
-function fieldType(field: string) {
-  const original = originalRecord.value[field]
-  if (typeof original === 'boolean') return 'boolean'
-  if (typeof original === 'number') return 'number'
-  if (original && typeof original === 'object') return 'json'
-  return 'text'
-}
+  function fieldType (field: string) {
+    const original = originalRecord.value[field]
+    if (typeof original === 'boolean') return 'boolean'
+    if (typeof original === 'number') return 'number'
+    if (original && typeof original === 'object') return 'json'
+    return 'text'
+  }
 
-function stringifyValue(value: unknown) {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
+  function stringifyValue (value: unknown) {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
 
-async function loadTables() {
-  errorMessage.value = ''
-  try {
-    const response = await getDataTables()
-    tables.value = response.data
-    if (!selectedTable.value && tables.value.length > 0) {
-      selectedTable.value = tables.value[0].name
+  async function loadTables () {
+    errorMessage.value = ''
+    try {
+      const response = await getDataTables()
+      tables.value = response.data
+      if (!selectedTable.value && tables.value.length > 0) {
+        selectedTable.value = tables.value[0].name
+      }
+    } catch (error) {
+      tables.value = []
+      selectedTable.value = ''
+      headers.value = []
+      rows.value = []
+      total.value = 0
+      errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
     }
-  } catch (error) {
-    tables.value = []
-    selectedTable.value = ''
+  }
+
+  async function loadRecords () {
+    if (!selectedTable.value) return
+
+    loading.value = true
+    errorMessage.value = ''
+    try {
+      const response = await getDataRecords(selectedTable.value, page.value, pageSize.value, search.value.trim())
+      primaryKey.value = response.data.primary_key
+      headers.value = [
+        ...response.data.columns.map(column => ({
+          title: column,
+          key: column,
+          sortable: false,
+        })),
+        { title: t('data.actions'), key: 'actions', sortable: false },
+      ]
+      rows.value = response.data.items
+      total.value = response.data.total
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function openRecordDialog (row: Record<string, unknown>) {
+    const recordId = row[primaryKey.value]
+    if (recordId === null || recordId === undefined) {
+      return
+    }
+
+    recordDialogVisible.value = true
+    dialogLoading.value = true
+    dialogErrorMessage.value = ''
+    editingRecordId.value = String(recordId)
+    try {
+      const response = await getDataRecord(selectedTable.value, editingRecordId.value)
+      originalRecord.value = response.data.record
+      editForm.value = Object.fromEntries(
+        Object.entries(response.data.record).map(([key, value]) => [key, stringifyValue(value)]),
+      )
+    } catch (error) {
+      dialogErrorMessage.value = getErrorMessage(error, t('data.loadRecordFailed'))
+    } finally {
+      dialogLoading.value = false
+    }
+  }
+
+  function applySearch () {
+    page.value = 1
+    void loadRecords()
+  }
+
+  function resetFilters () {
+    search.value = ''
+    page.value = 1
+    void loadRecords()
+  }
+
+  async function copyRecord () {
+    await navigator.clipboard.writeText(JSON.stringify(originalRecord.value, null, 2))
+    noticeStore.show(t('data.copied'), 'success')
+  }
+
+  async function copyField (field: string) {
+    await navigator.clipboard.writeText(editForm.value[field] || '')
+    noticeStore.show(t('data.copied'), 'success')
+  }
+
+  function handleOptionsChange (options: { page: number; itemsPerPage: number }) {
+    if (page.value !== options.page) {
+      page.value = options.page
+    }
+    if (pageSize.value !== options.itemsPerPage) {
+      pageSize.value = options.itemsPerPage
+    }
+  }
+
+  watch(selectedTable, () => {
+    page.value = 1
     headers.value = []
     rows.value = []
     total.value = 0
-    errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
-  }
-}
+    void loadRecords()
+  })
 
-async function loadRecords() {
-  if (!selectedTable.value) return
+  watch([page, pageSize], () => {
+    void loadRecords()
+  })
 
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    const response = await getDataRecords(selectedTable.value, page.value, pageSize.value, search.value.trim())
-    primaryKey.value = response.data.primary_key
-    headers.value = [
-      ...response.data.columns.map((column) => ({
-        title: column,
-        key: column,
-        sortable: false,
-      })),
-      { title: t('data.actions'), key: 'actions', sortable: false },
-    ]
-    rows.value = response.data.items
-    total.value = response.data.total
-  } catch (error) {
-    errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function openRecordDialog(row: Record<string, unknown>) {
-  const recordId = row[primaryKey.value]
-  if (recordId === null || recordId === undefined) {
-    return
-  }
-
-  recordDialogVisible.value = true
-  dialogLoading.value = true
-  dialogErrorMessage.value = ''
-  editingRecordId.value = String(recordId)
-  try {
-    const response = await getDataRecord(selectedTable.value, editingRecordId.value)
-    originalRecord.value = response.data.record
-    editForm.value = Object.fromEntries(
-      Object.entries(response.data.record).map(([key, value]) => [key, stringifyValue(value)]),
-    )
-  } catch (error) {
-    dialogErrorMessage.value = getErrorMessage(error, t('data.loadRecordFailed'))
-  } finally {
-    dialogLoading.value = false
-  }
-}
-
-function applySearch() {
-  page.value = 1
-  void loadRecords()
-}
-
-function resetFilters() {
-  search.value = ''
-  page.value = 1
-  void loadRecords()
-}
-
-async function copyRecord() {
-  await navigator.clipboard.writeText(JSON.stringify(originalRecord.value, null, 2))
-  noticeStore.show(t('data.copied'), 'success')
-}
-
-async function copyField(field: string) {
-  await navigator.clipboard.writeText(editForm.value[field] || '')
-  noticeStore.show(t('data.copied'), 'success')
-}
-
-function handleOptionsChange(options: { page: number; itemsPerPage: number }) {
-  if (page.value !== options.page) {
-    page.value = options.page
-  }
-  if (pageSize.value !== options.itemsPerPage) {
-    pageSize.value = options.itemsPerPage
-  }
-}
-
-watch(selectedTable, () => {
-  page.value = 1
-  headers.value = []
-  rows.value = []
-  total.value = 0
-  void loadRecords()
-})
-
-watch([page, pageSize], () => {
-  void loadRecords()
-})
-
-onMounted(() => {
-  void loadTables()
-})
+  onMounted(() => {
+    void loadTables()
+  })
 </script>
 
 <style scoped>

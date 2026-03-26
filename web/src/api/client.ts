@@ -5,7 +5,7 @@ const client = axios.create({
   timeout: 10000,
 })
 
-client.interceptors.request.use((config) => {
+client.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -14,8 +14,8 @@ client.interceptors.request.use((config) => {
 })
 
 client.interceptors.response.use(
-  (res) => res,
-  (err) => {
+  res => res,
+  err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('apeiria-principal')
@@ -25,10 +25,10 @@ client.interceptors.response.use(
   },
 )
 
-function joinValidationErrors(detail: unknown) {
+function joinValidationErrors (detail: unknown) {
   if (!Array.isArray(detail)) return ''
   const messages = detail
-    .map((item) => {
+    .map(item => {
       if (!item || typeof item !== 'object') return ''
       const entry = item as { loc?: unknown; msg?: unknown }
       const path = Array.isArray(entry.loc) ? entry.loc.join('.') : ''
@@ -40,7 +40,7 @@ function joinValidationErrors(detail: unknown) {
   return messages.join('\n')
 }
 
-export function getErrorMessage(error: unknown, fallback: string) {
+export function getErrorMessage (error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data
     if (typeof data === 'string' && data.trim()) {
