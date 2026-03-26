@@ -337,6 +337,7 @@ const zhCN = {
     errorCount: '高优先级',
     resetLevels: '清空级别筛选',
     loadOlder: '加载更早日志',
+    historyLoadFailed: '加载历史日志失败，已继续连接实时日志。',
   },
   chat: {
     title: '调试会话',

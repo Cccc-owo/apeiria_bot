@@ -337,6 +337,7 @@ const enUS = {
     errorCount: 'High Signal',
     resetLevels: 'Clear level filters',
     loadOlder: 'Load older logs',
+    historyLoadFailed: 'Failed to load log history. Live logs remain connected.',
   },
   chat: {
     title: 'Debug Session',
