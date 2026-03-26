@@ -24,10 +24,44 @@
         <div class="summary-card__label">{{ t('groups.customizedCount') }}</div>
         <div class="summary-card__value">{{ customizedGroupsCount }}</div>
       </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('groups.filteredCount') }}</div>
+        <div class="summary-card__value">{{ filteredGroups.length }}</div>
+      </v-sheet>
     </div>
 
+    <v-card class="page-panel groups-filter-card">
+      <v-card-text class="groups-filter-bar">
+        <v-text-field
+          v-model="search"
+          :label="t('groups.search')"
+          prepend-inner-icon="mdi-magnify"
+          density="compact"
+          hide-details
+          clearable
+          class="groups-filter-bar__search"
+        />
+        <v-select
+          v-model="statusFilter"
+          :items="statusFilterOptions"
+          :label="t('groups.statusFilter')"
+          density="compact"
+          hide-details
+          class="groups-filter-bar__select"
+        />
+        <v-select
+          v-model="pluginFilter"
+          :items="pluginFilterOptions"
+          :label="t('groups.pluginFilter')"
+          density="compact"
+          hide-details
+          class="groups-filter-bar__select"
+        />
+      </v-card-text>
+    </v-card>
+
     <v-card class="page-panel">
-      <v-data-table :headers="headers" :items="groups" :loading="loading" density="compact" class="page-table groups-table">
+      <v-data-table :headers="headers" :items="filteredGroups" :loading="loading" density="compact" class="page-table groups-table">
         <template #item.group_name="{ item }">
           <div class="groups-table__name">
             <span class="font-weight-medium">{{ item.group_name || t('groups.unnamed') }}</span>
@@ -45,15 +79,27 @@
           />
         </template>
         <template #item.disabled_plugins="{ value }">
-          <span v-if="value.length === 0" class="text-medium-emphasis">{{ t('common.none') }}</span>
-          <v-chip v-for="plugin in value" :key="plugin" size="x-small" class="mr-1 mb-1" color="warning" variant="tonal">
-            {{ plugin }}
-          </v-chip>
+          <div class="groups-table__plugins">
+            <span v-if="value.length === 0" class="text-medium-emphasis">{{ t('common.none') }}</span>
+            <template v-else>
+              <v-chip v-for="plugin in value.slice(0, 3)" :key="plugin" size="x-small" color="warning" variant="tonal">
+                {{ plugin }}
+              </v-chip>
+              <span v-if="value.length > 3" class="text-caption text-medium-emphasis">
+                {{ t('groups.morePlugins', { count: value.length - 3 }) }}
+              </span>
+            </template>
+          </div>
         </template>
         <template #item.actions="{ item }">
           <v-btn size="small" variant="tonal" color="primary" @click="openPluginDialog(item)">
             {{ t('groups.settings') }}
           </v-btn>
+        </template>
+        <template #no-data>
+          <div class="page-table__empty">
+            {{ t('groups.noGroups') }}
+          </div>
         </template>
       </v-data-table>
     </v-card>
@@ -62,8 +108,13 @@
       <v-card class="page-panel">
         <v-card-title class="page-panel__title">{{ t('groups.dialogTitle') }}</v-card-title>
         <v-card-text class="group-dialog">
-          <div class="group-dialog__meta">
-            {{ t('groups.currentGroup', { groupId: editingGroup?.group_id ?? '' }) }}
+          <div class="group-dialog__summary">
+            <div class="group-dialog__name">
+              {{ editingGroup?.group_name || t('groups.unnamed') }}
+            </div>
+            <div class="group-dialog__meta">
+              {{ t('groups.currentGroup', { groupId: editingGroup?.group_id ?? '' }) }}
+            </div>
           </div>
           <v-autocomplete
             v-model="selectedDisabledPlugins"
@@ -125,6 +176,9 @@ const pluginDialogVisible = ref(false)
 const savingPlugins = ref(false)
 const editingGroup = ref<GroupRow | null>(null)
 const selectedDisabledPlugins = ref<string[]>([])
+const search = ref('')
+const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
+const pluginFilter = ref<'all' | 'customized' | 'clean'>('all')
 const noticeStore = useNoticeStore()
 const { t } = useI18n()
 
@@ -137,6 +191,39 @@ const headers = computed(() => [
 
 const enabledGroupsCount = computed(() => groups.value.filter((item) => item.bot_status).length)
 const customizedGroupsCount = computed(() => groups.value.filter((item) => item.disabled_plugins.length > 0).length)
+
+const statusFilterOptions = computed(() => [
+  { title: t('groups.statusAll'), value: 'all' },
+  { title: t('groups.statusEnabled'), value: 'enabled' },
+  { title: t('groups.statusDisabled'), value: 'disabled' },
+])
+
+const pluginFilterOptions = computed(() => [
+  { title: t('groups.pluginFilterAll'), value: 'all' },
+  { title: t('groups.pluginFilterCustomized'), value: 'customized' },
+  { title: t('groups.pluginFilterClean'), value: 'clean' },
+])
+
+const filteredGroups = computed(() => {
+  const keyword = search.value.trim().toLowerCase()
+  return groups.value.filter((item) => {
+    const matchesKeyword = !keyword || [
+      item.group_id,
+      item.group_name || '',
+      ...item.disabled_plugins,
+    ].some(value => value.toLowerCase().includes(keyword))
+
+    const matchesStatus = statusFilter.value === 'all'
+      || (statusFilter.value === 'enabled' && item.bot_status)
+      || (statusFilter.value === 'disabled' && !item.bot_status)
+
+    const matchesPluginState = pluginFilter.value === 'all'
+      || (pluginFilter.value === 'customized' && item.disabled_plugins.length > 0)
+      || (pluginFilter.value === 'clean' && item.disabled_plugins.length === 0)
+
+    return matchesKeyword && matchesStatus && matchesPluginState
+  })
+})
 
 async function loadGroups() {
   loading.value = true
@@ -213,10 +300,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.groups-filter-card {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  background: rgb(var(--v-theme-surface-container));
+}
+
+.groups-filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.groups-filter-bar__search {
+  flex: 1 1 280px;
+}
+
+.groups-filter-bar__select {
+  flex: 0 0 180px;
+}
+
 .group-dialog {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.group-dialog__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-dialog__name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .group-dialog__meta {
@@ -231,5 +351,26 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
   padding: 4px 0;
+}
+
+.groups-table__plugins {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.page-table__empty {
+  padding: 20px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.64);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .groups-filter-bar__search,
+  .groups-filter-bar__select {
+    flex-basis: 100%;
+  }
 }
 </style>

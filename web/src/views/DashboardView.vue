@@ -10,13 +10,6 @@
           </div>
         </div>
         <div class="page-actions">
-          <v-switch
-            v-model="autoRefresh"
-            :label="t('dashboard.autoRefresh')"
-            color="primary"
-            hide-details
-            inset
-          />
           <v-btn color="warning" variant="tonal" :loading="restarting" @click="handleRestart">
             {{ t('dashboard.restart') }}
           </v-btn>
@@ -236,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
 import { getDashboardEvents, getStatus, getWebUIBuildStatus, restartBot, streamRebuildWebUI } from '@/api'
@@ -253,7 +246,6 @@ const buildDialogVisible = ref(false)
 const buildLogs = ref('')
 const buildDialogStatus = ref('')
 const buildLogCardRef = ref<HTMLElement | null>(null)
-const autoRefresh = ref(true)
 const lastUpdatedAt = ref<Date | null>(null)
 const { t, locale } = useI18n()
 const noticeStore = useNoticeStore()
@@ -336,6 +328,7 @@ async function handleRebuildWebUI () {
       throw new Error(buildFailedMessage || t('dashboard.webuiBuildFailed'))
     }
 
+    rebuildingWebUI.value = false
     noticeStore.show(t('dashboard.webuiBuildUpdated'), 'success')
     buildDialogStatus.value = t('dashboard.webuiBuildUpdated')
     await waitForWebUIBuildRefresh()
@@ -444,14 +437,6 @@ function stopAutoRefresh () {
     refreshTimer = null
   }
 }
-
-watch(autoRefresh, enabled => {
-  if (enabled) {
-    startAutoRefresh()
-    return
-  }
-  stopAutoRefresh()
-})
 
 onMounted(() => {
   void refreshDashboard()

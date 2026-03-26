@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,6 +98,12 @@ class LogBuffer:
 
 
 log_buffer = LogBuffer()
+LOG_LINE_PATTERN = re.compile(
+    r"^\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s"
+    r"\[(?P<level>[^\]]+)\]\s"
+    r"\[(?P<source>[^\]]+)\]\s"
+    r"(?P<message>.*)$"
+)
 
 
 def _log_format(_record: Record) -> str:
@@ -104,6 +111,10 @@ def _log_format(_record: Record) -> str:
     return (
         "[{time:YYYY-MM-DD HH:mm:ss}] [{level.name:<8}] [{name}] {message}\n{exception}"
     )
+
+
+def _log_dir() -> Path:
+    return Path("data/logs")
 
 
 def _serialize_extra(extra: "Mapping[str, Any]") -> dict[str, object]:
@@ -142,7 +153,7 @@ def setup_logging(
     Call this on bot startup, before loading plugins.
     """
     if log_dir is None:
-        log_dir = Path("data/logs")
+        log_dir = _log_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # File sink with daily rotation
@@ -167,3 +178,80 @@ def setup_logging(
     )
 
     logger.info("{}", t("logging.initialized", log_dir=log_dir))
+
+
+def load_history_logs(*, before: int = 0, limit: int = 50) -> tuple[list[StructuredLogEntry], bool]:
+    """Load persisted logs from disk, newest first.
+
+    Args:
+        before: Number of newest history entries to skip.
+        limit: Maximum number of history entries to return.
+
+    Returns:
+        A tuple of `(items, has_more)` where items are ordered newest first.
+    """
+    if limit <= 0:
+        return [], False
+
+    entries = _read_file_history()
+    total = len(entries)
+    if before >= total:
+        return [], False
+
+    end = total - before
+    start = max(0, end - limit)
+    page = entries[start:end]
+    return list(reversed(page)), start > 0
+
+
+def _read_file_history() -> list[StructuredLogEntry]:
+    """Read persisted log files and parse them into structured entries."""
+    log_dir = _log_dir()
+    if not log_dir.exists():
+        return []
+
+    entries: list[StructuredLogEntry] = []
+    for path in sorted(log_dir.glob("*.log")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        entries.extend(_parse_log_text(text))
+    return entries
+
+
+def _parse_log_text(text: str) -> list[StructuredLogEntry]:
+    """Parse a persisted log file using the configured line format."""
+    entries: list[StructuredLogEntry] = []
+    current: StructuredLogEntry | None = None
+
+    for line in text.splitlines():
+        match = LOG_LINE_PATTERN.match(line)
+        if match:
+            if current is not None:
+                entries.append(current)
+            current = StructuredLogEntry(
+                timestamp=match.group("timestamp"),
+                level=match.group("level").strip(),
+                source=match.group("source").strip(),
+                message=match.group("message"),
+                raw=line,
+                extra={},
+            )
+            continue
+
+        if current is None:
+            continue
+
+        current = StructuredLogEntry(
+            timestamp=current.timestamp,
+            level=current.level,
+            source=current.source,
+            message=current.message,
+            raw=f"{current.raw}\n{line}",
+            extra=current.extra,
+        )
+
+    if current is not None:
+        entries.append(current)
+    return entries

@@ -75,6 +75,22 @@ export interface DashboardEventItem {
   message: string
 }
 
+export interface LogItem {
+  timestamp: string
+  level: string
+  source: string
+  message: string
+  raw: string
+  extra: Record<string, unknown>
+}
+
+export interface LogHistoryResponse {
+  items: LogItem[]
+  before: number
+  next_before: number | null
+  has_more: boolean
+}
+
 export interface WebUIBuildStatus {
   is_built: boolean
   is_stale: boolean
@@ -200,6 +216,9 @@ export async function streamRebuildWebUI(
 
 export const restartBot = () =>
   client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
+
+export const getLogHistory = (params?: { before?: number; limit?: number }) =>
+  client.get<LogHistoryResponse>('/logs/history', { params })
 
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')
