@@ -84,7 +84,7 @@ async def create_ban(
     from nonebot_plugin_orm import get_session
 
     from apeiria.core.models.ban import BanConsole
-    from apeiria.core.services.cache import get_cache
+    from apeiria.core.utils.permission import invalidate_ban_cache
 
     async with get_session() as session:
         record = BanConsole(
@@ -98,7 +98,7 @@ async def create_ban(
         await session.commit()
         await session.refresh(record)
 
-    await get_cache().delete(f"ban:{body.user_id}")
+    await invalidate_ban_cache(body.user_id, body.group_id)
     return BanItem(
         id=record.id,
         user_id=record.user_id,
@@ -117,7 +117,7 @@ async def delete_ban(
     from sqlalchemy import select
 
     from apeiria.core.models.ban import BanConsole
-    from apeiria.core.services.cache import get_cache
+    from apeiria.core.utils.permission import invalidate_ban_cache
 
     async with get_session() as session:
         result = await session.execute(
@@ -130,9 +130,10 @@ async def delete_ban(
                 detail=t("web_ui.permissions.ban_not_found"),
             )
         user_id = record.user_id
+        group_id = record.group_id
         await session.delete(record)
         await session.commit()
 
     if user_id:
-        await get_cache().delete(f"ban:{user_id}")
+        await invalidate_ban_cache(user_id, group_id)
     return {"status": "ok"}

@@ -54,7 +54,7 @@ async def handle_ban(
     from nonebot_plugin_orm import get_session
 
     from apeiria.core.models.ban import BanConsole
-    from apeiria.core.services.cache import get_cache
+    from apeiria.core.utils.permission import invalidate_ban_cache
 
     async with get_session() as session:
         session.add(
@@ -68,7 +68,7 @@ async def handle_ban(
         )
         await session.commit()
 
-    await get_cache().delete(f"ban:{target_id}")
+    await invalidate_ban_cache(target_id)
 
     from apeiria.core.utils.helpers import format_duration
 
@@ -93,7 +93,7 @@ async def handle_unban(user: Match[str | At]) -> None:
     from sqlalchemy import delete, select
 
     from apeiria.core.models.ban import BanConsole
-    from apeiria.core.services.cache import get_cache
+    from apeiria.core.utils.permission import invalidate_ban_cache
 
     async with get_session() as session:
         result = await session.execute(
@@ -105,5 +105,5 @@ async def handle_unban(user: Match[str | At]) -> None:
         await session.execute(delete(BanConsole).where(BanConsole.user_id == target_id))
         await session.commit()
 
-    await get_cache().delete(f"ban:{target_id}")
+    await invalidate_ban_cache(target_id)
     await _unban.finish(t("admin.ban.unbanned", target=target_id))

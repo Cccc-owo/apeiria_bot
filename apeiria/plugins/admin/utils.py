@@ -6,6 +6,7 @@ import nonebot
 from nonebot.adapters import Event  # noqa: TC002
 
 from apeiria.core.i18n import t
+from apeiria.core.utils.permission import extract_group_id as _extract_group_id
 
 
 def extract_group_id(event: Event) -> str | None:
@@ -14,14 +15,7 @@ def extract_group_id(event: Event) -> str | None:
         user_id = event.get_user_id()
     except Exception:  # noqa: BLE001
         return None
-    session_id = event.get_session_id()
-    if session_id == user_id:
-        return None
-    if "_" in session_id:
-        parts = session_id.split("_")
-        if len(parts) >= 2:  # noqa: PLR2004
-            return parts[1] if parts[0] == "group" else parts[0]
-    return None
+    return _extract_group_id(event.get_session_id(), user_id)
 
 
 def resolve_target_id(target: object) -> str:

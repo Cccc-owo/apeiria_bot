@@ -10,6 +10,39 @@ from nonebot.log import logger
 from apeiria.core.services.cache import get_cache
 
 
+def extract_group_id(session_id: str, user_id: str) -> str | None:
+    """Extract group_id from a NoneBot session id."""
+    if session_id == user_id:
+        return None
+    if "_" in session_id:
+        parts = session_id.split("_")
+        if len(parts) >= 2:  # noqa: PLR2004
+            return parts[1] if parts[0] == "group" else parts[0]
+    return None
+
+
+async def invalidate_user_level_cache(user_id: str, group_id: str) -> None:
+    cache = get_cache()
+    await cache.delete(f"perm:{user_id}:{group_id}")
+
+
+async def invalidate_ban_cache(user_id: str, group_id: str | None = None) -> None:
+    cache = get_cache()
+    await cache.delete(f"ban:{user_id}")
+    if group_id:
+        await cache.delete(f"ban:{user_id}:{group_id}")
+
+
+async def invalidate_group_plugin_cache(group_id: str) -> None:
+    cache = get_cache()
+    await cache.delete(f"group_plugin:{group_id}")
+
+
+async def invalidate_group_bot_status_cache(group_id: str) -> None:
+    cache = get_cache()
+    await cache.delete(f"group_bot:{group_id}")
+
+
 async def get_user_level(user_id: str, group_id: str) -> int:
     """Get user's permission level in a group.
 
@@ -125,6 +158,31 @@ async def is_plugin_enabled(group_id: str, plugin_module: str) -> bool:
     return plugin_module not in disabled
 
 
+async def is_group_bot_enabled(group_id: str) -> bool:
+    """Check whether the bot is enabled for a group."""
+    cache = get_cache()
+    cache_key = f"group_bot:{group_id}"
+
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import select
+
+    from apeiria.core.models.group import GroupConsole
+
+    async with get_session() as session:
+        result = await session.execute(
+            select(GroupConsole.bot_status).where(GroupConsole.group_id == group_id)
+        )
+        bot_status = result.scalar_one_or_none()
+
+    enabled = bot_status is not False
+    await cache.set(cache_key, enabled, ttl=120)
+    return enabled
+
+
 async def is_plugin_globally_enabled(plugin_module: str) -> bool:
     """Check if a plugin is globally enabled."""
     from apeiria.core.utils.helpers import is_plugin_protected
@@ -177,6 +235,5 @@ async def set_user_level(user_id: str, group_id: str, level: int) -> None:
             session.add(LevelUser(user_id=user_id, group_id=group_id, level=level))
         await session.commit()
 
-    cache = get_cache()
-    await cache.delete(f"perm:{user_id}:{group_id}")
+    await invalidate_user_level_cache(user_id, group_id)
     logger.debug("Set level {}:{} -> {}", user_id, group_id, level)

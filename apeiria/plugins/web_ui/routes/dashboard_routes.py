@@ -19,6 +19,7 @@ router = APIRouter()
 
 _start_time = time.time()
 _background_tasks: set[asyncio.Task[None]] = set()
+_restart_task: asyncio.Task[None] | None = None
 
 
 async def _restart_process() -> None:
@@ -79,7 +80,9 @@ async def get_status(_: Annotated[Any, Depends(require_auth)]) -> StatusResponse
 async def restart_bot(
     _: Annotated[Any, Depends(require_auth)],
 ) -> OperationStatusResponse:
-    task = asyncio.create_task(_restart_process())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    global _restart_task  # noqa: PLW0603
+    if _restart_task is None or _restart_task.done():
+        _restart_task = asyncio.create_task(_restart_process())
+        _background_tasks.add(_restart_task)
+        _restart_task.add_done_callback(_background_tasks.discard)
     return OperationStatusResponse(detail=t("web_ui.dashboard.restart_scheduled"))

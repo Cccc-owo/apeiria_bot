@@ -186,7 +186,7 @@ async function handleRestart() {
   try {
     const res = await restartBot()
     noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
-    await waitForRestart()
+    await waitForRestartTransition()
     window.location.reload()
   } catch (error) {
     const message = getErrorMessage(error, t('dashboard.restartFailed'))
@@ -196,17 +196,19 @@ async function handleRestart() {
   }
 }
 
-async function waitForRestart() {
-  const maxAttempts = 60
-  const delayMs = 1000
+async function waitForRestartTransition() {
+  await waitForStatus(false, 30, 1000)
+  await waitForStatus(true, 60, 1000)
+}
 
+async function waitForStatus(expectedOnline: boolean, maxAttempts: number, delayMs: number) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     await sleep(delayMs)
     try {
       await getStatus()
-      return
+      if (expectedOnline) return
     } catch {
-      continue
+      if (!expectedOnline) return
     }
   }
 

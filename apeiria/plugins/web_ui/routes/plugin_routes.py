@@ -21,7 +21,10 @@ from apeiria.core.configs.capabilities import (
 )
 from apeiria.core.configs.config import BotConfig
 from apeiria.core.configs.plugin_config_resolver import resolve_plugin_declared_config
-from apeiria.core.configs.registry import get_registered_plugin_config
+from apeiria.core.configs.registry import (
+    PluginConfigConflictError,
+    get_registered_plugin_config,
+)
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import (
     get_plugin_name,
@@ -52,6 +55,7 @@ from apeiria.user_adapters import (
     write_project_adapter_config,
 )
 from apeiria.user_config import (
+    InvalidProjectConfigError,
     read_env_config,
     read_project_config,
     read_project_nonebot_section_config,
@@ -210,7 +214,10 @@ def _normalize_entries(values: list[str]) -> list[str]:
 def _get_plugin_declared_configs(
     module_name: str,
 ) -> tuple[str, bool, str, bool, list[RegisterConfig]]:
-    resolved = resolve_plugin_declared_config(module_name)
+    try:
+        resolved = resolve_plugin_declared_config(module_name)
+    except PluginConfigConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return (
         resolved.section,
         resolved.legacy_flatten,
@@ -546,7 +553,10 @@ async def update_core_settings(
     configs = _build_core_declared_configs()
     updates = _validate_and_coerce_updates(payload, configs)
 
-    write_project_nonebot_config(updates)
+    try:
+        write_project_nonebot_config(updates)
+    except InvalidProjectConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return PluginSettingsResponse(
         module_name="apeiria.core",
         section="nonebot",
@@ -564,7 +574,7 @@ async def update_core_settings_raw(
 ) -> PluginRawSettingsResponse:
     try:
         write_project_nonebot_section_toml(payload.text)
-    except ValueError as exc:
+    except (InvalidProjectConfigError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return PluginRawSettingsResponse(
         module_name="apeiria.core",
@@ -587,11 +597,14 @@ async def update_plugin_settings(
 
     updates = _validate_and_coerce_updates(payload, configs)
 
-    write_project_plugin_section_config(
-        section,
-        updates,
-        module_name=module_name,
-    )
+    try:
+        write_project_plugin_section_config(
+            section,
+            updates,
+            module_name=module_name,
+        )
+    except InvalidProjectConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return PluginSettingsResponse(
         module_name=module_name,
         section=section,
@@ -620,7 +633,7 @@ async def update_plugin_settings_raw(
             payload.text,
             module_name=module_name,
         )
-    except ValueError as exc:
+    except (InvalidProjectConfigError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return PluginRawSettingsResponse(
         module_name=module_name,

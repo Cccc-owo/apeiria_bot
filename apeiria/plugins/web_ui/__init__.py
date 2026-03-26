@@ -37,6 +37,27 @@ _WEB_DIR = Path(__file__).parent.parent.parent.parent / "web"
 _DIST_DIR = _WEB_DIR / "dist"
 
 
+def _latest_file_mtime(root: Path) -> float | None:
+    mtimes = [file.stat().st_mtime for file in root.rglob("*") if file.is_file()]
+    return max(mtimes) if mtimes else None
+
+
+def _has_fresh_dist() -> bool:
+    if not _DIST_DIR.is_dir():
+        return False
+    src_dir = _WEB_DIR / "src"
+    if not src_dir.is_dir():
+        return False
+
+    dist_mtime = _latest_file_mtime(_DIST_DIR)
+    src_mtime = _latest_file_mtime(src_dir)
+    return (
+        dist_mtime is not None
+        and src_mtime is not None
+        and src_mtime <= dist_mtime
+    )
+
+
 def _should_build_frontend_on_start() -> bool:
     value = os.getenv("APEIRIA_BUILD_FRONTEND_ON_START")
     if value is None:
@@ -44,48 +65,66 @@ def _should_build_frontend_on_start() -> bool:
     return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
+def _install_frontend_dependencies(pm: str) -> tuple[bool, str]:
+    try:
+        subprocess.run(
+            [pm, "install"],
+            cwd=_WEB_DIR,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        stderr = (
+            exc.stderr if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+        )
+        return False, stderr
+    return True, ""
+
+
+def _run_frontend_build(pm: str) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            [pm, "run", "build"],
+            cwd=_WEB_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        return False, str(exc)
+    return result.returncode == 0, result.stderr
+
+
 def _build_frontend() -> bool:
     """Auto build frontend if needed. Quiet unless something goes wrong."""
     from nonebot.log import logger
 
-    if not (_WEB_DIR / "package.json").is_file():
-        return _DIST_DIR.is_dir()
-
-    if _DIST_DIR.is_dir():
-        src_dir = _WEB_DIR / "src"
-        if src_dir.is_dir():
-            dist_mtime = max(
-                f.stat().st_mtime for f in _DIST_DIR.rglob("*") if f.is_file()
-            )
-            src_mtime = max(
-                f.stat().st_mtime for f in src_dir.rglob("*") if f.is_file()
-            )
-            if src_mtime <= dist_mtime:
-                return True
+    available = _DIST_DIR.is_dir()
+    should_build = (_WEB_DIR / "package.json").is_file() and not _has_fresh_dist()
+    if not should_build:
+        return available or (_WEB_DIR / "package.json").is_file()
 
     if not _should_build_frontend_on_start():
         logger.info("{}", t("web_ui.startup.build_disabled"))
-        return _DIST_DIR.is_dir()
+        return available
 
     pm = shutil.which("pnpm") or shutil.which("npm")
     if not pm:
         logger.warning("{}", t("web_ui.startup.no_package_manager"))
-        return _DIST_DIR.is_dir()
+        return available
 
     if not (_WEB_DIR / "node_modules").is_dir():
         logger.debug("Installing frontend dependencies...")
-        subprocess.run([pm, "install"], cwd=_WEB_DIR, check=True, capture_output=True)
+        installed, stderr = _install_frontend_dependencies(pm)
+        if not installed:
+            logger.error("{}", t("web_ui.startup.build_failed", stderr=stderr))
+            return False
 
     logger.debug("Building frontend...")
-    result = subprocess.run(
-        [pm, "run", "build"],
-        cwd=_WEB_DIR,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        logger.error("{}", t("web_ui.startup.build_failed", stderr=result.stderr))
+    built, stderr = _run_frontend_build(pm)
+    if not built:
+        logger.error("{}", t("web_ui.startup.build_failed", stderr=stderr))
         return False
 
     logger.info("{}", t("web_ui.startup.build_success"))

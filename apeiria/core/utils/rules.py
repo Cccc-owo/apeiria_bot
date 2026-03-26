@@ -8,7 +8,7 @@ def admin_check(level: int = 5) -> Rule:
     """Rule that requires minimum permission level."""
 
     async def _check(bot: Bot, event: Event) -> bool:
-        from apeiria.core.utils.permission import check_permission
+        from apeiria.core.utils.permission import check_permission, extract_group_id
 
         try:
             user_id = event.get_user_id()
@@ -21,7 +21,7 @@ def admin_check(level: int = 5) -> Rule:
             return True
 
         session_id = event.get_session_id()
-        group_id = _extract_group_id(session_id, user_id)
+        group_id = extract_group_id(session_id, user_id)
         if not group_id:
             return False
 
@@ -58,18 +58,6 @@ def ensure_private() -> Rule:
         return event.get_session_id() == user_id
 
     return Rule(_check)
-
-
-def _extract_group_id(session_id: str, user_id: str) -> str | None:
-    """Extract group_id from session_id."""
-    if session_id == user_id:
-        return None
-    if "_" in session_id:
-        parts = session_id.split("_")
-        if len(parts) >= 2:  # noqa: PLR2004
-            return parts[1] if parts[0] == "group" else parts[0]
-    return None
-
 
 async def _get_adapter_role_level(bot: Bot, event: Event, group_id: str) -> int:
     """Detect adapter-level roles. Returns 6=owner, 5=admin, 0=other."""

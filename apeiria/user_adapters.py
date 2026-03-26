@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import nonebot
 from nonebot.utils import resolve_dot_notation
 
-from apeiria.package_ids import normalize_package_id
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    try:
-        import tomli as tomllib
-    except ModuleNotFoundError:
-        tomllib = None
+from apeiria.core.utils.files import atomic_write_text, load_toml_dict
+from apeiria.core.utils.package_config import (
+    add_unique_sorted_item,
+    bind_package_item,
+    get_package_bound_items,
+    normalize_package_item_map,
+    normalize_string_list,
+    remove_item_from_config_packages,
+    unbind_package_item,
+)
 
 
 class UserAdapterConfig(TypedDict):
@@ -31,31 +32,17 @@ def _default_config_path() -> Path:
 
 
 def _normalize_str_list(value: object) -> list[str]:
-    if not isinstance(value, list | tuple):
-        return []
-    return [item for item in value if isinstance(item, str) and item.strip()]
+    return normalize_string_list(value)
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
-    if tomllib is None:
-        logger.warning(
+    return load_toml_dict(
+        config_path,
+        logger=logger,
+        missing_dependency_message=(
             "Skip loading apeiria.adapters.toml: tomllib/tomli is unavailable"
-        )
-        return {}
-    if not config_path.is_file():
-        return {}
-
-    try:
-        with config_path.open("rb") as file:
-            data = tomllib.load(file)
-    except OSError as exc:
-        logger.warning("Skip loading %s: %s", config_path.name, exc)
-        return {}
-    except tomllib.TOMLDecodeError as exc:
-        logger.warning("Skip loading %s: invalid TOML (%s)", config_path.name, exc)
-        return {}
-
-    return data if isinstance(data, dict) else {}
+        ),
+    )
 
 
 def _normalize_config(data: dict[str, Any]) -> UserAdapterConfig:
@@ -87,17 +74,7 @@ def _dump_config(config: UserAdapterConfig) -> str:
 
 
 def _normalize_package_map(value: object) -> dict[str, list[str]]:
-    if not isinstance(value, dict):
-        return {}
-    result: dict[str, list[str]] = {}
-    for package_name, modules in value.items():
-        if not isinstance(package_name, str) or not package_name.strip():
-            continue
-        normalized_modules = sorted(set(_normalize_str_list(modules)))
-        normalized_package = normalize_package_id(package_name)
-        if normalized_package and normalized_modules:
-            result[normalized_package] = normalized_modules
-    return result
+    return normalize_package_item_map(value)
 
 
 def default_config_path() -> Path:
@@ -114,8 +91,7 @@ def write_project_adapter_config(
     config_path: Path | None = None,
 ) -> Path:
     target = config_path or _default_config_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_dump_config(config), encoding="utf-8")
+    atomic_write_text(target, _dump_config(config))
     return target
 
 
@@ -131,9 +107,7 @@ def add_project_adapter_module(
     config_path: Path | None = None,
 ) -> UserAdapterConfig:
     config = read_project_adapter_config(config_path)
-    if module_name not in config["modules"]:
-        config["modules"].append(module_name)
-        config["modules"].sort()
+    if add_unique_sorted_item(config["modules"], module_name):
         write_project_adapter_config(config, config_path)
     return config
 
@@ -143,13 +117,11 @@ def remove_project_adapter_module(
     config_path: Path | None = None,
 ) -> UserAdapterConfig:
     config = read_project_adapter_config(config_path)
-    config["modules"] = [item for item in config["modules"] if item != module_name]
-    for package_name in list(config["packages"]):
-        config["packages"][package_name] = [
-            item for item in config["packages"][package_name] if item != module_name
-        ]
-        if not config["packages"][package_name]:
-            del config["packages"][package_name]
+    remove_item_from_config_packages(
+        cast("dict[str, Any]", config),
+        items_key="modules",
+        item=module_name,
+    )
     write_project_adapter_config(config, config_path)
     return config
 
@@ -199,12 +171,11 @@ def bind_project_adapter_package(
     config_path: Path | None = None,
 ) -> UserAdapterConfig:
     config = add_project_adapter_module(module_name, config_path)
-    package_key = normalize_package_id(package_name)
-    if not package_key:
-        return config
-    modules = set(config["packages"].get(package_key, []))
-    modules.add(module_name)
-    config["packages"][package_key] = sorted(modules)
+    bind_package_item(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+        item=module_name,
+    )
     write_project_adapter_config(config, config_path)
     return config
 
@@ -214,7 +185,10 @@ def get_project_adapter_package_modules(
     config_path: Path | None = None,
 ) -> list[str]:
     config = read_project_adapter_config(config_path)
-    return list(config["packages"].get(normalize_package_id(package_name), []))
+    return get_package_bound_items(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+    )
 
 
 def unbind_project_adapter_package(
@@ -223,23 +197,13 @@ def unbind_project_adapter_package(
     config_path: Path | None = None,
 ) -> UserAdapterConfig:
     config = read_project_adapter_config(config_path)
-    package_key = normalize_package_id(package_name)
-    if not package_key:
+    changed = unbind_package_item(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+        items_key="modules",
+        item=module_name,
+    )
+    if not changed:
         return config
-    if module_name is None:
-        modules = config["packages"].pop(package_key, [])
-        for item in modules:
-            config["modules"] = [
-                module for module in config["modules"] if module != item
-            ]
-        write_project_adapter_config(config, config_path)
-        return config
-    modules = config["packages"].get(package_key, [])
-    if not modules:
-        return config
-    config["packages"][package_key] = [item for item in modules if item != module_name]
-    if not config["packages"][package_key]:
-        del config["packages"][package_key]
-    config["modules"] = [item for item in config["modules"] if item != module_name]
     write_project_adapter_config(config, config_path)
     return config
