@@ -27,6 +27,51 @@
       </div>
     </section>
 
+    <section v-if="showWebUIBuildCard" class="dashboard-section">
+      <v-card class="dashboard-build-card">
+        <v-card-text class="dashboard-build-card__content">
+          <div class="dashboard-build-card__text">
+            <div class="text-subtitle-1 font-weight-medium">{{ webuiBuildHeadline }}</div>
+            <div class="text-body-2 text-medium-emphasis">{{ webuiBuildDescription }}</div>
+          </div>
+          <v-btn
+            color="warning"
+            variant="tonal"
+            :disabled="!webuiBuildStatus?.can_build"
+            :loading="rebuildingWebUI"
+            @click="handleRebuildWebUI"
+          >
+            {{ t('dashboard.rebuildWebUI') }}
+          </v-btn>
+        </v-card-text>
+      </v-card>
+    </section>
+
+    <v-dialog v-model="buildDialogVisible" max-width="920">
+      <v-card>
+        <v-card-title>{{ t('dashboard.rebuildWebUI') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <div class="text-body-2 text-medium-emphasis">
+            {{ buildDialogStatus }}
+          </div>
+          <v-progress-linear
+            v-if="rebuildingWebUI"
+            indeterminate
+            color="warning"
+          />
+          <div ref="buildLogCardRef" class="build-log-card">
+            <pre class="build-log-card__content">{{ buildLogs || t('dashboard.webuiBuildWaiting') }}</pre>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="rebuildingWebUI" @click="buildDialogVisible = false">
+            {{ t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <section class="dashboard-section">
       <div class="dashboard-section__header">
         <div class="dashboard-section__title">概览</div>
@@ -191,17 +236,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { DashboardEventItem, DashboardStatus } from '@/api'
-import { getDashboardEvents, getStatus, restartBot } from '@/api'
+import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
+import { getDashboardEvents, getStatus, getWebUIBuildStatus, restartBot, streamRebuildWebUI } from '@/api'
 import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 const status = ref<DashboardStatus | null>(null)
 const recentEvents = ref<DashboardEventItem[]>([])
+const webuiBuildStatus = ref<WebUIBuildStatus | null>(null)
 const loading = ref(false)
 const restarting = ref(false)
+const rebuildingWebUI = ref(false)
+const buildDialogVisible = ref(false)
+const buildLogs = ref('')
+const buildDialogStatus = ref('')
+const buildLogCardRef = ref<HTMLElement | null>(null)
 const autoRefresh = ref(true)
 const lastUpdatedAt = ref<Date | null>(null)
 const { t, locale } = useI18n()
@@ -222,19 +273,109 @@ const lastUpdatedText = computed(() => {
     }),
   })
 })
+const webuiBuildHeadline = computed(() => {
+  if (!webuiBuildStatus.value) return ''
+  if (!webuiBuildStatus.value.is_built) return t('dashboard.webuiBuildMissing')
+  return t('dashboard.webuiBuildOutdated')
+})
+const webuiBuildDescription = computed(() => {
+  if (!webuiBuildStatus.value) return ''
+  if (!webuiBuildStatus.value.can_build) return t('dashboard.webuiBuildUnavailable')
+  return t('dashboard.webuiBuildDetail', {
+    tool: webuiBuildStatus.value.build_tool || 'pnpm',
+  })
+})
+const showWebUIBuildCard = computed(() =>
+  Boolean(webuiBuildStatus.value && (!webuiBuildStatus.value.is_built || webuiBuildStatus.value.is_stale)),
+)
 
 async function refreshDashboard () {
   loading.value = true
   try {
-    const [statusResponse, eventsResponse] = await Promise.all([
+    const [statusResponse, eventsResponse, buildStatusResponse] = await Promise.all([
       getStatus(),
       getDashboardEvents(),
+      getWebUIBuildStatus(),
     ])
     status.value = statusResponse.data
     recentEvents.value = eventsResponse.data.items
+    webuiBuildStatus.value = buildStatusResponse.data
     lastUpdatedAt.value = new Date()
   } finally {
     loading.value = false
+  }
+}
+
+async function handleRebuildWebUI () {
+  buildDialogVisible.value = true
+  buildLogs.value = ''
+  buildDialogStatus.value = t('dashboard.webuiBuildRunning')
+  rebuildingWebUI.value = true
+  try {
+    let buildSucceeded = false
+    let buildFailedMessage = ''
+
+    await streamRebuildWebUI(async (event) => {
+      if (event.event === 'chunk') {
+        appendBuildLogs(event.chunk || '')
+        return
+      }
+
+      if (event.event === 'error') {
+        buildFailedMessage = event.detail || t('dashboard.webuiBuildFailed')
+        return
+      }
+
+      if (event.event === 'done' && event.status) {
+        buildSucceeded = true
+        webuiBuildStatus.value = event.status
+      }
+    })
+
+    if (!buildSucceeded) {
+      throw new Error(buildFailedMessage || t('dashboard.webuiBuildFailed'))
+    }
+
+    noticeStore.show(t('dashboard.webuiBuildUpdated'), 'success')
+    buildDialogStatus.value = t('dashboard.webuiBuildUpdated')
+    await waitForWebUIBuildRefresh()
+  } catch (error) {
+    const message = getErrorMessage(error, t('dashboard.webuiBuildFailed'))
+    if (!buildLogs.value.trim()) {
+      buildLogs.value = message
+    } else if (!buildLogs.value.includes(message)) {
+      appendBuildLogs(`\n${message}\n`)
+    }
+    buildDialogStatus.value = t('dashboard.webuiBuildFailed')
+    noticeStore.show(message, 'error')
+  } finally {
+    rebuildingWebUI.value = false
+  }
+}
+
+function appendBuildLogs (chunk: string) {
+  buildLogs.value += chunk
+  void nextTick(() => {
+    const container = buildLogCardRef.value
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  })
+}
+
+async function waitForWebUIBuildRefresh () {
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    try {
+      const response = await getWebUIBuildStatus()
+      webuiBuildStatus.value = response.data
+      if (response.data.is_built && !response.data.is_stale) {
+        await sleep(3000)
+        window.location.reload()
+        return
+      }
+    } catch {
+      // Ignore transient polling failures while waiting for the new assets.
+    }
+    await sleep(1000)
   }
 }
 
@@ -362,6 +503,42 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.dashboard-build-card {
+  background: rgb(var(--v-theme-surface-container));
+}
+
+.dashboard-build-card__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dashboard-build-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.build-log-card {
+  max-height: 48vh;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgb(var(--v-theme-surface-container-low));
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-outline-variant), 0.28);
+}
+
+.build-log-card__content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.83rem;
+  line-height: 1.45;
 }
 
 .dashboard-section__header {

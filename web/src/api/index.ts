@@ -75,6 +75,25 @@ export interface DashboardEventItem {
   message: string
 }
 
+export interface WebUIBuildStatus {
+  is_built: boolean
+  is_stale: boolean
+  can_build: boolean
+  build_tool: string | null
+  detail: string | null
+}
+
+export interface WebUIBuildRunResult extends WebUIBuildStatus {
+  logs: string
+}
+
+export interface WebUIBuildStreamEvent {
+  event: 'chunk' | 'done' | 'error'
+  chunk?: string
+  detail?: string | null
+  status?: WebUIBuildStatus
+}
+
 export interface PluginItem {
   module_name: string
   name: string | null
@@ -112,6 +131,72 @@ export const getStatus = () =>
 
 export const getDashboardEvents = () =>
   client.get<{ items: DashboardEventItem[] }>('/dashboard/events')
+
+export const getWebUIBuildStatus = () =>
+  client.get<WebUIBuildStatus>('/dashboard/webui-build')
+
+export const rebuildWebUI = () =>
+  client.post<WebUIBuildRunResult>('/dashboard/webui-build')
+
+export async function streamRebuildWebUI(
+  onEvent: (event: WebUIBuildStreamEvent) => void | Promise<void>,
+) {
+  const token = localStorage.getItem('token')
+  const response = await fetch('/api/dashboard/webui-build/stream', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+
+  if (response.status === 401) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('apeiria-principal')
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const body = await response.text()
+    let detail = body
+    try {
+      const payload = JSON.parse(body) as { detail?: string }
+      detail = payload.detail || body
+    } catch {
+      // Keep plain-text error bodies as-is.
+    }
+    throw new Error(detail || 'Failed to rebuild WebUI')
+  }
+
+  if (!response.body) {
+    throw new Error('Build log stream unavailable')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+    let lineBreakIndex = buffer.indexOf('\n')
+    while (lineBreakIndex >= 0) {
+      const line = buffer.slice(0, lineBreakIndex).trim()
+      buffer = buffer.slice(lineBreakIndex + 1)
+      if (line) {
+        await onEvent(JSON.parse(line) as WebUIBuildStreamEvent)
+      }
+      lineBreakIndex = buffer.indexOf('\n')
+    }
+
+    if (done) {
+      const line = buffer.trim()
+      if (line) {
+        await onEvent(JSON.parse(line) as WebUIBuildStreamEvent)
+      }
+      break
+    }
+  }
+}
 
 export const restartBot = () =>
   client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
