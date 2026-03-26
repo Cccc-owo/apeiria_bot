@@ -116,6 +116,14 @@
               {{ t('groups.currentGroup', { groupId: editingGroup?.group_id ?? '' }) }}
             </div>
           </div>
+          <v-alert
+            v-if="protectedPluginCount > 0"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+          >
+            {{ t('groups.protectedInfo') }}
+          </v-alert>
           <v-autocomplete
             v-model="selectedDisabledPlugins"
             :items="pluginOptions"
@@ -145,6 +153,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getGroups, getPlugins, updateGroup, updateGroupPlugins } from '@/api'
+import type { PluginItem } from '@/api'
 import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
@@ -161,14 +170,9 @@ interface PluginOption {
   disabled?: boolean
 }
 
-interface PluginListItem {
-  module_name: string
-  name: string | null
-  source?: string
-}
-
 const groups = ref<GroupRow[]>([])
 const pluginOptions = ref<PluginOption[]>([])
+const protectedPluginCount = ref(0)
 const loading = ref(false)
 const pendingGroupId = ref('')
 const errorMessage = ref('')
@@ -231,9 +235,12 @@ async function loadGroups() {
   try {
     const [groupsResponse, pluginsResponse] = await Promise.all([getGroups(), getPlugins()])
     groups.value = groupsResponse.data
+    protectedPluginCount.value = pluginsResponse.data.filter(
+      (item: PluginItem) => item.source !== 'framework' && item.is_protected,
+    ).length
     pluginOptions.value = pluginsResponse.data
-      .filter((item: PluginListItem) => item.source !== 'framework')
-      .map((item: PluginListItem) => ({
+      .filter((item: PluginItem) => item.source !== 'framework' && !item.is_protected)
+      .map((item: PluginItem) => ({
         title: item.name || item.module_name,
         value: item.module_name,
       }))

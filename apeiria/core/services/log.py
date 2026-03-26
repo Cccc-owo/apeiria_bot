@@ -193,31 +193,42 @@ def load_history_logs(*, before: int = 0, limit: int = 50) -> tuple[list[Structu
     if limit <= 0:
         return [], False
 
-    entries = _read_file_history()
-    total = len(entries)
-    if before >= total:
-        return [], False
-
-    end = total - before
-    start = max(0, end - limit)
-    page = entries[start:end]
-    return list(reversed(page)), start > 0
-
-
-def _read_file_history() -> list[StructuredLogEntry]:
-    """Read persisted log files and parse them into structured entries."""
     log_dir = _log_dir()
     if not log_dir.exists():
-        return []
+        return [], False
 
-    entries: list[StructuredLogEntry] = []
-    for path in sorted(log_dir.glob("*.log")):
+    remaining_skip = before
+    remaining_take = limit
+    collected: list[StructuredLogEntry] = []
+    log_files = sorted(log_dir.glob("*.log"), reverse=True)
+
+    for index, path in enumerate(log_files):
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        entries.extend(_parse_log_text(text))
-    return entries
+
+        file_entries = list(reversed(_parse_log_text(text)))
+        if not file_entries:
+            continue
+
+        if remaining_skip >= len(file_entries):
+            remaining_skip -= len(file_entries)
+            continue
+
+        start = remaining_skip
+        available_entries = file_entries[start:]
+        take_count = min(remaining_take, len(available_entries))
+        collected.extend(available_entries[:take_count])
+        remaining_take -= take_count
+        remaining_skip = 0
+
+        if remaining_take == 0:
+            has_more_in_current_file = start + take_count < len(file_entries)
+            has_more_in_older_files = index < len(log_files) - 1
+            return collected, has_more_in_current_file or has_more_in_older_files
+
+    return collected, False
 
 
 def _parse_log_text(text: str) -> list[StructuredLogEntry]:

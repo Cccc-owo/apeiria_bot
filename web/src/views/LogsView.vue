@@ -107,6 +107,16 @@
       </v-sheet>
     </div>
 
+    <v-alert
+      v-if="historyError"
+      type="warning"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+    >
+      {{ historyError }}
+    </v-alert>
+
     <v-card class="page-panel log-card">
       <div v-if="hasMoreHistory || loadingOlder" class="log-card__history">
         <v-btn
@@ -180,6 +190,7 @@ import { nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, comp
 import { useI18n } from 'vue-i18n'
 import { getLogHistory } from '@/api'
 import type { LogItem } from '@/api'
+import { getErrorMessage } from '@/api/client'
 
 interface LogEntry {
   id: string
@@ -202,9 +213,12 @@ const loadingHistory = ref(false)
 const loadingOlder = ref(false)
 const hasMoreHistory = ref(false)
 const nextBefore = ref<number | null>(0)
+const historyError = ref('')
 const { t } = useI18n()
 let ws: WebSocket | null = null
 const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
+const pendingLiveLogs: LogEntry[] = []
+let primingHistory = false
 
 const levelOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.level))).sort())
 const sourceOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.source))).sort())
@@ -238,7 +252,12 @@ function connect() {
   }
 
   ws.onmessage = (event) => {
-    logs.value.push(normalizeLogFrame(event.data))
+    const entry = normalizeLogFrame(event.data)
+    if (primingHistory) {
+      pendingLiveLogs.push(entry)
+      return
+    }
+    appendLiveLog(entry)
     if (!autoScroll.value) {
       return
     }
@@ -263,6 +282,9 @@ function resetLogsView() {
   search.value = ''
   hasMoreHistory.value = false
   nextBefore.value = 0
+  historyError.value = ''
+  pendingLiveLogs.length = 0
+  primingHistory = false
 }
 
 function toLogEntry(item: LogItem): LogEntry {
@@ -279,6 +301,7 @@ function toLogEntry(item: LogItem): LogEntry {
 
 async function loadInitialHistory() {
   loadingHistory.value = true
+  historyError.value = ''
   try {
     const response = await getLogHistory({ before: 0, limit: 50 })
     logs.value = response.data.items
@@ -289,6 +312,8 @@ async function loadInitialHistory() {
     nextBefore.value = response.data.next_before
     await nextTick()
     logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })
+  } catch (error) {
+    historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
   } finally {
     loadingHistory.value = false
   }
@@ -313,6 +338,8 @@ async function loadOlderHistory() {
       const nextHeight = container.scrollHeight
       container.scrollTop = nextHeight - previousHeight
     }
+  } catch (error) {
+    historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
   } finally {
     loadingOlder.value = false
   }
@@ -330,10 +357,13 @@ function handleLogScroll(event: Event) {
 
 async function initializeLogsView() {
   resetLogsView()
+  primingHistory = true
+  connect()
   try {
     await loadInitialHistory()
   } finally {
-    connect()
+    flushPendingLiveLogs()
+    primingHistory = false
   }
 }
 
@@ -343,7 +373,8 @@ async function toggleConnection() {
     return
   }
   if (logs.value.length === 0) {
-    await loadInitialHistory()
+    await initializeLogsView()
+    return
   }
   connect()
 }
@@ -386,6 +417,24 @@ function toggleQuickLevel(level: string) {
     return
   }
   selectedLevels.value = [...selectedLevels.value, level]
+}
+
+function appendLiveLog(entry: LogEntry) {
+  const entryKey = buildLogKey(entry)
+  if (logs.value.some(item => buildLogKey(item) === entryKey)) {
+    return
+  }
+  logs.value.push(entry)
+}
+
+function flushPendingLiveLogs() {
+  for (const entry of pendingLiveLogs.splice(0)) {
+    appendLiveLog(entry)
+  }
+}
+
+function buildLogKey(entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
+  return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
 }
 
 function exportLogs() {
