@@ -52,6 +52,8 @@ __all__ = [
     "DriverConfigResponse",
     "DashboardEventItem",
     "DashboardEventsResponse",
+    "LogHistoryResponse",
+    "LogItem",
     "WebUIBuildRunResponse",
     "WebUIBuildStatusResponse",
     "EnvelopeVersion",
@@ -158,6 +160,26 @@ class DashboardEventsResponse(BaseModel):
     """Recent dashboard events response."""
 
     items: list[DashboardEventItem]
+
+
+class LogItem(BaseModel):
+    """Structured log item returned by the Web UI log APIs."""
+
+    timestamp: str
+    level: str
+    source: str
+    message: str
+    raw: str
+    extra: dict[str, object] = {}
+
+
+class LogHistoryResponse(BaseModel):
+    """Paginated persisted log history response."""
+
+    items: list[LogItem]
+    before: int
+    next_before: int | None = None
+    has_more: bool = False
 
 
 class WebUIBuildStatusResponse(BaseModel):

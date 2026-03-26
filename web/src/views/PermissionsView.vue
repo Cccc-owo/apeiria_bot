@@ -27,7 +27,33 @@
             <div class="summary-card__label">{{ t('permissions.permanentBans') }}</div>
             <div class="summary-card__value">{{ permanentBansCount }}</div>
           </v-sheet>
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.filteredBans') }}</div>
+            <div class="summary-card__value">{{ filteredBans.length }}</div>
+          </v-sheet>
         </div>
+
+        <v-card class="mb-4 page-panel permission-filter-card">
+          <v-card-text class="permission-filter-bar">
+            <v-text-field
+              v-model="banSearch"
+              :label="t('permissions.searchBans')"
+              prepend-inner-icon="mdi-magnify"
+              density="compact"
+              hide-details
+              clearable
+              class="permission-filter-bar__search"
+            />
+            <v-select
+              v-model="banFilter"
+              :items="banFilterOptions"
+              :label="t('permissions.banType')"
+              density="compact"
+              hide-details
+              class="permission-filter-bar__select"
+            />
+          </v-card-text>
+        </v-card>
 
         <v-card class="mb-4 page-panel permission-create-card">
           <v-card-title class="page-panel__title permission-panel__title">
@@ -78,15 +104,20 @@
         </v-card>
 
         <v-card class="page-panel">
-          <v-data-table :headers="banHeaders" :items="bans" :loading="loading" density="compact" class="page-table permission-table">
+          <v-data-table :headers="banHeaders" :items="filteredBans" :loading="loading" density="compact" class="page-table permission-table">
             <template #item.user_id="{ item }">
-              <span>{{ item.user_id || t('common.none') }}</span>
-            </template>
-            <template #item.group_id="{ item }">
-              <span>{{ item.group_id || t('common.none') }}</span>
+              <div class="permission-identity">
+                <span class="font-weight-medium">{{ item.user_id || t('common.none') }}</span>
+                <span class="text-caption text-medium-emphasis">
+                  {{ t('permissions.groupLabel') }}: {{ item.group_id || t('common.none') }}
+                </span>
+              </div>
             </template>
             <template #item.duration="{ value }">
               {{ value === 0 ? t('permissions.permanent') : `${value}s` }}
+            </template>
+            <template #item.reason="{ value }">
+              <span>{{ value || t('permissions.noReason') }}</span>
             </template>
             <template #item.actions="{ item }">
               <v-btn
@@ -98,6 +129,11 @@
                 @click="handleDeleteBan(item.id)"
               />
             </template>
+            <template #no-data>
+              <div class="page-table__empty">
+                {{ t('permissions.noBans') }}
+              </div>
+            </template>
           </v-data-table>
         </v-card>
       </v-tabs-window-item>
@@ -108,10 +144,48 @@
             <div class="summary-card__label">{{ t('permissions.totalUsers') }}</div>
             <div class="summary-card__value">{{ users.length }}</div>
           </v-sheet>
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.filteredUsers') }}</div>
+            <div class="summary-card__value">{{ filteredUsers.length }}</div>
+          </v-sheet>
+          <v-sheet class="summary-card" rounded="lg">
+            <div class="summary-card__label">{{ t('permissions.highLevelUsers') }}</div>
+            <div class="summary-card__value">{{ highLevelUsersCount }}</div>
+          </v-sheet>
         </div>
 
+        <v-card class="mb-4 page-panel permission-filter-card">
+          <v-card-text class="permission-filter-bar">
+            <v-text-field
+              v-model="userSearch"
+              :label="t('permissions.searchUsers')"
+              prepend-inner-icon="mdi-magnify"
+              density="compact"
+              hide-details
+              clearable
+              class="permission-filter-bar__search"
+            />
+            <v-select
+              v-model="levelFilter"
+              :items="levelFilterOptions"
+              :label="t('permissions.levelFilter')"
+              density="compact"
+              hide-details
+              class="permission-filter-bar__select"
+            />
+          </v-card-text>
+        </v-card>
+
         <v-card class="page-panel">
-          <v-data-table :headers="userHeaders" :items="users" :loading="loading" density="compact" class="page-table permission-table">
+          <v-data-table :headers="userHeaders" :items="filteredUsers" :loading="loading" density="compact" class="page-table permission-table">
+            <template #item.user_id="{ item }">
+              <div class="permission-identity">
+                <span class="font-weight-medium">{{ item.user_id }}</span>
+                <span class="text-caption text-medium-emphasis">
+                  {{ t('permissions.groupLabel') }}: {{ item.group_id || t('common.none') }}
+                </span>
+              </div>
+            </template>
             <template #item.level="{ item }">
               <div class="d-flex align-center ga-2">
                 <v-select
@@ -128,6 +202,11 @@
                   size="18"
                   width="2"
                 />
+              </div>
+            </template>
+            <template #no-data>
+              <div class="page-table__empty">
+                {{ t('permissions.noUsers') }}
               </div>
             </template>
           </v-data-table>
@@ -166,10 +245,15 @@ const creatingBan = ref(false)
 const deletingBanId = ref<number | null>(null)
 const pendingUserKey = ref('')
 const errorMessage = ref('')
+const banSearch = ref('')
+const userSearch = ref('')
+const banFilter = ref<'all' | 'permanent' | 'temporary'>('all')
+const levelFilter = ref<string>('all')
 const noticeStore = useNoticeStore()
 const { t } = useI18n()
 
 const levelOptions = [0, 1, 2, 3, 4, 5, 6]
+const highLevelThreshold = 4
 
 const banForm = reactive({
   user_id: '',
@@ -180,7 +264,6 @@ const banForm = reactive({
 
 const banHeaders = computed(() => [
   { title: t('permissions.user'), key: 'user_id' },
-  { title: t('permissions.group'), key: 'group_id' },
   { title: t('permissions.durationHeader'), key: 'duration' },
   { title: t('permissions.reasonHeader'), key: 'reason' },
   { title: '', key: 'actions', sortable: false },
@@ -188,11 +271,58 @@ const banHeaders = computed(() => [
 
 const userHeaders = computed(() => [
   { title: t('permissions.user'), key: 'user_id' },
-  { title: t('permissions.group'), key: 'group_id' },
   { title: t('permissions.level'), key: 'level', sortable: false },
 ])
 
 const permanentBansCount = computed(() => bans.value.filter((item) => item.duration === 0).length)
+const highLevelUsersCount = computed(() => users.value.filter((item) => item.level >= highLevelThreshold).length)
+
+const banFilterOptions = computed(() => [
+  { title: t('permissions.banFilterAll'), value: 'all' },
+  { title: t('permissions.banFilterPermanent'), value: 'permanent' },
+  { title: t('permissions.banFilterTemporary'), value: 'temporary' },
+])
+
+const levelFilterOptions = computed(() => [
+  { title: t('permissions.levelFilterAll'), value: 'all' },
+  { title: t('permissions.levelFilterHigh'), value: 'high' },
+  ...levelOptions.map(level => ({ title: `${t('permissions.level')} ${level}`, value: String(level) })),
+])
+
+const filteredBans = computed(() => {
+  const keyword = banSearch.value.trim().toLowerCase()
+  return bans.value.filter((item) => {
+    const matchesKeyword = !keyword || [
+      item.user_id || '',
+      item.group_id || '',
+      item.reason || '',
+      item.duration === 0 ? t('permissions.permanent') : String(item.duration),
+    ].some(value => value.toLowerCase().includes(keyword))
+
+    const matchesFilter = banFilter.value === 'all'
+      || (banFilter.value === 'permanent' && item.duration === 0)
+      || (banFilter.value === 'temporary' && item.duration > 0)
+
+    return matchesKeyword && matchesFilter
+  })
+})
+
+const filteredUsers = computed(() => {
+  const keyword = userSearch.value.trim().toLowerCase()
+  return users.value.filter((item) => {
+    const matchesKeyword = !keyword || [
+      item.user_id,
+      item.group_id || '',
+      String(item.level),
+    ].some(value => value.toLowerCase().includes(keyword))
+
+    const matchesLevel = levelFilter.value === 'all'
+      || (levelFilter.value === 'high' && item.level >= highLevelThreshold)
+      || item.level === Number(levelFilter.value)
+
+    return matchesKeyword && matchesLevel
+  })
+})
 
 async function loadAll() {
   loading.value = true
@@ -280,6 +410,47 @@ onMounted(() => {
   void loadAll()
 })
 </script>
+
+<style scoped>
+.permission-filter-card {
+  background: rgb(var(--v-theme-surface-container));
+}
+
+.permission-filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.permission-filter-bar__search {
+  flex: 1 1 280px;
+}
+
+.permission-filter-bar__select {
+  flex: 0 0 180px;
+}
+
+.permission-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.page-table__empty {
+  padding: 20px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.64);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .permission-filter-bar__search,
+  .permission-filter-bar__select {
+    flex-basis: 100%;
+  }
+}
+</style>
 
 <style scoped>
 .permission-panel__title {

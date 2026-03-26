@@ -69,25 +69,76 @@
       />
     </div>
 
+    <div class="logs-quick-filters">
+      <v-chip
+        v-for="level in quickLevelFilters"
+        :key="level"
+        size="small"
+        :variant="selectedLevels.includes(level) ? 'flat' : 'tonal'"
+        :color="levelColor(level)"
+        class="logs-quick-filters__chip"
+        @click="toggleQuickLevel(level)"
+      >
+        {{ level }}
+      </v-chip>
+      <v-btn
+        v-if="selectedLevels.length"
+        size="small"
+        variant="text"
+        class="logs-quick-filters__reset"
+        @click="selectedLevels = []"
+      >
+        {{ t('logs.resetLevels') }}
+      </v-btn>
+    </div>
+
+    <div class="page-summary-grid mb-4">
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('logs.totalCount') }}</div>
+        <div class="summary-card__value">{{ logs.length }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('logs.visibleCount') }}</div>
+        <div class="summary-card__value">{{ filteredLogs.length }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('logs.errorCount') }}</div>
+        <div class="summary-card__value">{{ highSignalCount }}</div>
+      </v-sheet>
+    </div>
+
     <v-card class="page-panel log-card">
-      <div v-if="filteredLogs.length === 0" class="text-medium-emphasis text-center pa-8">
-        {{ t('logs.waiting') }}
+      <div v-if="hasMoreHistory || loadingOlder" class="log-card__history">
+        <v-btn
+          variant="text"
+          size="small"
+          :loading="loadingOlder"
+          @click="loadOlderHistory"
+        >
+          {{ t('logs.loadOlder') }}
+        </v-btn>
       </div>
 
-      <div v-else ref="logContainer" class="structured-log-list">
-        <div class="log-table-head">
-          <span>{{ t('logs.level') }}</span>
-          <span>{{ t('logs.timestamp') }}</span>
-          <span>{{ t('logs.source') }}</span>
-          <span>{{ t('logs.message') }}</span>
-        </div>
+      <div v-if="filteredLogs.length > 0" class="log-table-head">
+        <span>{{ t('logs.level') }}</span>
+        <span>{{ t('logs.timestamp') }}</span>
+        <span>{{ t('logs.source') }}</span>
+        <span>{{ t('logs.message') }}</span>
+        <span></span>
+      </div>
+
+      <div v-if="filteredLogs.length === 0" class="text-medium-emphasis text-center pa-8">
+        {{ loadingHistory ? t('common.loading') : logs.length === 0 ? t('logs.waiting') : t('logs.noResults') }}
+      </div>
+
+      <div v-else ref="logContainer" class="structured-log-list" @scroll="handleLogScroll">
         <v-expansion-panels variant="accordion">
           <v-expansion-panel
             v-for="entry in filteredLogs"
             :key="entry.id"
             :class="`log-entry log-entry--${entry.level.toLowerCase()}`"
           >
-            <v-expansion-panel-title>
+            <v-expansion-panel-title v-slot="{ expanded }" hide-actions>
               <div class="log-entry__summary">
                 <v-chip
                   size="small"
@@ -98,8 +149,13 @@
                   {{ entry.level }}
                 </v-chip>
                 <span class="log-entry__time">{{ entry.timestamp }}</span>
-                <span class="log-entry__source">{{ entry.source }}</span>
+                <span class="log-entry__source" :title="entry.source">{{ entry.source }}</span>
                 <span class="log-entry__message">{{ entry.message }}</span>
+                <span class="log-entry__toggle" aria-hidden="true">
+                  <v-icon size="18">
+                    {{ expanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+                  </v-icon>
+                </span>
               </div>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
@@ -107,7 +163,7 @@
                 <div class="text-caption text-medium-emphasis">{{ t('logs.raw') }}</div>
                 <pre class="log-entry__raw">{{ entry.raw }}</pre>
                 <div v-if="Object.keys(entry.extra).length" class="text-caption text-medium-emphasis">
-                  extra
+                  {{ t('logs.extra') }}
                 </div>
                 <pre v-if="Object.keys(entry.extra).length" class="log-entry__raw">{{ JSON.stringify(entry.extra, null, 2) }}</pre>
               </div>
@@ -120,8 +176,10 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
+import { nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getLogHistory } from '@/api'
+import type { LogItem } from '@/api'
 
 interface LogEntry {
   id: string
@@ -140,11 +198,19 @@ const search = ref('')
 const selectedLevels = ref<string[]>([])
 const selectedSources = ref<string[]>([])
 const logContainer = ref<HTMLElement>()
+const loadingHistory = ref(false)
+const loadingOlder = ref(false)
+const hasMoreHistory = ref(false)
+const nextBefore = ref<number | null>(0)
 const { t } = useI18n()
 let ws: WebSocket | null = null
+const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
 
 const levelOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.level))).sort())
 const sourceOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.source))).sort())
+const highSignalCount = computed(() =>
+  logs.value.filter((entry) => entry.level === 'ERROR' || entry.level === 'CRITICAL' || entry.level === 'WARNING').length,
+)
 const filteredLogs = computed(() => logs.value.filter((entry) => {
   if (selectedLevels.value.length > 0 && !selectedLevels.value.includes(entry.level)) {
     return false
@@ -161,6 +227,7 @@ const filteredLogs = computed(() => logs.value.filter((entry) => {
 }))
 
 function connect() {
+  disconnect()
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   ws = new WebSocket(`${proto}//${location.host}/api/logs/ws`)
 
@@ -172,7 +239,6 @@ function connect() {
 
   ws.onmessage = (event) => {
     logs.value.push(normalizeLogFrame(event.data))
-    if (logs.value.length > 1000) logs.value.splice(0, 100)
     if (!autoScroll.value) {
       return
     }
@@ -190,8 +256,96 @@ function disconnect() {
   connected.value = false
 }
 
-function toggleConnection() {
-  connected.value ? disconnect() : connect()
+function resetLogsView() {
+  logs.value = []
+  selectedLevels.value = []
+  selectedSources.value = []
+  search.value = ''
+  hasMoreHistory.value = false
+  nextBefore.value = 0
+}
+
+function toLogEntry(item: LogItem): LogEntry {
+  return {
+    timestamp: item.timestamp,
+    level: item.level,
+    source: item.source,
+    message: item.message,
+    raw: item.raw,
+    extra: item.extra,
+    id: `${item.timestamp}_${item.level}_${item.source}_${Math.random().toString(16).slice(2)}`,
+  }
+}
+
+async function loadInitialHistory() {
+  loadingHistory.value = true
+  try {
+    const response = await getLogHistory({ before: 0, limit: 50 })
+    logs.value = response.data.items
+      .slice()
+      .reverse()
+      .map(item => toLogEntry(item))
+    hasMoreHistory.value = response.data.has_more
+    nextBefore.value = response.data.next_before
+    await nextTick()
+    logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+async function loadOlderHistory() {
+  if (loadingOlder.value || nextBefore.value === null) return
+  const container = logContainer.value
+  const previousHeight = container?.scrollHeight || 0
+  loadingOlder.value = true
+  try {
+    const response = await getLogHistory({ before: nextBefore.value, limit: 50 })
+    const olderEntries = response.data.items
+      .slice()
+      .reverse()
+      .map(item => toLogEntry(item))
+    logs.value = [...olderEntries, ...logs.value]
+    hasMoreHistory.value = response.data.has_more
+    nextBefore.value = response.data.next_before
+    await nextTick()
+    if (container) {
+      const nextHeight = container.scrollHeight
+      container.scrollTop = nextHeight - previousHeight
+    }
+  } finally {
+    loadingOlder.value = false
+  }
+}
+
+function handleLogScroll(event: Event) {
+  const target = event.target as HTMLElement | null
+  if (!target || loadingOlder.value || !hasMoreHistory.value) {
+    return
+  }
+  if (target.scrollTop <= 24) {
+    void loadOlderHistory()
+  }
+}
+
+async function initializeLogsView() {
+  resetLogsView()
+  try {
+    await loadInitialHistory()
+  } finally {
+    connect()
+  }
+}
+
+async function toggleConnection() {
+  if (connected.value) {
+    disconnect()
+    return
+  }
+  if (logs.value.length === 0) {
+    await loadInitialHistory()
+  }
+  connect()
 }
 
 function normalizeLogFrame(frame: string): LogEntry {
@@ -226,6 +380,14 @@ function levelColor(level: string) {
   return 'info'
 }
 
+function toggleQuickLevel(level: string) {
+  if (selectedLevels.value.includes(level)) {
+    selectedLevels.value = selectedLevels.value.filter(item => item !== level)
+    return
+  }
+  selectedLevels.value = [...selectedLevels.value, level]
+}
+
 function exportLogs() {
   const blob = new Blob(
     [filteredLogs.value.map((entry) => JSON.stringify(entry)).join('\n')],
@@ -239,7 +401,9 @@ function exportLogs() {
   URL.revokeObjectURL(url)
 }
 
-onMounted(connect)
+onMounted(() => { void initializeLogsView() })
+onActivated(() => { void initializeLogsView() })
+onDeactivated(disconnect)
 onUnmounted(disconnect)
 </script>
 
@@ -249,6 +413,12 @@ onUnmounted(disconnect)
   min-height: 60vh;
 }
 
+.log-card__history {
+  display: flex;
+  justify-content: center;
+  padding: 10px 12px 0;
+}
+
 .logs-filter {
   min-width: 180px;
 }
@@ -256,15 +426,34 @@ onUnmounted(disconnect)
 .structured-log-list {
   max-height: 70vh;
   overflow-y: auto;
-  padding: 12px;
+  padding: 0 12px 12px;
+}
+
+.logs-quick-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.logs-quick-filters__chip {
+  cursor: pointer;
+}
+
+.logs-quick-filters__reset {
+  min-width: 0;
 }
 
 .log-table-head {
   display: grid;
-  grid-template-columns: 110px 176px 220px minmax(0, 1fr);
+  grid-template-columns: 110px 176px 220px minmax(0, 1fr) 28px;
   gap: 12px;
   align-items: center;
-  padding: 0 20px 10px 20px;
+  padding: 12px 20px 10px;
+  margin: 0 12px;
+  border-bottom: 1px solid rgba(var(--v-theme-outline-variant), 0.5);
+  background: rgb(var(--v-theme-surface-container-low));
   color: rgba(var(--v-theme-on-surface), 0.56);
   font-size: 0.76rem;
   font-weight: 700;
@@ -278,7 +467,7 @@ onUnmounted(disconnect)
 
 .log-entry__summary {
   display: grid;
-  grid-template-columns: 110px 176px 220px minmax(0, 1fr);
+  grid-template-columns: 110px 176px 220px minmax(0, 1fr) 28px;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -288,6 +477,9 @@ onUnmounted(disconnect)
 .log-entry__time,
 .log-entry__source {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-size: 0.82rem;
   color: rgba(var(--v-theme-on-surface), 0.64);
@@ -307,6 +499,12 @@ onUnmounted(disconnect)
   font-weight: 500;
 }
 
+.log-entry__toggle {
+  display: inline-flex;
+  justify-content: center;
+  color: rgba(var(--v-theme-on-surface), 0.52);
+}
+
 :deep(.log-entry .v-expansion-panel-title) {
   min-height: 62px;
   padding: 14px 18px;
@@ -314,10 +512,6 @@ onUnmounted(disconnect)
 
 :deep(.log-entry .v-expansion-panel-title__overlay) {
   opacity: 0 !important;
-}
-
-:deep(.log-entry .v-expansion-panel-title__icon) {
-  margin-inline-start: 10px;
 }
 
 :deep(.log-entry .v-expansion-panel-text__wrapper) {
@@ -354,6 +548,10 @@ onUnmounted(disconnect)
 
   .log-entry__message {
     white-space: normal;
+  }
+
+  .log-entry__toggle {
+    justify-content: flex-start;
   }
 }
 </style>
