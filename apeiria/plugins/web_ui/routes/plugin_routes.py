@@ -313,6 +313,12 @@ async def list_plugins(_: Annotated[Any, Depends(require_auth)]) -> list[PluginI
             is_global_enabled=plugin.is_global_enabled,
             is_protected=plugin.is_protected,
             protected_reason=plugin.protected_reason,
+            plugin_type=plugin.plugin_type,
+            admin_level=plugin.admin_level,
+            author=plugin.author,
+            version=plugin.version,
+            required_plugins=plugin.required_plugins,
+            dependent_plugins=plugin.dependent_plugins,
         )
         for plugin in plugins
     ]

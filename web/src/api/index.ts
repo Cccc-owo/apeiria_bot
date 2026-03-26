@@ -75,6 +75,22 @@ export interface DashboardEventItem {
   message: string
 }
 
+export interface PluginItem {
+  module_name: string
+  name: string | null
+  description: string | null
+  source: string
+  is_global_enabled: boolean
+  is_protected: boolean
+  protected_reason: string | null
+  plugin_type: string
+  admin_level: number
+  author: string | null
+  version: string | null
+  required_plugins: string[]
+  dependent_plugins: string[]
+}
+
 export const login = (payload: {
   username: string
   password: string
@@ -101,7 +117,7 @@ export const restartBot = () =>
   client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
 
 export const getPlugins = () =>
-  client.get<any[]>('/plugins/')
+  client.get<PluginItem[]>('/plugins/')
 
 export const getCoreSettings = () =>
   client.get<SettingsResponse>('/plugins/core/settings')

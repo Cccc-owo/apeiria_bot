@@ -47,7 +47,7 @@
                     color="primary"
                     :loading="coreSaving"
                     :disabled="!hasPendingCoreChanges"
-                    @click="saveCoreSettings"
+                    @click="openCoreSettingsPreview"
                   >
                     {{ t('plugins.settingsSave') }}
                   </v-btn>
@@ -144,7 +144,7 @@
                   :save-label="t('plugins.settingsSave')"
                   :saving="coreRawSaving"
                   @reload="loadCoreRawSettings"
-                  @save="saveCoreRawSettings"
+                  @save="openCoreRawPreview"
                 />
               </template>
             </div>
@@ -162,17 +162,33 @@
                 <div class="summary-card__label">{{ t('plugins.userManagedCount') }}</div>
                 <div class="summary-card__value">{{ nonSystemPlugins.length }}</div>
               </v-sheet>
+              <v-sheet class="summary-card" rounded="lg">
+                <div class="summary-card__label">{{ t('plugins.visibleCount') }}</div>
+                <div class="summary-card__value">{{ visiblePlugins.length }}</div>
+              </v-sheet>
             </div>
 
             <div class="section-heading">
-              <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.configTitle') }}</div>
-              <v-switch
-                v-model="hideSystemPlugins"
-                color="primary"
-                hide-details
-                inset
-                :label="t('plugins.hideSystemDependencies')"
-              />
+              <div class="section-heading__main">
+                <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.configTitle') }}</div>
+                <v-text-field
+                  v-model.trim="pluginSearch"
+                  :label="t('plugins.search')"
+                  density="comfortable"
+                  hide-details
+                  prepend-inner-icon="mdi-magnify"
+                  class="plugin-search"
+                />
+              </div>
+              <div class="section-heading__actions">
+                <v-switch
+                  v-model="hideSystemPlugins"
+                  color="primary"
+                  hide-details
+                  inset
+                  :label="t('plugins.hideSystemDependencies')"
+                />
+              </div>
             </div>
 
             <v-data-table
@@ -184,8 +200,51 @@
             >
               <template #item.name="{ item }">
                 <div class="plugins-table__name">
-                  <span class="font-weight-medium">{{ item.name || item.module_name }}</span>
+                  <div class="plugins-table__title-row">
+                    <span class="font-weight-medium">{{ item.name || item.module_name }}</span>
+                    <v-chip
+                      v-if="item.admin_level > 0"
+                      size="x-small"
+                      variant="tonal"
+                      color="secondary"
+                    >
+                      Lv.{{ item.admin_level }}
+                    </v-chip>
+                    <v-chip
+                      size="x-small"
+                      variant="tonal"
+                      :color="item.plugin_type === 'admin' || item.plugin_type === 'superuser' ? 'warning' : 'default'"
+                    >
+                      {{ item.plugin_type }}
+                    </v-chip>
+                  </div>
                   <span class="text-caption text-medium-emphasis">{{ item.module_name }}</span>
+                  <span v-if="item.description" class="text-caption text-medium-emphasis plugins-table__description">
+                    {{ item.description }}
+                  </span>
+                  <div v-if="pluginMetaSummary(item)" class="text-caption text-medium-emphasis plugins-table__meta">
+                    {{ pluginMetaSummary(item) }}
+                  </div>
+                  <div v-if="item.required_plugins.length > 0 || item.dependent_plugins.length > 0" class="plugins-table__relations">
+                    <v-chip
+                      v-for="dependency in item.required_plugins"
+                      :key="`req:${item.module_name}:${dependency}`"
+                      size="x-small"
+                      variant="tonal"
+                      color="info"
+                    >
+                      {{ t('plugins.requires', { name: dependency }) }}
+                    </v-chip>
+                    <v-chip
+                      v-for="dependent in item.dependent_plugins"
+                      :key="`dep:${item.module_name}:${dependent}`"
+                      size="x-small"
+                      variant="tonal"
+                      color="warning"
+                    >
+                      {{ t('plugins.requiredBy', { name: dependent }) }}
+                    </v-chip>
+                  </div>
                 </div>
               </template>
               <template #item.source="{ value }">
@@ -194,38 +253,42 @@
                 </v-chip>
               </template>
               <template #item.is_global_enabled="{ item }">
-                <div class="plugin-enabled-cell">
-                  <v-btn
-                    size="small"
-                    variant="text"
-                    color="primary"
-                    :loading="settingsLoadingModule === item.module_name"
-                    @click="openSettings(item)"
-                  >
-                    {{ t('plugins.settings') }}
-                  </v-btn>
-                  <v-switch
-                    :model-value="item.is_global_enabled"
-                    color="success"
-                    hide-details
-                    inset
-                    :disabled="item.is_protected"
-                    :loading="pendingModule === item.module_name"
-                    @update:model-value="togglePlugin(item, $event)"
-                  />
-                  <v-tooltip v-if="item.is_protected" location="top">
-                    <template #activator="{ props }">
+                <div class="plugin-status-card">
+                  <div class="plugin-status-card__toolbar">
+                    <div class="plugin-status-card__actions">
                       <v-chip
-                        v-bind="props"
-                        size="x-small"
+                        v-if="item.is_protected"
+                        class="plugin-status-card__protected-chip"
+                        size="small"
                         color="warning"
                         variant="tonal"
+                        :title="item.protected_reason || ''"
                       >
                         {{ t('plugins.protected') }}
                       </v-chip>
-                    </template>
-                    {{ item.protected_reason }}
-                  </v-tooltip>
+                      <v-btn
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        :loading="settingsLoadingModule === item.module_name"
+                        @click="openSettings(item)"
+                      >
+                        {{ t('plugins.settings') }}
+                      </v-btn>
+                      <v-switch
+                        :model-value="item.is_global_enabled"
+                        color="success"
+                        hide-details
+                        inset
+                        :disabled="item.is_protected"
+                        :loading="pendingModule === item.module_name"
+                        @update:model-value="togglePlugin(item, $event)"
+                      />
+                    </div>
+                  </div>
+                  <div v-if="pluginRiskLabel(item)" class="plugin-status-card__hint text-caption text-medium-emphasis">
+                    {{ pluginRiskLabel(item) }}
+                  </div>
                 </div>
               </template>
               <template #no-data>
@@ -405,6 +468,52 @@
             <v-chip size="small" variant="tonal" :color="settingsState.legacy_flatten ? 'warning' : 'default'">
               {{ settingsState.legacy_flatten ? t('plugins.settingsLegacy') : settingsSourceLabel(settingsState.config_source) }}
             </v-chip>
+            <v-chip
+              v-if="settingsPlugin?.admin_level"
+              size="small"
+              variant="tonal"
+              color="secondary"
+            >
+              Lv.{{ settingsPlugin.admin_level }}
+            </v-chip>
+            <v-chip
+              v-if="settingsPlugin?.plugin_type"
+              size="small"
+              variant="tonal"
+              :color="settingsPlugin.plugin_type === 'admin' || settingsPlugin.plugin_type === 'superuser' ? 'warning' : 'default'"
+            >
+              {{ settingsPlugin.plugin_type }}
+            </v-chip>
+          </div>
+
+          <div v-if="settingsPlugin" class="plugin-detail-meta">
+            <div v-if="settingsPlugin.author || settingsPlugin.version" class="text-caption text-medium-emphasis">
+              {{ settingsPlugin.author || 'unknown' }} · {{ settingsPlugin.version || '0.0.0' }}
+            </div>
+            <div v-if="settingsPlugin.required_plugins.length > 0" class="plugin-detail-tags">
+              <span class="text-caption text-medium-emphasis">{{ t('plugins.requiredPlugins') }}</span>
+              <v-chip
+                v-for="dependency in settingsPlugin.required_plugins"
+                :key="`detail-required:${dependency}`"
+                size="x-small"
+                variant="tonal"
+                color="info"
+              >
+                {{ dependency }}
+              </v-chip>
+            </div>
+            <div v-if="settingsPlugin.dependent_plugins.length > 0" class="plugin-detail-tags">
+              <span class="text-caption text-medium-emphasis">{{ t('plugins.dependentPlugins') }}</span>
+              <v-chip
+                v-for="dependency in settingsPlugin.dependent_plugins"
+                :key="`detail-dependent:${dependency}`"
+                size="x-small"
+                variant="tonal"
+                color="warning"
+              >
+                {{ dependency }}
+              </v-chip>
+            </div>
           </div>
 
           <v-alert v-if="settingsErrorMessage" type="error" variant="tonal" density="comfortable">
@@ -434,7 +543,7 @@
                   color="primary"
                   :disabled="!settingsState?.has_config_model || !hasPendingPluginChanges"
                   :loading="settingsSaving"
-                  @click="saveSettings"
+                  @click="openPluginSettingsPreview"
                 >
                   {{ t('plugins.settingsSave') }}
                 </v-btn>
@@ -521,7 +630,7 @@
                 :save-label="t('plugins.settingsSave')"
                 :saving="settingsRawSaving"
                 @reload="settingsPlugin && loadPluginRawSettings(settingsPlugin.module_name)"
-                @save="savePluginRawSettings"
+                @save="openPluginRawPreview"
               />
             </template>
           </div>
@@ -529,6 +638,92 @@
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="settingsDialogVisible = false">{{ t('common.cancel') }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="previewDialogVisible" max-width="920">
+      <v-card>
+        <v-card-title>{{ previewTitle }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-alert type="warning" variant="tonal" density="comfortable">
+            {{ t('plugins.settingsRestartHint') }}
+          </v-alert>
+          <div v-if="previewMode === 'basic'" class="preview-list">
+            <div
+              v-for="item in previewItems"
+              :key="item.key"
+              class="preview-item"
+            >
+              <div class="preview-item__key">{{ item.key }}</div>
+              <div class="preview-item__values">
+                <div class="preview-item__block">
+                  <div class="text-caption text-medium-emphasis">{{ t('plugins.previewCurrent') }}</div>
+                  <pre class="preview-item__code">{{ item.current }}</pre>
+                </div>
+                <div class="preview-item__block">
+                  <div class="text-caption text-medium-emphasis">{{ t('plugins.previewNext') }}</div>
+                  <pre class="preview-item__code preview-item__code--next">{{ item.next }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="preview-raw-grid">
+            <div class="preview-item__block">
+              <div class="text-caption text-medium-emphasis">{{ t('plugins.previewCurrent') }}</div>
+              <pre class="preview-item__code">{{ previewCurrentText }}</pre>
+            </div>
+            <div class="preview-item__block">
+              <div class="text-caption text-medium-emphasis">{{ t('plugins.previewNext') }}</div>
+              <pre class="preview-item__code preview-item__code--next">{{ previewNextText }}</pre>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="previewDialogVisible = false">{{ t('common.cancel') }}</v-btn>
+          <v-spacer />
+          <v-btn color="primary" :loading="previewSaving" @click="confirmPreviewSave">
+            {{ t('plugins.confirmSave') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="toggleConfirmVisible" max-width="560">
+      <v-card>
+        <v-card-title>{{ toggleConfirmTitle }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-alert type="warning" variant="tonal" density="comfortable">
+            {{ toggleConfirmSummary }}
+          </v-alert>
+          <div v-if="toggleConfirmItem" class="confirm-plugin-list">
+            <div
+              class="confirm-plugin-item"
+            >
+              <div class="confirm-plugin-item__title">
+                <span class="font-weight-medium">{{ toggleConfirmItem.name || toggleConfirmItem.module_name }}</span>
+                <span class="text-caption text-medium-emphasis">{{ toggleConfirmItem.module_name }}</span>
+              </div>
+              <div v-if="toggleConfirmItem.dependent_plugins.length > 0" class="confirm-plugin-item__relations">
+                <v-chip
+                  v-for="dependent in toggleConfirmItem.dependent_plugins"
+                  :key="`confirm-dependent:${toggleConfirmItem.module_name}:${dependent}`"
+                  size="x-small"
+                  variant="tonal"
+                  color="warning"
+                >
+                  {{ t('plugins.requiredBy', { name: dependent }) }}
+                </v-chip>
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="closeToggleConfirm">{{ t('common.cancel') }}</v-btn>
+          <v-spacer />
+          <v-btn color="warning" :loading="toggleConfirmLoading" @click="confirmToggleAction">
+            {{ t('plugins.confirmDisable') }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -553,6 +748,7 @@ import {
   updatePluginConfig,
   updatePluginSettings,
   updatePluginSettingsRaw,
+  type PluginItem,
   type ModuleConfigItem,
   type DirConfigItem,
   type DriverConfigItem,
@@ -561,6 +757,7 @@ import {
 import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 import {
+  buildChangedValues,
   displayFieldValue,
   type PluginSettingField,
   type PluginSettingsState,
@@ -569,22 +766,13 @@ import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
 import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
 import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
 
-interface PluginRow {
-  module_name: string
-  name: string | null
-  description: string | null
-  source: string
-  is_global_enabled: boolean
-  is_protected: boolean
-  protected_reason: string | null
-}
-
-const plugins = ref<PluginRow[]>([])
+const plugins = ref<PluginItem[]>([])
 const loading = ref(false)
 const pendingModule = ref('')
 const errorMessage = ref('')
 const sectionTab = ref('plugins')
 const hideSystemPlugins = ref(true)
+const pluginSearch = ref('')
 const configSaving = ref(false)
 const adapterModules = ref<ModuleConfigItem[]>([])
 const driverBuiltin = ref<DriverConfigItem[]>([])
@@ -600,13 +788,19 @@ const coreRawSaving = ref(false)
 const coreRawErrorMessage = ref('')
 const settingsDialogVisible = ref(false)
 const settingsLoadingModule = ref('')
-const settingsPlugin = ref<PluginRow | null>(null)
+const settingsPlugin = ref<PluginItem | null>(null)
 const settingsEditorMode = ref<'basic' | 'advanced'>('basic')
 const settingsRawText = ref('')
 const settingsRawInitialText = ref('')
 const settingsRawLoading = ref(false)
 const settingsRawSaving = ref(false)
 const settingsRawErrorMessage = ref('')
+const previewDialogVisible = ref(false)
+const previewMode = ref<'basic' | 'raw'>('basic')
+const previewAction = ref<'plugin-basic' | 'plugin-raw' | 'core-basic' | 'core-raw'>('plugin-basic')
+const toggleConfirmVisible = ref(false)
+const toggleConfirmLoading = ref(false)
+const toggleConfirmItem = ref<PluginItem | null>(null)
 const noticeStore = useNoticeStore()
 const { t } = useI18n()
 
@@ -679,8 +873,30 @@ const nonSystemPlugins = computed(() =>
 )
 
 const visiblePlugins = computed(() =>
-  hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value,
+  (hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value)
+    .filter((item) => {
+      const keyword = pluginSearch.value.trim().toLowerCase()
+      if (!keyword) return true
+      return `${item.name || ''} ${item.module_name} ${item.description || ''} ${item.source}`.toLowerCase().includes(keyword)
+    }),
 )
+const previewSaving = computed(() =>
+  settingsSaving.value || settingsRawSaving.value || coreSaving.value || coreRawSaving.value,
+)
+const previewTitle = computed(() =>
+  previewMode.value === 'basic' ? t('plugins.previewChangesTitle') : t('plugins.previewRawTitle'),
+)
+const toggleConfirmTitle = computed(() =>
+  t('plugins.disableConfirmTitle'),
+)
+const toggleConfirmSummary = computed(() => {
+  if (!toggleConfirmItem.value) return ''
+  const riskCount = toggleConfirmItem.value.dependent_plugins.length
+  if (riskCount > 0) {
+    return t('plugins.disableConfirmRiskSummary', { count: 1, riskCount })
+  }
+  return t('plugins.disableConfirmSummary', { count: 1 })
+})
 
 const SOURCE_COLORS: Record<string, string> = {
   framework: 'error',
@@ -708,6 +924,41 @@ function sourceLabel(source: string) {
   })
 }
 
+function pluginMetaSummary(item: PluginItem) {
+  const author = item.author?.trim()
+  const version = item.version?.trim()
+  if (author && version) return `${author} · ${version}`
+  if (author) return author
+  if (version) return `v${version}`
+  return ''
+}
+
+function pluginRiskLabel(item: PluginItem) {
+  if (item.is_protected && item.protected_reason) return item.protected_reason
+  if (item.dependent_plugins.length > 0) {
+    return t('plugins.dependentCountHint', { count: item.dependent_plugins.length })
+  }
+  if (item.required_plugins.length > 0) {
+    return t('plugins.requiredCountHint', { count: item.required_plugins.length })
+  }
+  return ''
+}
+
+function closeToggleConfirm() {
+  toggleConfirmVisible.value = false
+  toggleConfirmLoading.value = false
+  toggleConfirmItem.value = null
+}
+
+function shouldConfirmToggle(item: PluginItem, enabled: boolean) {
+  return !enabled && item.dependent_plugins.length > 0
+}
+
+function openToggleConfirm(item: PluginItem) {
+  toggleConfirmItem.value = item
+  toggleConfirmVisible.value = true
+}
+
 function settingsSourceLabel(source: string) {
   return labelFromMap(source, {
     static_scan: t('plugins.settingsSourceStaticScan'),
@@ -729,6 +980,18 @@ function settingsValueSourceLabel(source: string) {
 
 const hasPendingCoreChanges = coreEditor.hasPendingChanges
 const hasPendingPluginChanges = pluginEditor.hasPendingChanges
+const previewItems = computed(() => {
+  if (previewAction.value === 'plugin-basic') {
+    return buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
+  }
+  return buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
+})
+const previewCurrentText = computed(() =>
+  previewAction.value === 'plugin-raw' ? settingsRawInitialText.value : coreRawInitialText.value,
+)
+const previewNextText = computed(() =>
+  previewAction.value === 'plugin-raw' ? settingsRawText.value : coreRawText.value,
+)
 
 function applyCoreRawState(nextState: RawSettingsResponse) {
   coreRawText.value = nextState.text
@@ -804,7 +1067,7 @@ async function loadPlugins() {
   await loadCoreRawSettings()
 }
 
-async function openSettings(item: PluginRow) {
+async function openSettings(item: PluginItem) {
   settingsPlugin.value = item
   settingsDialogVisible.value = true
   settingsEditorMode.value = 'basic'
@@ -831,6 +1094,37 @@ async function saveSettings() {
   await pluginEditor.submit()
 }
 
+function buildPreviewItems(
+  fields: PluginSettingField[],
+  form: Record<string, unknown>,
+  draftOverrides: Record<string, boolean>,
+) {
+  try {
+    const editableFields = fields.filter((field) =>
+      field.editable && (field.has_local_override || Boolean(draftOverrides[field.key])),
+    )
+    const values = buildChangedValues(editableFields, form, t('plugins.settingsInvalidJson'))
+    return editableFields
+      .filter((field) => Object.prototype.hasOwnProperty.call(values, field.key))
+      .map((field) => ({
+        key: field.key,
+        current: displayFieldValue(field.current_value),
+        next: displayFieldValue(values[field.key]),
+      }))
+  } catch {
+    return []
+  }
+}
+
+function openPluginSettingsPreview() {
+  if (!settingsState.value) return
+  const items = buildPreviewItems(settingsFields.value, settingsForm.value, pluginEditor.draftOverrides.value)
+  if (items.length === 0) return
+  previewMode.value = 'basic'
+  previewAction.value = 'plugin-basic'
+  previewDialogVisible.value = true
+}
+
 async function clearPluginField(field: PluginSettingField) {
   if (!settingsPlugin.value) return
   await pluginEditor.clearField(field)
@@ -839,6 +1133,15 @@ async function clearPluginField(field: PluginSettingField) {
 async function saveCoreSettings() {
   if (!coreSettings.value) return
   await coreEditor.submit()
+}
+
+function openCoreSettingsPreview() {
+  if (!coreSettings.value) return
+  const items = buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
+  if (items.length === 0) return
+  previewMode.value = 'basic'
+  previewAction.value = 'core-basic'
+  previewDialogVisible.value = true
 }
 
 async function saveCoreRawSettings() {
@@ -858,6 +1161,13 @@ async function saveCoreRawSettings() {
   } finally {
     coreRawSaving.value = false
   }
+}
+
+function openCoreRawPreview() {
+  if (!hasPendingCoreRawChanges.value) return
+  previewMode.value = 'raw'
+  previewAction.value = 'core-raw'
+  previewDialogVisible.value = true
 }
 
 async function clearCoreField(field: PluginSettingField) {
@@ -882,6 +1192,34 @@ async function savePluginRawSettings() {
     noticeStore.show(message, 'error')
   } finally {
     settingsRawSaving.value = false
+  }
+}
+
+function openPluginRawPreview() {
+  if (!hasPendingPluginRawChanges.value) return
+  previewMode.value = 'raw'
+  previewAction.value = 'plugin-raw'
+  previewDialogVisible.value = true
+}
+
+async function confirmPreviewSave() {
+  if (previewAction.value === 'plugin-basic') {
+    await saveSettings()
+  } else if (previewAction.value === 'plugin-raw') {
+    await savePluginRawSettings()
+  } else if (previewAction.value === 'core-basic') {
+    await saveCoreSettings()
+  } else {
+    await saveCoreRawSettings()
+  }
+
+  if (
+    !settingsErrorMessage.value
+    && !settingsRawErrorMessage.value
+    && !coreErrorMessage.value
+    && !coreRawErrorMessage.value
+  ) {
+    previewDialogVisible.value = false
   }
 }
 
@@ -969,12 +1307,21 @@ function driverStatusText(item: DriverConfigItem) {
   return item.is_active ? t('plugins.driverActive') : t('plugins.driverRegisteredOnly')
 }
 
-async function togglePlugin(item: PluginRow, nextValue: boolean | null) {
+async function togglePlugin(item: PluginItem, nextValue: boolean | null) {
   if (item.is_protected) {
     noticeStore.show(item.protected_reason || t('plugins.cannotDisable'), 'warning')
     return
   }
   const enabled = Boolean(nextValue)
+  if (shouldConfirmToggle(item, enabled)) {
+    item.is_global_enabled = !enabled
+    openToggleConfirm(item)
+    return
+  }
+  await executeToggle(item, enabled)
+}
+
+async function executeToggle(item: PluginItem, enabled: boolean) {
   const previous = item.is_global_enabled
   item.is_global_enabled = enabled
   pendingModule.value = item.module_name
@@ -994,6 +1341,17 @@ async function togglePlugin(item: PluginRow, nextValue: boolean | null) {
     noticeStore.show(errorMessage.value, 'error')
   } finally {
     pendingModule.value = ''
+  }
+}
+
+async function confirmToggleAction() {
+  if (!toggleConfirmItem.value) return
+  toggleConfirmLoading.value = true
+  try {
+    await executeToggle(toggleConfirmItem.value, false)
+    closeToggleConfirm()
+  } finally {
+    toggleConfirmLoading.value = false
   }
 }
 
@@ -1126,13 +1484,85 @@ onMounted(() => {
   gap: 6px;
 }
 
-.plugin-enabled-cell {
-  min-width: 152px;
+.plugin-status-card {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.plugin-status-card__toolbar {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.plugin-status-card__actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.plugin-status-card__actions {
+  justify-content: flex-end;
   gap: 8px;
-  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.plugin-status-card__toolbar :deep(.v-btn) {
+  min-width: 44px;
+  padding-inline: 4px;
+}
+
+.plugin-status-card__toolbar :deep(.v-switch) {
+  width: 54px;
+  margin-inline: 0;
+}
+
+.plugin-status-card__toolbar :deep(.v-chip) {
+  min-width: 64px;
+  justify-content: center;
+}
+
+.plugin-status-card__protected-chip {
+  min-width: 0;
+}
+
+.plugin-status-card__hint {
+  width: 100%;
+  text-align: right;
+  line-height: 1.35;
+}
+
+@media (max-width: 960px) {
+  .plugin-status-card__toolbar {
+    justify-content: flex-end;
+  }
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-heading__main,
+.section-heading__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.plugin-search {
+  width: 240px;
 }
 
 .config-input {
@@ -1171,8 +1601,29 @@ onMounted(() => {
 .plugins-table__name {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   padding: 4px 0;
+}
+
+.plugins-table__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plugins-table__description {
+  line-height: 1.35;
+}
+
+.plugins-table__meta {
+  line-height: 1.3;
+}
+
+.plugins-table__relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .settings-list-row__chips {
@@ -1188,6 +1639,19 @@ onMounted(() => {
   gap: 8px 14px;
 }
 
+.plugin-detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plugin-detail-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 :deep(.plugins-table .v-selection-control) {
   justify-content: flex-end;
 }
@@ -1201,6 +1665,85 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(var(--v-theme-on-surface), 0.03);
+}
+
+.preview-item__key {
+  font-weight: 700;
+}
+
+.preview-item__values,
+.preview-raw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.preview-item__block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.preview-item__code {
+  margin: 0;
+  min-height: 72px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface-container-low));
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
+.preview-item__code--next {
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.24);
+}
+
+.confirm-plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirm-plugin-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface-container-low));
+}
+
+.confirm-plugin-item__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.confirm-plugin-item__relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 @media (max-width: 960px) {
@@ -1225,6 +1768,19 @@ onMounted(() => {
 
   .settings-list-row__chips {
     justify-content: flex-start;
+  }
+
+  .section-heading__actions {
+    width: 100%;
+  }
+
+  .plugin-search {
+    width: 100%;
+  }
+
+  .preview-item__values,
+  .preview-raw-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
