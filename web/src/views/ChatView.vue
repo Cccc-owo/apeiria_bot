@@ -368,8 +368,10 @@ const pendingSessionMessage = ref<{
   message_id: string
   segments: ChatSegment[]
 } | null>(null)
+const protectedAssetUrls = ref<Record<string, string>>({})
 const composerImages = new Map<string, PendingImage>()
 const composerMentions = new Map<string, PendingMention>()
+const loadingProtectedAssets = new Set<string>()
 
 const connected = computed(() => socketConnected.value && authenticated.value)
 const chatReady = computed(() => connected.value)
@@ -413,6 +415,8 @@ function resetActiveSessionState() {
   session.value = null
   messages.value = []
   clearPendingReply()
+  closeImagePreview()
+  revokeProtectedAssetUrls()
   clearComposer()
 }
 
@@ -534,6 +538,41 @@ function hasImageSegment(segments: ChatSegment[]) {
   return segments.some((segment) => segment.type === 'image')
 }
 
+async function ensureProtectedAssetUrl(rawUrl: string) {
+  if (protectedAssetUrls.value[rawUrl] || loadingProtectedAssets.has(rawUrl)) return
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  loadingProtectedAssets.add(rawUrl)
+  try {
+    const response = await fetch(rawUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to load asset: ${response.status}`)
+    }
+    const blob = await response.blob()
+    protectedAssetUrls.value = {
+      ...protectedAssetUrls.value,
+      [rawUrl]: URL.createObjectURL(blob),
+    }
+  } catch {
+    protectedAssetUrls.value = { ...protectedAssetUrls.value }
+  } finally {
+    loadingProtectedAssets.delete(rawUrl)
+  }
+}
+
+function revokeProtectedAssetUrls() {
+  Object.values(protectedAssetUrls.value).forEach((url) => {
+    URL.revokeObjectURL(url)
+  })
+  protectedAssetUrls.value = {}
+  loadingProtectedAssets.clear()
+}
+
 function resolveImageUrl(segment: ImageSegment) {
   if (segment.base64) {
     return `data:${segment.mime || 'image/png'};base64,${segment.base64}`
@@ -541,14 +580,16 @@ function resolveImageUrl(segment: ImageSegment) {
   const rawUrl = segment.url
   if (!rawUrl) return ''
   if (!rawUrl.startsWith('/api/chat/assets/')) return rawUrl
-  const token = localStorage.getItem('token')
-  if (!token) return rawUrl
-  const separator = rawUrl.includes('?') ? '&' : '?'
-  return `${rawUrl}${separator}token=${encodeURIComponent(token)}`
+  void ensureProtectedAssetUrl(rawUrl)
+  return protectedAssetUrls.value[rawUrl] || ''
 }
 
-function openImagePreview(segment: ImageSegment) {
-  const src = resolveImageUrl(segment)
+async function openImagePreview(segment: ImageSegment) {
+  let src = resolveImageUrl(segment)
+  if (!src && segment.url?.startsWith('/api/chat/assets/')) {
+    await ensureProtectedAssetUrl(segment.url)
+    src = protectedAssetUrls.value[segment.url] || ''
+  }
   if (!src) return
   imagePreviewSrc.value = src
   imagePreviewAlt.value = segment.alt || t('chat.imageAlt')
@@ -1313,6 +1354,7 @@ onUnmounted(() => {
   unsubscribeOpen()
   unsubscribeClose()
   client.disconnect()
+  revokeProtectedAssetUrls()
   clearComposer()
   window.removeEventListener('keydown', handleWindowKeydown)
 })

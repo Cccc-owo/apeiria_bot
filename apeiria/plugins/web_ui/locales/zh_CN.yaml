@@ -50,6 +50,6 @@ web_ui:
     build_failed: "前端构建失败：\n{stderr}"
     build_success: "前端构建成功"
     ready: "Web UI 已就绪：{url}"
-    password: "Web UI 密码：{password}"
+    credentials_file: "Web UI 凭据文件：{path}"
   dashboard:
     restart_scheduled: "已安排重启"

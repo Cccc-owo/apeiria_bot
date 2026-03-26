@@ -143,9 +143,12 @@ def _mount_routes() -> None:
             t("web_ui.startup.ready", url="http://127.0.0.1:8080/"),
         )
 
-        from .secrets import get_password
+        from .secrets import get_secret_file_path
 
-        logger.info("{}", t("web_ui.startup.password", password=get_password()))
+        logger.info(
+            "{}",
+            t("web_ui.startup.credentials_file", path=get_secret_file_path()),
+        )
     else:
         logger.debug("Web UI frontend not available")
 

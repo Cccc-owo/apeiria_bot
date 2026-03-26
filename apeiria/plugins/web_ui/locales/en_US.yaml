@@ -50,6 +50,6 @@ web_ui:
     build_failed: "Frontend build failed:\n{stderr}"
     build_success: "Frontend built successfully"
     ready: "Web UI ready at {url}"
-    password: "Web UI password: {password}"
+    credentials_file: "Web UI credentials file: {path}"
   dashboard:
     restart_scheduled: "Restart scheduled"

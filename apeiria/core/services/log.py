@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,29 +17,54 @@ if TYPE_CHECKING:
     from loguru import Record
 
 
+@dataclass(frozen=True)
+class LogSubscription:
+    """Per-connection queue used for real-time log delivery."""
+
+    queue: asyncio.Queue[str]
+    loop: asyncio.AbstractEventLoop
+
+
 class LogBuffer:
     """Circular buffer holding recent log entries for WebSocket push."""
 
     def __init__(self, maxlen: int = 500) -> None:
         self._buffer: deque[str] = deque(maxlen=maxlen)
-        self._subscribers: list = []  # WebSocket connections
+        self._subscribers: list[LogSubscription] = []
 
     def append(self, message: str) -> None:
         self._buffer.append(message)
+        for subscriber in tuple(self._subscribers):
+            subscriber.loop.call_soon_threadsafe(
+                self._push_to_queue,
+                subscriber.queue,
+                message,
+            )
 
     def get_recent(self, n: int = 100) -> list[str]:
         """Get the N most recent log entries."""
         items = list(self._buffer)
         return items[-n:]
 
-    def subscribe(self, ws: object) -> None:
-        self._subscribers.append(ws)
+    def subscribe(self, max_queue_size: int = 200) -> LogSubscription:
+        subscription = LogSubscription(
+            queue=asyncio.Queue(maxsize=max_queue_size),
+            loop=asyncio.get_running_loop(),
+        )
+        self._subscribers.append(subscription)
+        return subscription
 
-    def unsubscribe(self, ws: object) -> None:
-        import contextlib
-
+    def unsubscribe(self, subscription: LogSubscription) -> None:
         with contextlib.suppress(ValueError):
-            self._subscribers.remove(ws)
+            self._subscribers.remove(subscription)
+
+    @staticmethod
+    def _push_to_queue(queue: asyncio.Queue[str], message: str) -> None:
+        if queue.full():
+            with contextlib.suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+        with contextlib.suppress(asyncio.QueueFull):
+            queue.put_nowait(message)
 
 
 log_buffer = LogBuffer()
