@@ -55,9 +55,22 @@
         <div class="summary-card__label">{{ t('data.pageSize') }}</div>
         <div class="summary-card__value">{{ pageSize }}</div>
       </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('data.searchState') }}</div>
+        <div class="summary-card__value summary-card__value--text">
+          {{ activeSearchText }}
+        </div>
+      </v-sheet>
     </div>
 
     <v-card class="page-panel">
+      <div class="data-table-toolbar">
+        <div class="data-table-toolbar__meta">
+          <span>{{ t('data.currentPage', { page }) }}</span>
+          <span>{{ t('data.currentRows', { count: rows.length }) }}</span>
+        </div>
+      </div>
+
       <v-data-table-server
         v-model:items-per-page="pageSize"
         v-model:page="page"
@@ -92,6 +105,7 @@
               v-for="column in columns"
               :key="String(column.key)"
               class="data-cell"
+              :title="String(formatCell(item[String(column.key) as keyof typeof item]))"
             >
               <template v-if="String(column.key) === 'actions'">
                 <v-btn
@@ -137,7 +151,10 @@
           </div>
 
           <div v-else class="d-flex flex-column ga-4">
-            <div class="d-flex justify-end">
+            <div class="data-detail-toolbar">
+              <v-chip size="small" variant="tonal">
+                {{ t('data.fieldCount', { count: detailFields.length }) }}
+              </v-chip>
               <v-btn
                 variant="tonal"
                 size="small"
@@ -166,6 +183,7 @@
                 {{ String(originalRecord[field]) }}
               </v-chip>
               <pre v-else-if="fieldType(field) === 'json'" class="data-detail-row__code">{{ editForm[field] }}</pre>
+              <pre v-else-if="fieldType(field) === 'number'" class="data-detail-row__value data-detail-row__value--mono">{{ editForm[field] }}</pre>
               <div v-else class="data-detail-row__value">
                 {{ editForm[field] }}
               </div>
@@ -223,6 +241,7 @@ const selectedTableLabel = computed(
   () => tables.value.find((item) => item.name === selectedTable.value)?.label || '',
 )
 const detailFields = computed(() => Object.keys(editForm.value))
+const activeSearchText = computed(() => search.value.trim() || t('data.searchIdle'))
 
 function formatCell(value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
@@ -358,6 +377,21 @@ onMounted(async () => {
   min-width: 180px;
 }
 
+.data-table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 0;
+}
+
+.data-table-toolbar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.82rem;
+}
+
 :deep(.data-table .v-data-table-footer) {
   padding-top: 8px !important;
 }
@@ -390,6 +424,14 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.data-detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .data-detail-row__head {
   display: flex;
   align-items: center;
@@ -405,6 +447,11 @@ onMounted(async () => {
   background: rgba(var(--v-theme-on-surface), 0.04);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.data-detail-row__value--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-size: 12px;
 }
 
 .data-detail-row__code {
