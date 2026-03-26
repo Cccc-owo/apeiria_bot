@@ -8,15 +8,7 @@ import tomlkit
 import tomlkit.items
 
 from apeiria.core.configs.registry import build_legacy_nonebot_overrides
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    try:
-        import tomli as tomllib  # type: ignore[import-not-found]
-    except ModuleNotFoundError:
-        tomllib = None
-
+from apeiria.core.utils.files import atomic_write_text, load_toml_dict
 
 logger = logging.getLogger("apeiria.user_config")
 
@@ -25,32 +17,21 @@ _PROJECT_NONEBOT_DEFAULTS: dict[str, Any] = {
 }
 
 
-def _ensure_config_parent(target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-
+class InvalidProjectConfigError(ValueError):
+    """Raised when a project TOML file cannot be parsed safely for mutation."""
 
 def _default_config_path() -> Path:
     return Path(__file__).resolve().parent.parent / "apeiria.config.toml"
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
-    if tomllib is None:
-        logger.warning("Skip loading apeiria.config.toml: tomllib/tomli is unavailable")
-        return {}
-    if not config_path.is_file():
-        return {}
-
-    try:
-        with config_path.open("rb") as file:
-            data = tomllib.load(file)
-    except OSError as exc:
-        logger.warning("Skip loading %s: %s", config_path.name, exc)
-        return {}
-    except tomllib.TOMLDecodeError as exc:
-        logger.warning("Skip loading %s: invalid TOML (%s)", config_path.name, exc)
-        return {}
-
-    return data if isinstance(data, dict) else {}
+    return load_toml_dict(
+        config_path,
+        logger=logger,
+        missing_dependency_message=(
+            "Skip loading apeiria.config.toml: tomllib/tomli is unavailable"
+        ),
+    )
 
 
 def _normalize_config(data: dict[str, Any]) -> dict[str, Any]:
@@ -217,28 +198,8 @@ def write_project_plugin_module_map(
 ) -> Path:
     target = config_path or _default_config_path()
     document = _load_toml_document(target)
-
-    plugin_modules = document.get("plugin_modules")
-    if not isinstance(plugin_modules, tomlkit.items.Table):  # type: ignore[attr-defined]
-        plugin_modules = tomlkit.table()
-        document["plugin_modules"] = plugin_modules
-
-    for section, module_name in updates.items():
-        normalized_section = next(iter(_plugin_name_candidates(section)), section)
-        if not normalized_section:
-            continue
-        normalized_module = module_name.strip() if isinstance(module_name, str) else ""
-        if normalized_module:
-            plugin_modules[normalized_section] = normalized_module
-            continue
-        if normalized_section in plugin_modules:
-            del plugin_modules[normalized_section]
-
-    if len(plugin_modules) == 0 and "plugin_modules" in document:
-        del document["plugin_modules"]
-
-    _ensure_config_parent(target)
-    target.write_text(tomlkit.dumps(document), encoding="utf-8")
+    _set_plugin_module_mapping(document, updates)
+    atomic_write_text(target, tomlkit.dumps(document))
     return target
 
 
@@ -256,10 +217,11 @@ def _load_toml_document(config_path: Path) -> tomlkit.TOMLDocument:
     try:
         return tomlkit.parse(config_path.read_text(encoding="utf-8"))
     except OSError as exc:
-        logger.warning("Skip loading %s: %s", config_path.name, exc)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Skip loading %s: invalid TOML (%s)", config_path.name, exc)
-    return tomlkit.document()
+        msg = f"cannot read {config_path.name}: {exc}"
+        raise InvalidProjectConfigError(msg) from exc
+    except Exception as exc:
+        msg = f"{config_path.name} contains invalid TOML: {exc}"
+        raise InvalidProjectConfigError(msg) from exc
 
 
 def _dump_toml_value(value: object) -> tomlkit.items.Item:  # type: ignore[attr-defined]
@@ -329,8 +291,7 @@ def write_project_nonebot_section_toml(
     else:
         document["nonebot"] = section
 
-    _ensure_config_parent(target)
-    target.write_text(tomlkit.dumps(document), encoding="utf-8")
+    atomic_write_text(target, tomlkit.dumps(document))
     return target
 
 
@@ -373,6 +334,29 @@ def _validate_plugin_section_toml(
     return section
 
 
+def _set_plugin_module_mapping(
+    document: tomlkit.TOMLDocument,
+    updates: dict[str, str | None],
+) -> None:
+    plugin_modules = document.get("plugin_modules")
+    if not isinstance(plugin_modules, tomlkit.items.Table):  # type: ignore[attr-defined]
+        plugin_modules = tomlkit.table()
+        document["plugin_modules"] = plugin_modules
+
+    for section, module_name in updates.items():
+        normalized_section = next(iter(_plugin_name_candidates(section)), section)
+        if not normalized_section:
+            continue
+        normalized_module = module_name.strip() if isinstance(module_name, str) else ""
+        if normalized_module:
+            plugin_modules[normalized_section] = normalized_module
+        elif normalized_section in plugin_modules:
+            del plugin_modules[normalized_section]
+
+    if len(plugin_modules) == 0 and "plugin_modules" in document:
+        del document["plugin_modules"]
+
+
 def write_project_plugin_section_toml(
     plugin_name: str,
     text: str,
@@ -397,15 +381,14 @@ def write_project_plugin_section_toml(
             del plugins[section_name]
         if len(plugins) == 0 and "plugins" in document:
             del document["plugins"]
-        _ensure_config_parent(target)
-        target.write_text(tomlkit.dumps(document), encoding="utf-8")
-        return write_project_plugin_module_map({section_name: None}, target)
+        _set_plugin_module_mapping(document, {section_name: None})
+        atomic_write_text(target, tomlkit.dumps(document))
+        return target
 
     plugins[section_name] = section
-    _ensure_config_parent(target)
-    target.write_text(tomlkit.dumps(document), encoding="utf-8")
     if module_name is not None:
-        write_project_plugin_module_map({section_name: module_name}, target)
+        _set_plugin_module_mapping(document, {section_name: module_name})
+    atomic_write_text(target, tomlkit.dumps(document))
     return target
 
 
@@ -445,12 +428,11 @@ def write_project_plugin_section_config(
     if len(plugins) == 0:
         del document["plugins"]
 
-    _ensure_config_parent(target)
-    target.write_text(tomlkit.dumps(document), encoding="utf-8")
     if clear_module_mapping:
-        write_project_plugin_module_map({section_name: None}, target)
+        _set_plugin_module_mapping(document, {section_name: None})
     elif len(section) > 0 and module_name is not None:
-        write_project_plugin_module_map({section_name: module_name}, target)
+        _set_plugin_module_mapping(document, {section_name: module_name})
+    atomic_write_text(target, tomlkit.dumps(document))
     return target
 
 
@@ -476,6 +458,5 @@ def write_project_nonebot_config(
     if len(section) == 0:
         del document["nonebot"]
 
-    _ensure_config_parent(target)
-    target.write_text(tomlkit.dumps(document), encoding="utf-8")
+    atomic_write_text(target, tomlkit.dumps(document))
     return target

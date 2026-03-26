@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from apeiria.core.services.web_chat.protocol import (
     AuthHelloPayload,
@@ -245,7 +245,7 @@ class UserLevelItem(BaseModel):
 
 
 class UpdateLevelRequest(BaseModel):
-    level: int
+    level: int = Field(ge=0, le=4)
 
 
 class DataTableInfo(BaseModel):

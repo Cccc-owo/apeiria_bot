@@ -3,17 +3,17 @@ from __future__ import annotations
 import importlib
 import logging
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
-from apeiria.package_ids import normalize_package_id
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    try:
-        import tomli as tomllib
-    except ModuleNotFoundError:
-        tomllib = None
+from apeiria.core.utils.files import atomic_write_text, load_toml_dict
+from apeiria.core.utils.package_config import (
+    bind_package_item,
+    get_package_bound_items,
+    normalize_package_item_map,
+    normalize_string_list,
+    remove_item_from_config_packages,
+    unbind_package_item,
+)
 
 
 class UserDriverConfig(TypedDict):
@@ -29,31 +29,17 @@ def _default_config_path() -> Path:
 
 
 def _normalize_str_list(value: object) -> list[str]:
-    if not isinstance(value, list | tuple):
-        return []
-    return [item for item in value if isinstance(item, str) and item.strip()]
+    return normalize_string_list(value)
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
-    if tomllib is None:
-        logger.warning(
+    return load_toml_dict(
+        config_path,
+        logger=logger,
+        missing_dependency_message=(
             "Skip loading apeiria.drivers.toml: tomllib/tomli is unavailable"
-        )
-        return {}
-    if not config_path.is_file():
-        return {}
-
-    try:
-        with config_path.open("rb") as file:
-            data = tomllib.load(file)
-    except OSError as exc:
-        logger.warning("Skip loading %s: %s", config_path.name, exc)
-        return {}
-    except tomllib.TOMLDecodeError as exc:
-        logger.warning("Skip loading %s: invalid TOML (%s)", config_path.name, exc)
-        return {}
-
-    return data if isinstance(data, dict) else {}
+        ),
+    )
 
 
 def _normalize_config(data: dict[str, Any]) -> UserDriverConfig:
@@ -84,17 +70,7 @@ def _dump_config(config: UserDriverConfig) -> str:
 
 
 def _normalize_package_map(value: object) -> dict[str, list[str]]:
-    if not isinstance(value, dict):
-        return {}
-    result: dict[str, list[str]] = {}
-    for package_name, builtin in value.items():
-        if not isinstance(package_name, str) or not package_name.strip():
-            continue
-        normalized_builtin = sorted(set(_normalize_str_list(builtin)))
-        normalized_package = normalize_package_id(package_name)
-        if normalized_package and normalized_builtin:
-            result[normalized_package] = normalized_builtin
-    return result
+    return normalize_package_item_map(value)
 
 
 def default_config_path() -> Path:
@@ -111,8 +87,7 @@ def write_project_driver_config(
     config_path: Path | None = None,
 ) -> Path:
     target = config_path or _default_config_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_dump_config(config), encoding="utf-8")
+    atomic_write_text(target, _dump_config(config))
     return target
 
 
@@ -139,13 +114,11 @@ def remove_project_driver_builtin(
     config_path: Path | None = None,
 ) -> UserDriverConfig:
     config = read_project_driver_config(config_path)
-    config["builtin"] = [item for item in config["builtin"] if item != builtin_name]
-    for package_name in list(config["packages"]):
-        config["packages"][package_name] = [
-            item for item in config["packages"][package_name] if item != builtin_name
-        ]
-        if not config["packages"][package_name]:
-            del config["packages"][package_name]
+    remove_item_from_config_packages(
+        cast("dict[str, Any]", config),
+        items_key="builtin",
+        item=builtin_name,
+    )
     write_project_driver_config(config, config_path)
     return config
 
@@ -164,12 +137,11 @@ def bind_project_driver_package(
     config_path: Path | None = None,
 ) -> UserDriverConfig:
     config = add_project_driver_builtin(builtin_name, config_path)
-    package_key = normalize_package_id(package_name)
-    if not package_key:
-        return config
-    builtin = set(config["packages"].get(package_key, []))
-    builtin.add(builtin_name)
-    config["packages"][package_key] = sorted(builtin)
+    bind_package_item(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+        item=builtin_name,
+    )
     write_project_driver_config(config, config_path)
     return config
 
@@ -179,7 +151,10 @@ def get_project_driver_package_builtin(
     config_path: Path | None = None,
 ) -> list[str]:
     config = read_project_driver_config(config_path)
-    return list(config["packages"].get(normalize_package_id(package_name), []))
+    return get_package_bound_items(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+    )
 
 
 def unbind_project_driver_package(
@@ -188,22 +163,14 @@ def unbind_project_driver_package(
     config_path: Path | None = None,
 ) -> UserDriverConfig:
     config = read_project_driver_config(config_path)
-    package_key = normalize_package_id(package_name)
-    if not package_key:
+    changed = unbind_package_item(
+        cast("dict[str, Any]", config),
+        package_name=package_name,
+        items_key="builtin",
+        item=builtin_name,
+    )
+    if not changed:
         return config
-    if builtin_name is None:
-        builtin = config["packages"].pop(package_key, [])
-        for item in builtin:
-            config["builtin"] = [name for name in config["builtin"] if name != item]
-        write_project_driver_config(config, config_path)
-        return config
-    builtin = config["packages"].get(package_key, [])
-    if not builtin:
-        return config
-    config["packages"][package_key] = [item for item in builtin if item != builtin_name]
-    if not config["packages"][package_key]:
-        del config["packages"][package_key]
-    config["builtin"] = [item for item in config["builtin"] if item != builtin_name]
     write_project_driver_config(config, config_path)
     return config
 

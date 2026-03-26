@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.helpers import is_plugin_protected
+from apeiria.core.utils.helpers import is_plugin_protected, safe_json_loads
 from apeiria.plugins.web_ui.auth import require_auth
 from apeiria.plugins.web_ui.models import GroupItem
 
@@ -16,13 +16,15 @@ router = APIRouter()
 
 
 def _to_group_item(r: Any) -> GroupItem:
+    disabled_plugins = safe_json_loads(r.disabled_plugins, default=[])
     return GroupItem(
         group_id=r.group_id,
         group_name=r.group_name,
         bot_status=r.bot_status,
         disabled_plugins=[
             module
-            for module in json.loads(r.disabled_plugins or "[]")
+            for module in disabled_plugins
+            if isinstance(module, str)
             if not is_plugin_protected(module)
         ],
     )
@@ -71,6 +73,7 @@ async def update_group(
     from sqlalchemy import select
 
     from apeiria.core.models.group import GroupConsole
+    from apeiria.core.utils.permission import invalidate_group_bot_status_cache
 
     async with get_session() as session:
         result = await session.execute(
@@ -82,6 +85,7 @@ async def update_group(
         if bot_status is not None:
             record.bot_status = bot_status
         await session.commit()
+    await invalidate_group_bot_status_cache(group_id)
     return {"status": "ok"}
 
 
@@ -95,8 +99,8 @@ async def update_group_plugins(
     from sqlalchemy import select
 
     from apeiria.core.models.group import GroupConsole
-    from apeiria.core.services.cache import get_cache
     from apeiria.core.utils.helpers import get_plugin_protection_reason
+    from apeiria.core.utils.permission import invalidate_group_plugin_cache
 
     protected = [
         f"{module} ({reason})"
@@ -119,5 +123,5 @@ async def update_group_plugins(
         record.disabled_plugins = json.dumps(disabled_plugins)
         await session.commit()
 
-    await get_cache().delete(f"group_plugin:{group_id}")
+    await invalidate_group_plugin_cache(group_id)
     return {"status": "ok"}

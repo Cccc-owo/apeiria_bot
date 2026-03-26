@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
+class PluginConfigConflictError(ValueError):
+    """Raised when plugin config registrations produce ambiguous global keys."""
+
+
 @dataclass
 class PluginConfigRegistration:
     plugin_name: str
@@ -88,6 +92,50 @@ def _default_section(plugin_name: str) -> str:
     return plugin_name.rsplit(".", maxsplit=1)[-1]
 
 
+def _iter_legacy_global_keys(
+    registration: PluginConfigRegistration,
+) -> list[tuple[str, str]]:
+    if not registration.legacy_flatten:
+        return []
+    return [
+        (config.key, registration.key_map.get(config.key, config.key))
+        for config in registration.configs
+    ]
+
+
+def _validate_registration_conflicts(
+    registration: PluginConfigRegistration,
+) -> None:
+    existing_global_keys = {
+        global_key: (registered.plugin_name, source_key)
+        for registered in iter_registered_plugin_configs()
+        if registered.plugin_name != registration.plugin_name
+        for source_key, global_key in _iter_legacy_global_keys(registered)
+    }
+    local_seen: dict[str, str] = {}
+
+    for source_key, global_key in _iter_legacy_global_keys(registration):
+        local_owner = local_seen.get(global_key)
+        if local_owner is not None and local_owner != source_key:
+            msg = (
+                f"plugin {registration.plugin_name} maps both {local_owner} and "
+                f"{source_key} to legacy key {global_key}"
+            )
+            raise PluginConfigConflictError(msg)
+
+        local_seen[global_key] = source_key
+        conflict = existing_global_keys.get(global_key)
+        if conflict is None:
+            continue
+        conflict_plugin, conflict_key = conflict
+        msg = (
+            f"legacy config key conflict for {global_key}: "
+            f"{registration.plugin_name}.{source_key} conflicts with "
+            f"{conflict_plugin}.{conflict_key}"
+        )
+        raise PluginConfigConflictError(msg)
+
+
 def register_plugin_config(
     plugin_name: str,
     *,
@@ -105,6 +153,7 @@ def register_plugin_config(
         key_map=dict(resolved.key_map),
         source=resolved.source,
     )
+    _validate_registration_conflicts(registration)
     for candidate in _name_candidates(plugin_name):
         _REGISTRY[candidate] = registration
     return registration

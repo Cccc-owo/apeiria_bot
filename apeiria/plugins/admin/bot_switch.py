@@ -48,6 +48,7 @@ async def _set_bot_status(group_id: str, *, status: bool) -> None:
     from sqlalchemy import select
 
     from apeiria.core.models.group import GroupConsole
+    from apeiria.core.utils.permission import invalidate_group_bot_status_cache
 
     async with get_session() as session:
         result = await session.execute(
@@ -60,3 +61,4 @@ async def _set_bot_status(group_id: str, *, status: bool) -> None:
         else:
             group.bot_status = status
         await session.commit()
+    await invalidate_group_bot_status_cache(group_id)

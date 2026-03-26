@@ -114,6 +114,7 @@ class WebChatService:
                 return resumed_session.to_state()
             session.target_user_id = payload.target_user_id
             self._history[session.session_id] = []
+            self._prune_assets()
         session.updated_at = datetime.now(UTC)
         self._persist()
         return session.to_state()
@@ -254,6 +255,7 @@ class WebChatService:
     ) -> None:
         self._history.setdefault(payload.session_id, []).append(payload)
         self._history[payload.session_id] = self._history[payload.session_id][-100:]
+        self._prune_assets()
         self._persist()
         await connection.send_envelope("message.receive", payload)
 
@@ -290,9 +292,10 @@ class WebChatService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=t("web_ui.sessions.owner_mismatch"),
-            )
+        )
         self._history[session_id] = []
         session.updated_at = datetime.now(UTC)
+        self._prune_assets()
         self._persist()
         return session.to_state()
 
@@ -306,9 +309,10 @@ class WebChatService:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=t("web_ui.sessions.owner_mismatch"),
-            )
+        )
         self._sessions.pop(payload.session_id, None)
         self._history.pop(payload.session_id, None)
+        self._prune_assets()
         self._persist()
         return payload.session_id
 
@@ -357,6 +361,18 @@ class WebChatService:
 
     def _persist(self) -> None:
         self.store.save(self._sessions, self._history)
+
+    def _prune_assets(self) -> None:
+        self.assets.retain(self._referenced_asset_ids())
+
+    def _referenced_asset_ids(self) -> set[str]:
+        referenced: set[str] = set()
+        for messages in self._history.values():
+            for message in messages:
+                for segment in message.segments:
+                    if isinstance(segment, ImageSegment) and segment.asset_id:
+                        referenced.add(segment.asset_id)
+        return referenced
 
     def _build_session_list_item(self, session: ChatSession) -> SessionListItem:
         history = self._history.get(session.session_id, [])

@@ -32,7 +32,11 @@ def _load_user_module(user_bot: Path) -> ModuleType | None:
         return None
 
     module = module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001
+        nonebot.logger.warning("Skip loading {}: {}", user_bot.name, exc)
+        return None
     return module
 
 

@@ -110,13 +110,16 @@ class MessageCodec:
 
                 resolved_path = self._resolve_local_file(file_path)
                 if resolved_path and resolved_path.is_file():
-                    raw_bytes = resolved_path.read_bytes()
+                    asset = self._asset_manager.register_path(
+                        resolved_path,
+                        content_type=mimetypes.guess_type(resolved_path.name)[0]
+                        or "image/png",
+                        file_name=resolved_path.name,
+                    )
                     mime, _ = mimetypes.guess_type(resolved_path.name)
                     return ImageSegment(
-                        asset_id=self._asset_manager.register_path(
-                            resolved_path
-                        ).asset_id,
-                        base64=base64.b64encode(raw_bytes).decode("ascii"),
+                        url=f"/api/chat/assets/{asset.asset_id}",
+                        asset_id=asset.asset_id,
                         mime=mime or "image/png",
                         alt=cast("str | None", data.get("alt")),
                     )

@@ -10,6 +10,7 @@ from nonebot.message import run_preprocessor
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import get_plugin_extra
+from apeiria.core.utils.permission import extract_group_id
 
 
 @run_preprocessor
@@ -25,7 +26,7 @@ async def auth_hook(matcher: Matcher, event: Event, bot: Bot) -> None:
         return
 
     session_id = event.get_session_id()
-    group_id = _extract_group_id(session_id, user_id)
+    group_id = extract_group_id(session_id, user_id)
 
     from apeiria.core.utils.permission import is_plugin_globally_enabled
 
@@ -50,19 +51,14 @@ async def _check_group_auth(
     bot: Bot, event: Event, user_id: str, group_id: str, module_name: str
 ) -> None:
     """Check bot status, ban, and plugin enabled in group context."""
-    from nonebot_plugin_orm import get_session
-    from sqlalchemy import select
+    from apeiria.core.utils.permission import (
+        is_banned,
+        is_group_bot_enabled,
+        is_plugin_enabled,
+    )
 
-    from apeiria.core.models.group import GroupConsole
-    from apeiria.core.utils.permission import is_banned, is_plugin_enabled
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(GroupConsole.bot_status).where(GroupConsole.group_id == group_id)
-        )
-        bot_status = result.scalar_one_or_none()
-        if bot_status is False:
-            raise IgnoredException("bot_disabled")
+    if not await is_group_bot_enabled(group_id):
+        raise IgnoredException("bot_disabled")
 
     if await is_banned(user_id, group_id):
         logger.debug("Blocked banned user {} in group {}", user_id, group_id)
@@ -122,14 +118,3 @@ async def _check_plugin_level(
         with contextlib.suppress(Exception):
             await bot.send(event, t("auth.permission_denied", need=need))
         raise IgnoredException("insufficient_permission")
-
-
-def _extract_group_id(session_id: str, user_id: str) -> str | None:
-    """Extract group_id from session_id."""
-    if session_id == user_id:
-        return None
-    if "_" in session_id:
-        parts = session_id.split("_")
-        if len(parts) >= 2:  # noqa: PLR2004
-            return parts[1] if parts[0] == "group" else parts[0]
-    return None

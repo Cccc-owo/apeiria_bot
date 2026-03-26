@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from nonebot.log import logger
+
 from .protocol import ChatSessionState, MessageReceivePayload
 from .session import ChatSession
 
@@ -21,7 +23,16 @@ class WebChatStore:
         if not self._state_file.is_file():
             return {}, {}
 
-        data = json.loads(self._state_file.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(self._state_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning(
+                "Failed to load WebChat state from {}: {}",
+                self._state_file,
+                exc,
+            )
+            return {}, {}
+
         sessions = {
             item["session"]["session_id"]: ChatSession.from_state(
                 ChatSessionState.model_validate(item["session"]),
@@ -59,7 +70,9 @@ class WebChatStore:
                 )
             ],
         }
-        self._state_file.write_text(
+        temp_file = self._state_file.with_suffix(".tmp")
+        temp_file.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        temp_file.replace(self._state_file)

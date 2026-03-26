@@ -78,7 +78,7 @@ async def _toggle_plugin(group_id: str, plugin_name: str, *, enable: bool) -> No
     from sqlalchemy import select
 
     from apeiria.core.models.group import GroupConsole
-    from apeiria.core.services.cache import get_cache
+    from apeiria.core.utils.permission import invalidate_group_plugin_cache
 
     async with get_session() as session:
         result = await session.execute(
@@ -102,4 +102,4 @@ async def _toggle_plugin(group_id: str, plugin_name: str, *, enable: bool) -> No
         group.disabled_plugins = json.dumps(disabled)
         await session.commit()
 
-    await get_cache().delete(f"group_plugin:{group_id}")
+    await invalidate_group_plugin_cache(group_id)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ class ChatAsset:
     file_name: str | None = None
     local_path: Path | None = None
     remote_url: str | None = None
+    managed_file: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -40,6 +42,7 @@ class AssetManager:
             content_type=content_type,
             file_name=file_name,
             local_path=Path(path),
+            managed_file=False,
         )
         self._assets[asset_id] = asset
         return asset
@@ -59,6 +62,20 @@ class AssetManager:
             content_type=content_type,
             file_name=file_path.name,
             local_path=file_path,
+            managed_file=True,
         )
         self._assets[asset_id] = asset
         return asset
+
+    def retain(self, referenced_asset_ids: set[str]) -> None:
+        stale_asset_ids = [
+            asset_id
+            for asset_id in self._assets
+            if asset_id not in referenced_asset_ids
+        ]
+        for asset_id in stale_asset_ids:
+            asset = self._assets.pop(asset_id, None)
+            if not asset or not asset.managed_file or asset.local_path is None:
+                continue
+            with contextlib.suppress(OSError):
+                asset.local_path.unlink()

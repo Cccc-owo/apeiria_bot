@@ -431,6 +431,52 @@ def _raise_click_runtime_error(exc: RuntimeError) -> None:
     raise click.ClickException(str(exc)) from exc
 
 
+def _rollback_failure_message(exc: Exception, detail: str) -> str:
+    return f"{exc}\n{detail}"
+
+
+def _rollback_install_failure_detail(target: str) -> str:
+    return f"rollback failed: {target} is still installed in the extension environment"
+
+
+def _rollback_uninstall_failure_detail(target: str) -> str:
+    return f"rollback failed: {target} was removed from the extension environment"
+
+
+def _rollback_install(
+    target: str,
+    pip_args: tuple[str, ...],
+    exc: Exception,
+) -> None:
+    try:
+        remove_plugin_requirement(target, pip_args)
+    except RuntimeError:
+        _fail(
+            _rollback_failure_message(
+                exc,
+                _rollback_install_failure_detail(target),
+            )
+        )
+    raise click.ClickException(str(exc)) from exc
+
+
+def _rollback_uninstall(
+    target: str,
+    pip_args: tuple[str, ...],
+    exc: Exception,
+) -> None:
+    try:
+        add_plugin_requirement(target, pip_args)
+    except RuntimeError:
+        _fail(
+            _rollback_failure_message(
+                exc,
+                _rollback_uninstall_failure_detail(target),
+            )
+        )
+    raise click.ClickException(str(exc)) from exc
+
+
 def _runtime_export_targets() -> list[tuple[Path, Path]]:
     project_root = _project_root()
     return [
@@ -806,7 +852,10 @@ def plugin_install(
         add_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    bind_project_plugin_package(target, resolved_module)
+    try:
+        bind_project_plugin_package(target, resolved_module)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_install(target, pip_args, exc)
     click.echo(_("installed package: {package}").format(package=target))
 
 
@@ -890,11 +939,14 @@ def plugin_uninstall(
         remove_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    if get_project_plugin_package_modules(target):
-        unbind_project_plugin_package(target)
-    else:
-        for registered_module in registered_modules:
-            remove_project_plugin_module(registered_module)
+    try:
+        if get_project_plugin_package_modules(target):
+            unbind_project_plugin_package(target)
+        else:
+            for registered_module in registered_modules:
+                remove_project_plugin_module(registered_module)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_uninstall(target, pip_args, exc)
     click.echo(_("uninstalled package: {package}").format(package=target))
 
 
@@ -1096,7 +1148,10 @@ def adapter_install(
         add_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    bind_project_adapter_package(target, resolved_module)
+    try:
+        bind_project_adapter_package(target, resolved_module)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_install(target, pip_args, exc)
     click.echo(_("installed package: {package}").format(package=target))
 
 
@@ -1183,11 +1238,14 @@ def adapter_uninstall(
         remove_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    if get_project_adapter_package_modules(target):
-        unbind_project_adapter_package(target)
-    else:
-        for registered_module in registered_modules:
-            remove_project_adapter_module(registered_module)
+    try:
+        if get_project_adapter_package_modules(target):
+            unbind_project_adapter_package(target)
+        else:
+            for registered_module in registered_modules:
+                remove_project_adapter_module(registered_module)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_uninstall(target, pip_args, exc)
     click.echo(_("uninstalled package: {package}").format(package=target))
 
 
@@ -1342,7 +1400,10 @@ def driver_install(
         add_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    bind_project_driver_package(target, resolved_builtin)
+    try:
+        bind_project_driver_package(target, resolved_builtin)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_install(target, pip_args, exc)
     click.echo(_("installed package: {package}").format(package=target))
 
 
@@ -1429,11 +1490,14 @@ def driver_uninstall(
         remove_plugin_requirement(target, pip_args)
     except RuntimeError as exc:
         _raise_click_runtime_error(exc)
-    if get_project_driver_package_builtin(target):
-        unbind_project_driver_package(target)
-    else:
-        for item in registered_builtin:
-            remove_project_driver_builtin(item)
+    try:
+        if get_project_driver_package_builtin(target):
+            unbind_project_driver_package(target)
+        else:
+            for item in registered_builtin:
+                remove_project_driver_builtin(item)
+    except Exception as exc:  # noqa: BLE001
+        _rollback_uninstall(target, pip_args, exc)
     click.echo(_("uninstalled package: {package}").format(package=target))
 
 
