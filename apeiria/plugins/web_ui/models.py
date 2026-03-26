@@ -72,6 +72,8 @@ __all__ = [
     "PluginSettingsResponse",
     "PluginSettingsUpdateRequest",
     "RawSegment",
+    "RegisterRequest",
+    "RegisterResponse",
     "ReplySegment",
     "SessionCreatePayload",
     "SessionDeletePayload",
@@ -87,15 +89,45 @@ __all__ = [
     "UpdateLevelRequest",
     "UserLevelItem",
     "WebUIPrincipal",
+    "WebUIPrincipalResponse",
 ]
 
 
 class LoginRequest(BaseModel):
-    password: str
+    """Credentials used by the Web UI login endpoint."""
+
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class WebUIPrincipalResponse(BaseModel):
+    """Authenticated Web UI user information."""
+
+    user_id: str
+    username: str
+    role: str
 
 
 class LoginResponse(BaseModel):
+    """Successful login response."""
+
     token: str
+    principal: WebUIPrincipalResponse
+
+
+class RegisterRequest(BaseModel):
+    """Payload used to create a new Web UI account with a registration code."""
+
+    invite_code: str = Field(min_length=1, max_length=128)
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class RegisterResponse(BaseModel):
+    """Registration result returned by the Web UI API."""
+
+    status: str = "ok"
+    detail: str | None = None
 
 
 class StatusResponse(BaseModel):
@@ -249,22 +281,29 @@ class UpdateLevelRequest(BaseModel):
 
 
 class DataTableInfo(BaseModel):
+    """Metadata describing one browsable internal table."""
+
     name: str
     label: str
     primary_key: str
 
 
 class DataListResponse(BaseModel):
+    """Paginated read-only table response."""
+
     table: str
     primary_key: str
     columns: list[str]
     total: int
     page: int
     page_size: int
+    search: str = ""
     items: list[dict[str, object | None]]
 
 
 class DataRecordResponse(BaseModel):
+    """Single record response for the data browser."""
+
     table: str
     primary_key: str
     record: dict[str, object | None]

@@ -28,13 +28,13 @@ async def log_websocket(websocket: WebSocket) -> None:
     from apeiria.core.services.log import log_buffer
 
     # Send recent logs
-    for line in log_buffer.get_recent(50):
-        await websocket.send_text(line)
+    for entry in log_buffer.get_recent(50):
+        await websocket.send_json(entry.to_payload())
 
     subscription = log_buffer.subscribe()
     try:
         while True:
-            await websocket.send_text(await subscription.queue.get())
+            await websocket.send_json((await subscription.queue.get()).to_payload())
     except HTTPException:
         pass
     except WebSocketDisconnect:

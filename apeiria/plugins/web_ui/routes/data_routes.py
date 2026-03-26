@@ -36,12 +36,15 @@ async def list_records(
     _: Annotated[Any, Depends(require_auth)],
     page: int = 1,
     page_size: int = 20,
+    search: str = "",
 ) -> DataListResponse:
+    """List records for one internal table."""
     try:
         result = await data_browser_service.list_records(
             table,
             page=page,
             page_size=page_size,
+            search=search,
         )
     except ResourceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
@@ -52,6 +55,7 @@ async def list_records(
         total=result.total,
         page=result.page,
         page_size=result.page_size,
+        search=search.strip(),
         items=result.items,
     )
 
@@ -62,6 +66,7 @@ async def get_record(
     record_id: str,
     _: Annotated[Any, Depends(require_auth)],
 ) -> DataRecordResponse:
+    """Fetch one record from a browsable internal table."""
     try:
         result = await data_browser_service.get_record(table, record_id)
     except ResourceNotFoundError as exc:

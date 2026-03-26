@@ -8,6 +8,12 @@ const routes = [
     meta: { requiresAuth: false, titleKey: 'login.submit' },
   },
   {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { requiresAuth: false, titleKey: 'register.submit' },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },

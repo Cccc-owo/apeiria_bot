@@ -2,7 +2,12 @@ web_ui:
   auth:
     token_expired: "Login expired. Please sign in again."
     token_invalid: "Invalid login state. Please sign in again."
-    wrong_password: "Incorrect password"
+    invalid_credentials: "Incorrect username or password"
+    invite_invalid: "Registration code is invalid or already used"
+    username_invalid: "Username is required"
+    username_taken: "Username already exists"
+    register_failed: "Registration failed"
+    register_success: "Registration succeeded. Please sign in."
   chat:
     asset_not_found: "Asset not found"
     asset_file_missing: "Asset file missing"

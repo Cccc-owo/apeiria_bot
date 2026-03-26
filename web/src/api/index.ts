@@ -1,5 +1,11 @@
 import client from './client'
 
+export interface WebUIPrincipal {
+  user_id: string
+  username: string
+  role: string
+}
+
 export interface SettingsFieldItem {
   key: string
   type: string
@@ -51,8 +57,21 @@ export interface DriverConfigItem {
   is_active: boolean
 }
 
-export const login = (password: string) =>
-  client.post<{ token: string }>('/auth/login', { password })
+export const login = (payload: {
+  username: string
+  password: string
+}) =>
+  client.post<{ token: string; principal: WebUIPrincipal }>('/auth/login', payload)
+
+export const register = (payload: {
+  invite_code: string
+  username: string
+  password: string
+}) =>
+  client.post<{ status: string; detail?: string | null }>('/auth/register', payload)
+
+export const getCurrentUser = () =>
+  client.get<WebUIPrincipal>('/auth/me')
 
 export const getStatus = () =>
   client.get<{
@@ -176,7 +195,7 @@ export const updateUserLevel = (userId: string, groupId: string, level: number) 
 export const getDataTables = () =>
   client.get<{ name: string; label: string; primary_key: string }[]>('/data/')
 
-export const getDataRecords = (table: string, page = 1, pageSize = 20) =>
+export const getDataRecords = (table: string, page = 1, pageSize = 20, search = '') =>
   client.get<{
     table: string
     primary_key: string
@@ -184,11 +203,13 @@ export const getDataRecords = (table: string, page = 1, pageSize = 20) =>
     total: number
     page: number
     page_size: number
+    search: string
     items: Record<string, unknown>[]
   }>(`/data/${table}`, {
     params: {
       page,
       page_size: pageSize,
+      search,
     },
   })
 
