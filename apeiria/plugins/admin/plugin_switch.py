@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
 from arclet.alconna import Args
@@ -16,6 +15,8 @@ from apeiria.core.utils.helpers import (
     get_plugin_protection_reason,
 )
 from apeiria.core.utils.rules import admin_check, ensure_group
+from apeiria.domains.exceptions import PermissionDeniedError
+from apeiria.domains.groups import group_service
 
 from .utils import extract_group_id
 
@@ -74,32 +75,11 @@ def _find_plugin(name: str) -> Plugin | None:
 
 
 async def _toggle_plugin(group_id: str, plugin_name: str, *, enable: bool) -> None:
-    from nonebot_plugin_orm import get_session
-    from sqlalchemy import select
-
-    from apeiria.core.models.group import GroupConsole
-    from apeiria.core.utils.permission import invalidate_group_plugin_cache
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(GroupConsole).where(GroupConsole.group_id == group_id)
-        )
-        group = result.scalar_one_or_none()
-        if not group:
-            group = GroupConsole(group_id=group_id, disabled_plugins="[]")
-            session.add(group)
-
-        try:
-            disabled: list[str] = json.loads(group.disabled_plugins or "[]")
-        except (json.JSONDecodeError, TypeError):
-            disabled = []
-
-        if enable:
-            disabled = [p for p in disabled if p != plugin_name]
-        elif plugin_name not in disabled:
-            disabled.append(plugin_name)
-
-        group.disabled_plugins = json.dumps(disabled)
-        await session.commit()
-
-    await invalidate_group_plugin_cache(group_id)
+    try:
+        await group_service.toggle_group_plugin(group_id, plugin_name, enable=enable)
+    except PermissionDeniedError as exc:
+        message = str(exc)
+        if message:
+            if enable:
+                await _enable.finish(message)
+            await _disable.finish(message)

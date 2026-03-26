@@ -12,7 +12,9 @@ from nonebot.log import logger
 from .protocol import ErrorPayload, MessageReceivePayload
 
 if TYPE_CHECKING:
+    from .codec import MessageCodec
     from .connection import WebChatConnection
+    from .emitter import WebChatEmitter
     from .event import WebChatMessageEvent
     from .message import WebChatMessage, WebChatMessageSegment
     from .session import ChatSession
@@ -24,12 +26,14 @@ class WebChatBot(Bot):
         adapter: Any,
         session: "ChatSession",
         connection: "WebChatConnection",
-        service: Any,
+        codec: "MessageCodec",
+        emitter: "WebChatEmitter",
     ) -> None:
         super().__init__(adapter, f"webui_{session.session_id}")
         object.__setattr__(self, "_session", session)
         object.__setattr__(self, "_connection", connection)
-        object.__setattr__(self, "_service", service)
+        object.__setattr__(self, "_codec", codec)
+        object.__setattr__(self, "_emitter", emitter)
 
     async def send(
         self,
@@ -37,7 +41,7 @@ class WebChatBot(Bot):
         message: str | "WebChatMessage" | "WebChatMessageSegment",
         **kwargs: Any,  # noqa: ARG002
     ) -> Any:
-        segments = await self._service.codec.encode_message(message)
+        segments = await self._codec.encode_message(message)
         payload = MessageReceivePayload(
             session_id=self._session.session_id,
             message_id=f"srv_{uuid4().hex}",
@@ -45,7 +49,7 @@ class WebChatBot(Bot):
             segments=segments,
             timestamp=datetime.now(UTC),
         )
-        await self._service.emit_message(self._connection, payload)
+        await self._emitter.emit_message(self._connection, payload)
         return {"status": "ok"}
 
     async def call_api(self, api: str, **data: Any) -> Any:

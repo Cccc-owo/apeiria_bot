@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from apeiria.core.services.web_chat.protocol import (
+from apeiria.domains.chat.protocol import (
     AuthHelloPayload,
     AuthOkPayload,
     CapabilitiesResponsePayload,

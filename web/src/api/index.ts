@@ -198,14 +198,3 @@ export const getDataRecord = (table: string, recordId: string) =>
     primary_key: string
     record: Record<string, unknown>
   }>(`/data/${table}/${recordId}`)
-
-export const updateDataRecord = (
-  table: string,
-  recordId: string,
-  values: Record<string, unknown>,
-) =>
-  client.patch<{
-    table: string
-    primary_key: string
-    record: Record<string, unknown>
-  }>(`/data/${table}/${recordId}`, { values })

@@ -25,6 +25,7 @@ def _official_plugin_root() -> Path:
 
 
 def load_framework() -> None:
+    """Load framework plugins, builtins, and core side effects."""
     from apeiria.core.services.log import setup_logging
 
     setup_logging()

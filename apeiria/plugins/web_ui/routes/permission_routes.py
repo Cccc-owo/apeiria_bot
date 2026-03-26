@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from apeiria.core.i18n import t
+from apeiria.domains.exceptions import ResourceNotFoundError
+from apeiria.domains.permissions import permission_service
 from apeiria.plugins.web_ui.auth import require_auth
 from apeiria.plugins.web_ui.models import (
     BanCreateRequest,
@@ -21,17 +22,11 @@ router = APIRouter()
 
 @router.get("/users", response_model=list[UserLevelItem])
 async def list_users(_: Annotated[Any, Depends(require_auth)]) -> list[UserLevelItem]:
-    from nonebot_plugin_orm import get_session
-    from sqlalchemy import select
-
-    from apeiria.core.models.level import LevelUser
-
-    async with get_session() as session:
-        result = await session.execute(select(LevelUser))
-        rows = result.scalars().all()
+    rows = await permission_service.list_user_levels()
     return [
-        UserLevelItem(user_id=r.user_id, group_id=r.group_id, level=r.level)
+        UserLevelItem(user_id=user_id, group_id=group_id, level=level)
         for r in rows
+        for user_id, group_id, level in [r]
     ]
 
 
@@ -48,31 +43,22 @@ async def update_user_level(
             detail=t("web_ui.permissions.group_id_required"),
         )
 
-    from apeiria.core.utils.permission import set_user_level
-
-    await set_user_level(user_id, group_id, body.level)
+    await permission_service.set_user_level(user_id, group_id, body.level)
     return {"status": "ok"}
 
 
 @router.get("/bans", response_model=list[BanItem])
 async def list_bans(_: Annotated[Any, Depends(require_auth)]) -> list[BanItem]:
-    from nonebot_plugin_orm import get_session
-    from sqlalchemy import select
-
-    from apeiria.core.models.ban import BanConsole
-
-    async with get_session() as session:
-        result = await session.execute(select(BanConsole))
-        rows = result.scalars().all()
+    rows = await permission_service.list_bans()
     return [
         BanItem(
-            id=r.id,
-            user_id=r.user_id,
-            group_id=r.group_id,
-            duration=r.duration,
-            reason=r.reason,
+            id=ban_id,
+            user_id=user_id,
+            group_id=group_id,
+            duration=duration,
+            reason=reason,
         )
-        for r in rows
+        for ban_id, user_id, group_id, duration, reason in rows
     ]
 
 
@@ -81,30 +67,18 @@ async def create_ban(
     body: BanCreateRequest,
     _: Annotated[Any, Depends(require_auth)],
 ) -> BanItem:
-    from nonebot_plugin_orm import get_session
-
-    from apeiria.core.models.ban import BanConsole
-    from apeiria.core.utils.permission import invalidate_ban_cache
-
-    async with get_session() as session:
-        record = BanConsole(
-            user_id=body.user_id,
-            group_id=body.group_id,
-            ban_time=datetime.now(timezone.utc),
-            duration=body.duration,
-            reason=body.reason,
-        )
-        session.add(record)
-        await session.commit()
-        await session.refresh(record)
-
-    await invalidate_ban_cache(body.user_id, body.group_id)
+    ban_id, user_id, group_id, duration, reason = await permission_service.create_ban(
+        user_id=body.user_id,
+        group_id=body.group_id,
+        duration=body.duration,
+        reason=body.reason,
+    )
     return BanItem(
-        id=record.id,
-        user_id=record.user_id,
-        group_id=record.group_id,
-        duration=record.duration,
-        reason=record.reason,
+        id=ban_id,
+        user_id=user_id,
+        group_id=group_id,
+        duration=duration,
+        reason=reason,
     )
 
 
@@ -113,27 +87,11 @@ async def delete_ban(
     ban_id: int,
     _: Annotated[Any, Depends(require_auth)],
 ) -> dict[str, str]:
-    from nonebot_plugin_orm import get_session
-    from sqlalchemy import select
-
-    from apeiria.core.models.ban import BanConsole
-    from apeiria.core.utils.permission import invalidate_ban_cache
-
-    async with get_session() as session:
-        result = await session.execute(
-            select(BanConsole).where(BanConsole.id == ban_id)
-        )
-        record = result.scalar_one_or_none()
-        if not record:
-            raise HTTPException(
-                status_code=404,
-                detail=t("web_ui.permissions.ban_not_found"),
-            )
-        user_id = record.user_id
-        group_id = record.group_id
-        await session.delete(record)
-        await session.commit()
-
-    if user_id:
-        await invalidate_ban_cache(user_id, group_id)
+    try:
+        await permission_service.delete_ban(ban_id)
+    except ResourceNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.permissions.ban_not_found"),
+        ) from None
     return {"status": "ok"}

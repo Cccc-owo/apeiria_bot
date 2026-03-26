@@ -1,0 +1,361 @@
+"""Application service for Web UI chat gateway flows."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
+
+from apeiria.core.i18n import t
+from apeiria.core.services.web_chat import WebChatConnection, web_chat_service
+from apeiria.domains.chat.protocol import (
+    AuthHelloPayload,
+    ChatEnvelope,
+    MessageSendPayload,
+    SessionCreatePayload,
+    SessionDeletePayload,
+    SessionUpdatePayload,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from apeiria.core.services.web_chat.assets import ChatAsset
+
+
+class ChatAssetNotFoundError(ValueError):
+    """Raised when a requested chat asset is unknown."""
+
+
+class ChatAssetFileMissingError(ValueError):
+    """Raised when a chat asset record exists but its file is missing."""
+
+
+class ChatGatewayService:
+    """Adapt Web UI websocket frames onto the WebChat kernel.
+
+    The domain layer owns request validation, auth handoff, and HTTP/WebSocket
+    error semantics. The core WebChat service remains focused on chat runtime
+    state and protocol emission.
+    """
+
+    def get_asset(self, asset_id: str) -> "ChatAsset":
+        """Resolve one asset and translate kernel state into domain errors."""
+        asset = web_chat_service.get_asset(asset_id)
+        if asset is None:
+            raise ChatAssetNotFoundError(asset_id)
+        if asset.remote_url:
+            return asset
+        if asset.local_path and asset.local_path.is_file():
+            return asset
+        raise ChatAssetFileMissingError(asset_id)
+
+    async def serve_websocket(
+        self,
+        websocket: WebSocket,
+        token_verifier: Callable[[str], dict[str, object]],
+    ) -> None:
+        """Run the full websocket session loop for one browser connection."""
+        await websocket.accept()
+        connection = WebChatConnection(websocket)
+        active_session_id: str | None = None
+
+        try:
+            while True:
+                frame = ChatEnvelope.model_validate(await websocket.receive_json())
+                active_session_id = await self._handle_frame(
+                    connection,
+                    frame,
+                    active_session_id,
+                    token_verifier,
+                )
+        except ValidationError as exc:
+            await web_chat_service.emit_error(
+                connection,
+                code="INVALID_FRAME",
+                message=f"{t('web_ui.chat.invalid_frame')}: {exc}",
+                type_="system.error",
+            )
+        except WebSocketDisconnect:
+            if active_session_id:
+                web_chat_service.close_session(active_session_id)
+        except Exception as exc:  # noqa: BLE001
+            await web_chat_service.emit_error(
+                connection,
+                code="INTERNAL_ERROR",
+                message=f"{t('web_ui.chat.internal_error')}: {exc}",
+                type_="system.error",
+            )
+            await websocket.close(
+                code=1011,
+                reason=t("web_ui.chat.websocket_close_reason"),
+            )
+
+    async def _handle_frame(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+        token_verifier: Callable[[str], dict[str, object]],
+    ) -> str | None:
+        """Dispatch one validated client frame into the appropriate handler."""
+        if frame.type != "auth.hello" and connection.principal is None:
+            await web_chat_service.emit_error(
+                connection,
+                code="AUTH_REQUIRED",
+                message=t("web_ui.chat.auth_required"),
+                request_id=frame.request_id,
+            )
+            return active_session_id
+
+        if frame.type == "auth.hello":
+            return await self._handle_auth_hello(
+                connection,
+                frame,
+                token_verifier,
+                active_session_id,
+            )
+        if frame.type == "capabilities.request":
+            await web_chat_service.emit_capabilities(
+                connection,
+                request_id=frame.request_id,
+            )
+            return active_session_id
+        if frame.type in {
+            "session.create",
+            "session.update",
+            "session.list",
+            "session.close",
+            "session.clear_history",
+            "session.delete",
+        }:
+            return await self._handle_session_frame(
+                connection,
+                frame,
+                active_session_id,
+            )
+        if frame.type == "message.send":
+            return await self._handle_message_send(
+                connection,
+                frame,
+                active_session_id,
+            )
+        await web_chat_service.emit_error(
+            connection,
+            code="UNSUPPORTED_FRAME",
+            message=t("web_ui.chat.unsupported_frame", type=frame.type),
+            request_id=frame.request_id,
+        )
+        return active_session_id
+
+    async def _handle_session_frame(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+    ) -> str | None:
+        next_session_id = active_session_id
+        match frame.type:
+            case "session.create":
+                next_session_id = await self._handle_session_create(
+                    connection,
+                    frame,
+                    active_session_id,
+                )
+            case "session.update":
+                next_session_id = await self._handle_session_update(
+                    connection,
+                    frame,
+                    active_session_id,
+                )
+            case "session.list":
+                await web_chat_service.emit_session_list(
+                    connection,
+                    connection.principal,
+                    request_id=frame.request_id,
+                )
+            case "session.close":
+                next_session_id = await self._handle_session_close(
+                    connection,
+                    active_session_id,
+                )
+            case "session.clear_history":
+                await self._handle_session_clear_history(
+                    connection,
+                    active_session_id,
+                    frame.request_id,
+                )
+            case "session.delete":
+                next_session_id = await self._handle_session_delete(
+                    connection,
+                    frame,
+                    active_session_id,
+                )
+        return next_session_id
+
+    async def _handle_session_create(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+    ) -> str | None:
+        payload = SessionCreatePayload.model_validate(frame.payload)
+        session = web_chat_service.create_session(
+            connection.principal,
+            payload,
+        )
+        active_session_id = session.session_id
+        await web_chat_service.emit_session_state(
+            connection,
+            session,
+            request_id=frame.request_id,
+        )
+        await web_chat_service.emit_session_list(
+            connection,
+            connection.principal,
+        )
+        return active_session_id
+
+    async def _handle_session_update(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+    ) -> str | None:
+        payload = SessionUpdatePayload.model_validate(frame.payload)
+        session = web_chat_service.update_session(
+            connection.principal,
+            payload,
+        )
+        active_session_id = session.session_id
+        await web_chat_service.emit_session_state(
+            connection,
+            session,
+            request_id=frame.request_id,
+        )
+        await web_chat_service.emit_session_list(
+            connection,
+            connection.principal,
+        )
+        return active_session_id
+
+    async def _handle_message_send(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+    ) -> str | None:
+        payload = MessageSendPayload.model_validate(frame.payload)
+        await web_chat_service.handle_message(connection, payload)
+        await web_chat_service.emit_session_list(
+            connection,
+            connection.principal,
+        )
+        return active_session_id
+
+    async def _handle_auth_hello(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        token_verifier: Callable[[str], dict[str, object]],
+        active_session_id: str | None,
+    ) -> str | None:
+        """Authenticate the websocket session and send initial session state."""
+        try:
+            payload = AuthHelloPayload.model_validate(frame.payload)
+            claims = token_verifier(payload.token)
+            principal = web_chat_service.build_principal(claims)
+            await web_chat_service.emit_auth_ok(
+                connection,
+                principal,
+                request_id=frame.request_id,
+            )
+            await web_chat_service.emit_system_info(
+                connection,
+                t("web_ui.chat.auth_connected"),
+            )
+            await web_chat_service.emit_session_list(connection, principal)
+        except HTTPException as exc:
+            await web_chat_service.emit_error(
+                connection,
+                code="AUTH_FAILED",
+                message=str(exc.detail),
+                request_id=frame.request_id,
+                type_="auth.error",
+            )
+        return active_session_id
+
+    async def _handle_session_close(
+        self,
+        connection: WebChatConnection,
+        active_session_id: str | None,
+    ) -> str | None:
+        """Close the active session tracked by this websocket connection."""
+        if active_session_id:
+            web_chat_service.close_session(active_session_id)
+            await web_chat_service.emit_system_info(
+                connection,
+                t("web_ui.chat.session_closed"),
+            )
+            await web_chat_service.emit_session_list(
+                connection,
+                connection.principal,
+            )
+        return None
+
+    async def _handle_session_clear_history(
+        self,
+        connection: WebChatConnection,
+        active_session_id: str | None,
+        request_id: str | None,
+    ) -> None:
+        if active_session_id and connection.principal is not None:
+            session = web_chat_service.clear_history(
+                active_session_id,
+                connection.principal,
+            )
+            await web_chat_service.emit_session_state(
+                connection,
+                session,
+                request_id=request_id,
+                type_="session.history_cleared",
+            )
+            await web_chat_service.emit_session_list(
+                connection,
+                connection.principal,
+            )
+
+    async def _handle_session_delete(
+        self,
+        connection: WebChatConnection,
+        frame: ChatEnvelope,
+        active_session_id: str | None,
+    ) -> str | None:
+        if connection.principal is not None:
+            payload = SessionDeletePayload.model_validate(frame.payload)
+            deleted_session_id = web_chat_service.delete_session(
+                connection.principal,
+                payload,
+            )
+            if active_session_id == deleted_session_id:
+                active_session_id = None
+            await web_chat_service.emit_session_deleted(
+                connection,
+                deleted_session_id,
+                request_id=frame.request_id,
+            )
+            await web_chat_service.emit_session_list(
+                connection,
+                connection.principal,
+            )
+        return active_session_id
+
+chat_gateway_service = ChatGatewayService()
+
+__all__ = [
+    "ChatAssetFileMissingError",
+    "ChatAssetNotFoundError",
+    "ChatGatewayService",
+    "chat_gateway_service",
+]

@@ -6,7 +6,7 @@ import nonebot
 from nonebot.adapters import Event  # noqa: TC002
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.permission import extract_group_id as _extract_group_id
+from apeiria.domains.permissions import permission_service
 
 
 def extract_group_id(event: Event) -> str | None:
@@ -15,7 +15,7 @@ def extract_group_id(event: Event) -> str | None:
         user_id = event.get_user_id()
     except Exception:  # noqa: BLE001
         return None
-    return _extract_group_id(event.get_session_id(), user_id)
+    return permission_service.extract_group_id(event.get_session_id(), user_id)
 
 
 def resolve_target_id(target: object) -> str:
