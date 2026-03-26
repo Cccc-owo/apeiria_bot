@@ -14,6 +14,7 @@ from nonebot.log import logger
 from nonebot_plugin_localstore import get_data_file
 
 from apeiria.core.i18n import t
+from apeiria.core.utils.files import atomic_write_text
 
 from .models import WebUIPrincipalResponse
 
@@ -85,12 +86,32 @@ def _load_or_create_raw() -> dict[str, Any]:
     if secret_file.is_file():
         try:
             data = json.loads(secret_file.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "token_secret" in data:
-                upgraded = _upgrade_legacy_schema(data)
-                _persist_raw(upgraded)
-                return upgraded
-        except (json.JSONDecodeError, OSError):
-            pass
+        except json.JSONDecodeError as exc:
+            logger.opt(exception=exc).critical(
+                "Web UI auth storage is corrupted: {}",
+                secret_file,
+            )
+            msg = (
+                "web_ui auth storage is corrupted; "
+                "fix or restore secret.json before startup"
+            )
+            raise RuntimeError(msg) from exc
+        except OSError as exc:
+            logger.opt(exception=exc).critical(
+                "Failed to read Web UI auth storage: {}",
+                secret_file,
+            )
+            msg = "web_ui auth storage is unreadable"
+            raise RuntimeError(msg) from exc
+
+        if isinstance(data, dict) and "token_secret" in data:
+            upgraded = _upgrade_legacy_schema(data)
+            _persist_raw(upgraded)
+            return upgraded
+
+        logger.critical("Web UI auth storage has unsupported schema: {}", secret_file)
+        msg = "web_ui auth storage has unsupported schema"
+        raise RuntimeError(msg)
 
     data = {
         "token_secret": secrets.token_urlsafe(32),
@@ -130,10 +151,9 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
 def _persist_raw(data: dict[str, Any]) -> None:
     """Persist auth storage to disk."""
     secret_file = get_data_file(_PLUGIN_DATA_ID, "secret.json")
-    secret_file.parent.mkdir(parents=True, exist_ok=True)
-    secret_file.write_text(
+    atomic_write_text(
+        secret_file,
         json.dumps(data, ensure_ascii=True, indent=2),
-        encoding="utf-8",
     )
     _apply_secret_permissions(secret_file)
 

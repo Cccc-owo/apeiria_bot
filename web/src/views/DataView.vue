@@ -264,10 +264,20 @@ function stringifyValue(value: unknown) {
 }
 
 async function loadTables() {
-  const response = await getDataTables()
-  tables.value = response.data
-  if (!selectedTable.value && tables.value.length > 0) {
-    selectedTable.value = tables.value[0].name
+  errorMessage.value = ''
+  try {
+    const response = await getDataTables()
+    tables.value = response.data
+    if (!selectedTable.value && tables.value.length > 0) {
+      selectedTable.value = tables.value[0].name
+    }
+  } catch (error) {
+    tables.value = []
+    selectedTable.value = ''
+    headers.value = []
+    rows.value = []
+    total.value = 0
+    errorMessage.value = getErrorMessage(error, t('data.loadFailed'))
   }
 }
 
@@ -361,8 +371,8 @@ watch([page, pageSize], () => {
   void loadRecords()
 })
 
-onMounted(async () => {
-  await loadTables()
+onMounted(() => {
+  void loadTables()
 })
 </script>
 

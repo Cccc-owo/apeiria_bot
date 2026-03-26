@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import heapq
 import re
 from collections import deque
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from nonebot.log import logger
 from apeiria.core.i18n import t
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterator, Mapping
 
     from loguru import Record
 
@@ -104,6 +105,9 @@ LOG_LINE_PATTERN = re.compile(
     r"\[(?P<source>[^\]]+)\]\s"
     r"(?P<message>.*)$"
 )
+ACCESS_LOG_PATTERN = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s(?P<message>.*)$"
+)
 
 
 def _log_format(_record: Record) -> str:
@@ -180,7 +184,11 @@ def setup_logging(
     logger.info("{}", t("logging.initialized", log_dir=log_dir))
 
 
-def load_history_logs(*, before: int = 0, limit: int = 50) -> tuple[list[StructuredLogEntry], bool]:
+def load_history_logs(
+    *,
+    before: int = 0,
+    limit: int = 50,
+) -> tuple[list[StructuredLogEntry], bool]:
     """Load persisted logs from disk, newest first.
 
     Args:
@@ -197,42 +205,18 @@ def load_history_logs(*, before: int = 0, limit: int = 50) -> tuple[list[Structu
     if not log_dir.exists():
         return [], False
 
-    remaining_skip = before
-    remaining_take = limit
-    collected: list[StructuredLogEntry] = []
-    log_files = sorted(log_dir.glob("*.log"), reverse=True)
-
-    for index, path in enumerate(log_files):
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-
-        file_entries = list(reversed(_parse_log_text(text)))
-        if not file_entries:
-            continue
-
-        if remaining_skip >= len(file_entries):
-            remaining_skip -= len(file_entries)
-            continue
-
-        start = remaining_skip
-        available_entries = file_entries[start:]
-        take_count = min(remaining_take, len(available_entries))
-        collected.extend(available_entries[:take_count])
-        remaining_take -= take_count
-        remaining_skip = 0
-
-        if remaining_take == 0:
-            has_more_in_current_file = start + take_count < len(file_entries)
-            has_more_in_older_files = index < len(log_files) - 1
-            return collected, has_more_in_current_file or has_more_in_older_files
-
-    return collected, False
+    return _collect_history_page(
+        sorted(log_dir.glob("*.log"), reverse=True),
+        before=before,
+        limit=limit,
+    )
 
 
-def _parse_log_text(text: str) -> list[StructuredLogEntry]:
+def _parse_log_text(text: str, *, source_hint: str = "") -> list[StructuredLogEntry]:
     """Parse a persisted log file using the configured line format."""
+    if source_hint == "access.log":
+        return _parse_access_log_text(text)
+
     entries: list[StructuredLogEntry] = []
     current: StructuredLogEntry | None = None
 
@@ -266,3 +250,162 @@ def _parse_log_text(text: str) -> list[StructuredLogEntry]:
     if current is not None:
         entries.append(current)
     return entries
+
+
+def _parse_access_log_text(text: str) -> list[StructuredLogEntry]:
+    """Parse uvicorn access logs persisted in access.log."""
+    entries: list[StructuredLogEntry] = []
+    for line in text.splitlines():
+        match = ACCESS_LOG_PATTERN.match(line)
+        if not match:
+            continue
+        entries.append(
+            StructuredLogEntry(
+                timestamp=match.group("timestamp"),
+                level="INFO",
+                source="uvicorn.access",
+                message=match.group("message"),
+                raw=line,
+                extra={},
+            )
+        )
+    return entries
+
+
+def _collect_history_page(
+    paths: list[Path],
+    *,
+    before: int,
+    limit: int,
+) -> tuple[list[StructuredLogEntry], bool]:
+    remaining_skip = before
+    remaining_take = limit
+    collected: list[StructuredLogEntry] = []
+    iterators = [
+        _iter_log_entries_reverse(path)
+        for path in paths
+    ]
+    heap: list[tuple[str, int, StructuredLogEntry]] = []
+
+    for source_index, iterator in enumerate(iterators):
+        first = next(iterator, None)
+        if first is None:
+            continue
+        heapq.heappush(
+            heap,
+            (_invert_timestamp(first.timestamp), source_index, first),
+        )
+
+    while heap:
+        _, source_index, entry = heapq.heappop(heap)
+        iterator = iterators[source_index]
+
+        if remaining_skip > 0:
+            remaining_skip -= 1
+        else:
+            collected.append(entry)
+            remaining_take -= 1
+            if remaining_take == 0:
+                return collected, _advance_history_heap(heap, iterator, source_index)
+
+        next_entry = next(iterator, None)
+        if next_entry is not None:
+            heapq.heappush(
+                heap,
+                (_invert_timestamp(next_entry.timestamp), source_index, next_entry),
+            )
+
+    return collected, False
+
+
+def _advance_history_heap(
+    heap: list[tuple[str, int, StructuredLogEntry]],
+    iterator: "Iterator[StructuredLogEntry]",
+    source_index: int,
+) -> bool:
+    if heap:
+        return True
+
+    next_entry = next(iterator, None)
+    if next_entry is None:
+        return False
+
+    heapq.heappush(
+        heap,
+        (_invert_timestamp(next_entry.timestamp), source_index, next_entry),
+    )
+    return True
+
+
+def _iter_log_entries_reverse(path: Path) -> "Iterator[StructuredLogEntry]":
+    if path.name == "access.log":
+        yield from _iter_access_log_entries_reverse(path)
+        return
+    yield from _iter_structured_log_entries_reverse(path)
+
+
+def _iter_access_log_entries_reverse(path: Path) -> "Iterator[StructuredLogEntry]":
+    for line in _iter_lines_reverse(path):
+        match = ACCESS_LOG_PATTERN.match(line)
+        if not match:
+            continue
+        yield StructuredLogEntry(
+            timestamp=match.group("timestamp"),
+            level="INFO",
+            source="uvicorn.access",
+            message=match.group("message"),
+            raw=line,
+            extra={},
+        )
+
+
+def _iter_structured_log_entries_reverse(path: Path) -> "Iterator[StructuredLogEntry]":
+    tail_lines: list[str] = []
+    for line in _iter_lines_reverse(path):
+        match = LOG_LINE_PATTERN.match(line)
+        if match:
+            raw_lines = [line, *reversed(tail_lines)]
+            yield StructuredLogEntry(
+                timestamp=match.group("timestamp"),
+                level=match.group("level").strip(),
+                source=match.group("source").strip(),
+                message=match.group("message"),
+                raw="\n".join(raw_lines),
+                extra={},
+            )
+            tail_lines.clear()
+            continue
+        tail_lines.append(line)
+
+
+def _iter_lines_reverse(
+    path: Path,
+    *,
+    chunk_size: int = 8192,
+) -> "Iterator[str]":
+    try:
+        with path.open("rb") as file:
+            file.seek(0, 2)
+            position = file.tell()
+            remainder = b""
+
+            while position > 0:
+                read_size = min(chunk_size, position)
+                position -= read_size
+                file.seek(position)
+                chunk = file.read(read_size)
+                parts = (chunk + remainder).split(b"\n")
+                remainder = parts[0]
+                for part in reversed(parts[1:]):
+                    yield part.decode("utf-8", errors="replace")
+
+            if remainder:
+                yield remainder.decode("utf-8", errors="replace")
+    except OSError:
+        return
+
+
+def _invert_timestamp(value: str) -> str:
+    """Invert sortable timestamp text so heapq yields newest entries first."""
+    return "".join(chr(255 - ord(char)) for char in value)
+

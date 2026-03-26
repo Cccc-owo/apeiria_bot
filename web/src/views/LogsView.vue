@@ -214,11 +214,13 @@ const loadingOlder = ref(false)
 const hasMoreHistory = ref(false)
 const nextBefore = ref<number | null>(0)
 const historyError = ref('')
+const historyLogCount = ref(0)
 const { t } = useI18n()
 let ws: WebSocket | null = null
 const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
 const pendingLiveLogs: LogEntry[] = []
 let primingHistory = false
+const MAX_LIVE_LOGS = 500
 
 const levelOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.level))).sort())
 const sourceOptions = computed(() => Array.from(new Set(logs.value.map((item) => item.source))).sort())
@@ -283,6 +285,7 @@ function resetLogsView() {
   hasMoreHistory.value = false
   nextBefore.value = 0
   historyError.value = ''
+  historyLogCount.value = 0
   pendingLiveLogs.length = 0
   primingHistory = false
 }
@@ -308,6 +311,7 @@ async function loadInitialHistory() {
       .slice()
       .reverse()
       .map(item => toLogEntry(item))
+    historyLogCount.value = logs.value.length
     hasMoreHistory.value = response.data.has_more
     nextBefore.value = response.data.next_before
     await nextTick()
@@ -331,6 +335,7 @@ async function loadOlderHistory() {
       .reverse()
       .map(item => toLogEntry(item))
     logs.value = [...olderEntries, ...logs.value]
+    historyLogCount.value += olderEntries.length
     hasMoreHistory.value = response.data.has_more
     nextBefore.value = response.data.next_before
     await nextTick()
@@ -419,22 +424,29 @@ function toggleQuickLevel(level: string) {
   selectedLevels.value = [...selectedLevels.value, level]
 }
 
-function appendLiveLog(entry: LogEntry) {
-  const entryKey = buildLogKey(entry)
-  if (logs.value.some(item => buildLogKey(item) === entryKey)) {
-    return
-  }
-  logs.value.push(entry)
-}
-
 function flushPendingLiveLogs() {
+  const existingKeys = new Set(logs.value.map(item => buildLogKey(item)))
   for (const entry of pendingLiveLogs.splice(0)) {
+    const entryKey = buildLogKey(entry)
+    if (existingKeys.has(entryKey)) {
+      continue
+    }
+    existingKeys.add(entryKey)
     appendLiveLog(entry)
   }
 }
 
 function buildLogKey(entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
   return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
+}
+
+function appendLiveLog(entry: LogEntry) {
+  logs.value.push(entry)
+  const maxLogs = historyLogCount.value + MAX_LIVE_LOGS
+  if (logs.value.length <= maxLogs) {
+    return
+  }
+  logs.value.splice(historyLogCount.value, logs.value.length - maxLogs)
 }
 
 function exportLogs() {

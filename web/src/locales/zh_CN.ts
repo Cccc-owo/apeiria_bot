@@ -259,7 +259,7 @@ const zhCN = {
     customizedCount: '已定制',
     filteredCount: '当前显示群组',
     currentGroup: '群组 {groupId}',
-    protectedInfo: '框架依赖不能在这里禁用。',
+    protectedInfo: '受保护插件不能在这里禁用。',
     disabledPlugins: '禁用插件',
     search: '搜索群组',
     statusFilter: '机器人状态',
