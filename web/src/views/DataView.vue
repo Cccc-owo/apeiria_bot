@@ -66,7 +66,7 @@
             color="primary"
             @click="openRecordDialog(item)"
           >
-            {{ t('data.viewEdit') }}
+            {{ t('data.viewDetail') }}
           </v-btn>
         </template>
         <template #item="{ item, columns }">
@@ -83,7 +83,7 @@
                   color="primary"
                   @click="openRecordDialog(item)"
                 >
-                  {{ t('data.viewEdit') }}
+                  {{ t('data.viewDetail') }}
                 </v-btn>
               </template>
               <template v-else>
@@ -128,7 +128,7 @@
                 color="primary"
                 hide-details
                 inset
-                :readonly="!isEditableField(field)"
+                readonly
                 density="compact"
               />
               <v-text-field
@@ -137,7 +137,7 @@
                 :label="field"
                 density="compact"
                 type="number"
-                :readonly="!isEditableField(field)"
+                readonly
               />
               <v-textarea
                 v-else-if="fieldType(field) === 'json'"
@@ -146,29 +146,20 @@
                 density="compact"
                 auto-grow
                 rows="4"
-                :readonly="!isEditableField(field)"
+                readonly
               />
               <v-text-field
                 v-else
                 v-model="editForm[field]"
                 :label="field"
                 density="compact"
-                :readonly="!isEditableField(field)"
+                readonly
               />
             </template>
           </div>
         </v-card-text>
         <v-card-actions>
           <v-btn variant="text" @click="recordDialogVisible = false">{{ t('common.close') }}</v-btn>
-          <v-spacer />
-          <v-btn
-            color="primary"
-            :loading="savingRecord"
-            :disabled="!editingRecordId"
-            @click="saveRecord"
-          >
-            {{ t('common.save') }}
-          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -178,9 +169,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getDataRecord, getDataRecords, getDataTables, updateDataRecord } from '@/api'
+import { getDataRecord, getDataRecords, getDataTables } from '@/api'
 import { getErrorMessage } from '@/api/client'
-import { useNoticeStore } from '@/stores/notice'
 
 interface DataTableInfo {
   name: string
@@ -201,13 +191,11 @@ const pageSize = ref(20)
 
 const recordDialogVisible = ref(false)
 const dialogLoading = ref(false)
-const savingRecord = ref(false)
 const dialogErrorMessage = ref('')
 const editingRecordId = ref('')
 const originalRecord = ref<Record<string, unknown>>({})
 const editForm = ref<Record<string, string>>({})
 const booleanEditForm = ref<Record<string, boolean>>({})
-const noticeStore = useNoticeStore()
 const { t } = useI18n()
 
 const tableOptions = computed(() => tables.value)
@@ -222,10 +210,6 @@ function formatCell(value: unknown) {
   return String(value)
 }
 
-function isEditableField(field: string) {
-  return ![primaryKey.value, 'created_at', 'updated_at'].includes(field)
-}
-
 function fieldType(field: string) {
   const original = originalRecord.value[field]
   if (typeof original === 'boolean') return 'boolean'
@@ -238,32 +222,6 @@ function stringifyValue(value: unknown) {
   if (value === null || value === undefined) return ''
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
-}
-
-function normalizeEditedValue(field: string, rawValue: string) {
-  const original = originalRecord.value[field]
-
-  if (!isEditableField(field)) {
-    return original
-  }
-  if (rawValue === '' && original === null) {
-    return null
-  }
-  if (typeof original === 'number') {
-    const parsed = Number(rawValue)
-    return Number.isNaN(parsed) ? original : parsed
-  }
-  if (typeof original === 'boolean') {
-    return rawValue === 'true'
-  }
-  if (original && typeof original === 'object') {
-    try {
-      return JSON.parse(rawValue)
-    } catch {
-      return original
-    }
-  }
-  return rawValue
 }
 
 async function loadTables() {
@@ -328,41 +286,7 @@ async function openRecordDialog(row: Record<string, unknown>) {
 }
 
 async function saveRecord() {
-  if (!editingRecordId.value) return
-
-  savingRecord.value = true
-  dialogErrorMessage.value = ''
-  try {
-    const values = Object.fromEntries(
-      Object.entries(editForm.value)
-        .filter(([field]) => isEditableField(field))
-        .map(([field, rawValue]) => {
-          if (fieldType(field) === 'boolean') {
-            return [field, booleanEditForm.value[field] ?? false]
-          }
-          return [field, normalizeEditedValue(field, rawValue)]
-        }),
-    )
-
-    const response = await updateDataRecord(selectedTable.value, editingRecordId.value, values)
-    originalRecord.value = response.data.record
-    editForm.value = Object.fromEntries(
-      Object.entries(response.data.record).map(([key, value]) => [key, stringifyValue(value)]),
-    )
-    booleanEditForm.value = Object.fromEntries(
-      Object.entries(response.data.record)
-        .filter(([, value]) => typeof value === 'boolean')
-        .map(([key, value]) => [key, Boolean(value)]),
-    )
-    recordDialogVisible.value = false
-    await loadRecords()
-    noticeStore.show(t('data.updated'), 'success')
-  } catch (error) {
-    dialogErrorMessage.value = getErrorMessage(error, t('data.saveFailed'))
-    noticeStore.show(dialogErrorMessage.value, 'error')
-  } finally {
-    savingRecord.value = false
-  }
+  return
 }
 
 function handleOptionsChange(options: { page: number; itemsPerPage: number }) {

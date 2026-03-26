@@ -16,33 +16,13 @@ from apeiria.cli_nb import (
     prompt_select_text,
     search_store_packages,
 )
+from apeiria.config import (
+    adapter_config_service,
+    driver_config_service,
+    plugin_config_service,
+)
 from apeiria.core.plugin_policy import is_framework_protected_plugin_module
-from apeiria.user_adapters import (
-    add_project_adapter_module,
-    bind_project_adapter_package,
-    ensure_project_adapter_config,
-    get_project_adapter_package_modules,
-    read_project_adapter_config,
-    remove_project_adapter_module,
-    unbind_project_adapter_package,
-)
-from apeiria.user_adapters import (
-    default_config_path as default_adapter_config_path,
-)
-from apeiria.user_drivers import (
-    add_project_driver_builtin,
-    bind_project_driver_package,
-    ensure_project_driver_config,
-    get_project_driver_kwargs,
-    get_project_driver_package_builtin,
-    read_project_driver_config,
-    remove_project_driver_builtin,
-    unbind_project_driver_package,
-)
-from apeiria.user_drivers import (
-    default_config_path as default_driver_config_path,
-)
-from apeiria.user_plugin_env import (
+from apeiria.runtime_env import (
     add_plugin_requirement,
     ensure_plugin_project,
     find_uv_executable,
@@ -56,20 +36,42 @@ from apeiria.user_plugin_env import (
     update_plugin_requirement,
     uv_cache_dir,
 )
-from apeiria.user_plugins import (
-    add_project_plugin_dir,
-    add_project_plugin_module,
-    bind_project_plugin_package,
-    ensure_project_plugin_config,
-    get_project_plugin_package_modules,
-    read_project_plugin_config,
-    remove_project_plugin_dir,
-    remove_project_plugin_module,
-    unbind_project_plugin_package,
+
+add_project_adapter_module = adapter_config_service.add_project_adapter_module
+bind_project_adapter_package = adapter_config_service.bind_project_adapter_package
+default_adapter_config_path = adapter_config_service.default_config_path
+ensure_project_adapter_config = adapter_config_service.ensure_project_adapter_config
+get_project_adapter_package_modules = (
+    adapter_config_service.get_project_adapter_package_modules
 )
-from apeiria.user_plugins import (
-    default_config_path as default_plugin_config_path,
+read_project_adapter_config = adapter_config_service.read_project_adapter_config
+remove_project_adapter_module = adapter_config_service.remove_project_adapter_module
+unbind_project_adapter_package = adapter_config_service.unbind_project_adapter_package
+
+add_project_driver_builtin = driver_config_service.add_project_driver_builtin
+bind_project_driver_package = driver_config_service.bind_project_driver_package
+default_driver_config_path = driver_config_service.default_config_path
+ensure_project_driver_config = driver_config_service.ensure_project_driver_config
+get_project_driver_kwargs = driver_config_service.get_project_driver_kwargs
+get_project_driver_package_builtin = (
+    driver_config_service.get_project_driver_package_builtin
 )
+read_project_driver_config = driver_config_service.read_project_driver_config
+remove_project_driver_builtin = driver_config_service.remove_project_driver_builtin
+unbind_project_driver_package = driver_config_service.unbind_project_driver_package
+
+add_project_plugin_dir = plugin_config_service.add_project_plugin_dir
+add_project_plugin_module = plugin_config_service.add_project_plugin_module
+bind_project_plugin_package = plugin_config_service.bind_project_plugin_package
+default_plugin_config_path = plugin_config_service.default_config_path
+ensure_project_plugin_config = plugin_config_service.ensure_project_plugin_config
+get_project_plugin_package_modules = (
+    plugin_config_service.get_project_plugin_package_modules
+)
+read_project_plugin_config = plugin_config_service.read_project_plugin_config
+remove_project_plugin_dir = plugin_config_service.remove_project_plugin_dir
+remove_project_plugin_module = plugin_config_service.remove_project_plugin_module
+unbind_project_plugin_package = plugin_config_service.unbind_project_plugin_package
 
 
 def _config_path(path: str | None) -> Path | None:

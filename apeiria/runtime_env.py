@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Helpers for the managed extension runtime environment."""
+
 import os
 import site
 import subprocess
@@ -20,6 +22,7 @@ def _project_root() -> Path:
 
 
 def plugin_project_root() -> Path:
+    """Return the root directory of the managed extension project."""
     return _project_root() / _PLUGIN_PROJECT_RELATIVE_PATH
 
 
@@ -80,6 +83,7 @@ def _plugin_project_template() -> str:
 
 
 def ensure_plugin_project() -> Path:
+    """Create the extension project scaffold when it does not exist yet."""
     root = plugin_project_root()
     root.mkdir(parents=True, exist_ok=True)
     pyproject_path = plugin_project_pyproject_path()
@@ -89,6 +93,7 @@ def ensure_plugin_project() -> Path:
 
 
 def find_uv_executable() -> str:
+    """Resolve the `uv` executable required for extension environment changes."""
     executable = which("uv")
     if executable is None:
         msg = "uv is required but was not found in PATH"
@@ -111,6 +116,7 @@ def _run_uv(args: list[str], *, cwd: Path) -> None:
 
 
 def sync_plugin_project(*, locked: bool = True) -> Path:
+    """Sync the managed extension environment with its pyproject and lockfile."""
     root = ensure_plugin_project()
     args = ["sync"]
     if locked and plugin_project_lock_path().exists():
@@ -141,6 +147,7 @@ def remove_plugin_requirement(
 
 
 def declared_plugin_requirements() -> dict[str, str]:
+    """Return normalized dependency names mapped to declared requirement strings."""
     pyproject_path = plugin_project_pyproject_path()
     try:
         import tomllib
@@ -189,6 +196,11 @@ def plugin_site_packages_paths() -> list[Path]:
 
 
 def inject_plugin_site_packages() -> list[Path]:
+    """Expose extension site-packages to the current interpreter process.
+
+    This keeps NoneBot able to import plugins, adapters, and drivers installed
+    into the managed extension environment without activating that venv.
+    """
     added: list[Path] = []
     for path in plugin_site_packages_paths():
         if str(path) in site.getsitepackages():
@@ -202,6 +214,7 @@ def inject_plugin_site_packages() -> list[Path]:
 
 
 def _extend_loaded_nonebot_package(site_packages: Path) -> None:
+    """Extend already-imported NoneBot namespace packages with extension paths."""
     _extend_loaded_package_path("nonebot", site_packages / "nonebot")
     _extend_loaded_package_path(
         "nonebot.adapters",

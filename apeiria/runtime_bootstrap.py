@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+"""Top-level NoneBot bootstrap used by bot.py and CLI entrypoints."""
+
+import nonebot
+
+from apeiria.config import driver_config_service, project_config_service
+from apeiria.plugin_config_bootstrap import bootstrap_plugin_configs
+from apeiria.runtime_env import inject_plugin_site_packages
+from apeiria.runtime_framework import load_framework
+from apeiria.runtime_user import load_user_plugins, load_user_setup
+
+
+def resolve_driver_kwargs(config_kwargs: dict[str, object]) -> dict[str, object]:
+    """Resolve driver kwargs with the runtime precedence used by the project.
+
+    Project-managed driver config wins over values loaded from config files.
+    If the project does not pin a driver, fall back to env-derived config so
+    existing NoneBot behavior remains intact.
+    """
+    project_driver_kwargs = driver_config_service.get_project_driver_kwargs()
+
+    if project_driver_kwargs.get("driver"):
+        config_kwargs.pop("driver", None)
+        return project_driver_kwargs
+    if "driver" in config_kwargs:
+        return {}
+
+    env_config = project_config_service.read_env_config()
+    if env_config.get("driver"):
+        return {"driver": env_config["driver"]}
+    return {}
+
+
+def initialize_nonebot() -> None:
+    """Initialize NoneBot and load all project-managed runtime layers.
+
+    The order matters:
+    1. bootstrap plugin config metadata
+    2. expose extension environment site-packages
+    3. initialize NoneBot with merged config
+    4. load local user setup, framework plugins, then project plugins
+    """
+    bootstrap_plugin_configs()
+    inject_plugin_site_packages()
+
+    config_kwargs = project_config_service.get_project_config_kwargs()
+    driver_kwargs = resolve_driver_kwargs(config_kwargs)
+
+    nonebot.init(**config_kwargs, **driver_kwargs)
+    nonebot.load_from_toml("pyproject.toml")
+
+    load_user_setup()
+    load_framework()
+    load_user_plugins()
+
+
+def run() -> None:
+    """Convenience entrypoint for CLI-style execution."""
+    initialize_nonebot()
+    nonebot.run()

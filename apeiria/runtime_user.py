@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING
 
 import nonebot
 
-from apeiria.user_adapters import load_project_adapters
-from apeiria.user_plugin_env import inject_plugin_site_packages
-from apeiria.user_plugins import load_project_plugins
+from apeiria.config import adapter_config_service, plugin_config_service
+from apeiria.runtime_env import inject_plugin_site_packages
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -23,6 +22,7 @@ def _project_root() -> Path:
 
 
 def _load_user_module(user_bot: Path) -> ModuleType | None:
+    """Load the optional local `user_bot.py` module if it exists."""
     if not user_bot.is_file():
         return None
 
@@ -41,6 +41,7 @@ def _load_user_module(user_bot: Path) -> ModuleType | None:
 
 
 def _apply_user_module(module: ModuleType, driver: object) -> None:
+    """Invoke `configure()` from `user_bot.py` with backward-compatible arity."""
     configure = getattr(module, "configure", None)
     if configure is None:
         nonebot.logger.warning("Skip loading user_bot.py: missing configure()")
@@ -71,14 +72,21 @@ def _apply_user_module(module: ModuleType, driver: object) -> None:
 
 
 def load_user_setup(user_bot: Path | None = None) -> None:
+    """Load local user setup hooks and configured adapters.
+
+    `user_bot.py` remains the project-specific escape hatch for custom setup.
+    Adapters are loaded afterward so user setup can still influence runtime
+    initialization before registration happens.
+    """
     inject_plugin_site_packages()
     target = user_bot or _project_root() / "user_bot.py"
     module = _load_user_module(target)
     if module is not None:
         _apply_user_module(module, nonebot.get_driver())
-    load_project_adapters(nonebot.get_driver())
+    adapter_config_service.load_project_adapters(nonebot.get_driver())
 
 
 def load_user_plugins() -> None:
+    """Load project plugins from the managed plugin config after bootstrap."""
     inject_plugin_site_packages()
-    load_project_plugins()
+    plugin_config_service.load_project_plugins()

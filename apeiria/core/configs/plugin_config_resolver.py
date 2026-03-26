@@ -6,12 +6,11 @@ from pathlib import Path
 
 import nonebot
 
-from apeiria.runtime import FRAMEWORK_BUILTIN_PLUGIN_NAMES, FRAMEWORK_PLUGIN_MODULES
-from apeiria.user_config import (
-    read_project_plugin_module_map,
-    read_pyproject_nonebot_config,
+from apeiria.config import plugin_config_service, project_config_service
+from apeiria.runtime_framework import (
+    FRAMEWORK_BUILTIN_PLUGIN_NAMES,
+    FRAMEWORK_PLUGIN_MODULES,
 )
-from apeiria.user_plugins import read_project_plugin_config
 
 from .models import PluginExtraData, RegisterConfig
 from .registry import (
@@ -21,6 +20,10 @@ from .registry import (
     register_plugin_config,
 )
 from .static_scan import scan_plugin_config, scan_plugin_config_from_origin
+
+read_project_plugin_module_map = project_config_service.read_project_plugin_module_map
+read_pyproject_nonebot_config = project_config_service.read_pyproject_nonebot_config
+read_project_plugin_config = plugin_config_service.read_project_plugin_config
 
 
 @dataclass(frozen=True)
