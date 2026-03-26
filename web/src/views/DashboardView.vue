@@ -3,7 +3,7 @@
     <section class="dashboard-hero">
       <div class="dashboard-hero__top">
         <div class="dashboard-hero__intro">
-          <span class="text-overline dashboard-kicker">Apeiria Console</span>
+          <span class="text-overline dashboard-kicker">{{ t('layout.brand') }}</span>
           <h1 class="page-title">{{ t('dashboard.title') }}</h1>
           <div class="text-caption text-medium-emphasis">
             {{ lastUpdatedText }}
