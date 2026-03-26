@@ -82,18 +82,26 @@ class PermissionService:
         if group_id is None:
             return 0
 
+        event_level = self._get_event_role_level(event)
+        if event_level > 0:
+            return event_level
+
+        if not self._is_onebot_api_available(bot):
+            return 0
+
         try:
             user_id = event.get_user_id()
+            api_group_id = self._to_onebot_numeric_id(group_id)
+            api_user_id = self._to_onebot_numeric_id(user_id)
+            if api_group_id is None or api_user_id is None:
+                return 0
+
             info = await bot.call_api(
                 "get_group_member_info",
-                group_id=int(group_id),
-                user_id=int(user_id),
+                group_id=api_group_id,
+                user_id=api_user_id,
             )
-            role = info.get("role", "")
-            if role == "owner":
-                return 6
-            if role == "admin":
-                return 5
+            return self._map_role_to_level(info.get("role"))
         except Exception:  # noqa: BLE001
             pass
         return 0
@@ -494,6 +502,40 @@ class PermissionService:
             return event.get_session_id() == user_id
         except Exception:  # noqa: BLE001
             return False
+
+    def _get_event_role_level(self, event: Event) -> int:
+        sender = getattr(event, "sender", None)
+        sender_role = getattr(sender, "role", None)
+        if isinstance(sender_role, str):
+            return self._map_role_to_level(sender_role)
+
+        role = getattr(event, "role", None)
+        if isinstance(role, str):
+            return self._map_role_to_level(role)
+        return 0
+
+    def _is_onebot_api_available(self, bot: Bot) -> bool:
+        adapter = getattr(bot, "adapter", None)
+        get_name = getattr(adapter, "get_name", None)
+        if not callable(get_name):
+            return False
+        adapter_name = str(get_name()).lower()
+        return "onebot" in adapter_name
+
+    def _to_onebot_numeric_id(self, value: str) -> int | None:
+        normalized = value.strip()
+        if not normalized.isdigit():
+            return None
+        return int(normalized)
+
+    def _map_role_to_level(self, role: object) -> int:
+        if not isinstance(role, str):
+            return 0
+        if role == "owner":
+            return 6
+        if role == "admin":
+            return 5
+        return 0
 
     async def _send_ignored_message(self, bot: Bot, event: Event, message: str) -> None:
         with contextlib.suppress(Exception):

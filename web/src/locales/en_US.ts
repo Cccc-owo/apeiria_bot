@@ -259,7 +259,7 @@ const enUS = {
     customizedCount: 'Customized',
     filteredCount: 'Visible Groups',
     currentGroup: 'Group {groupId}',
-    protectedInfo: 'Framework dependencies cannot be disabled here.',
+    protectedInfo: 'Protected plugins cannot be disabled here.',
     disabledPlugins: 'Disabled Plugins',
     search: 'Search groups',
     statusFilter: 'Robot Status',
