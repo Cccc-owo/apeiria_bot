@@ -60,11 +60,11 @@ const enUS = {
   },
   dashboard: {
     title: 'Dashboard',
+    overview: 'Overview',
     restart: 'Restart',
     restartConfirm: 'Restart now? Connection will briefly drop.',
     restartScheduled: 'Restart request sent',
     restartFailed: 'Failed to restart',
-    autoRefresh: 'Auto refresh',
     lastUpdated: 'Last updated {time}',
     noEvents: 'No recent high-signal events',
     recentEvents: 'Recent Issues',
