@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from apeiria.core.i18n import t
 from apeiria.domains.dashboard import dashboard_service
@@ -14,6 +15,8 @@ from apeiria.plugins.web_ui.models import (
     DashboardEventsResponse,
     OperationStatusResponse,
     StatusResponse,
+    WebUIBuildRunResponse,
+    WebUIBuildStatusResponse,
 )
 
 router = APIRouter()
@@ -50,6 +53,51 @@ async def get_events(
             )
             for item in dashboard_service.get_recent_events()
         ]
+    )
+
+
+@router.get("/webui-build", response_model=WebUIBuildStatusResponse)
+async def get_webui_build_status(
+    _: Annotated[Any, Depends(require_auth)],
+) -> WebUIBuildStatusResponse:
+    status = dashboard_service.get_web_ui_build_status()
+    return WebUIBuildStatusResponse(
+        is_built=status.is_built,
+        is_stale=status.is_stale,
+        can_build=status.can_build,
+        build_tool=status.build_tool,
+        detail=status.detail,
+    )
+
+
+@router.post("/webui-build", response_model=WebUIBuildRunResponse)
+async def rebuild_webui(
+    _: Annotated[Any, Depends(require_auth)],
+) -> WebUIBuildRunResponse:
+    try:
+        status = await dashboard_service.rebuild_web_ui()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return WebUIBuildRunResponse(
+        is_built=status.is_built,
+        is_stale=status.is_stale,
+        can_build=status.can_build,
+        build_tool=status.build_tool,
+        detail=status.detail,
+        logs=status.logs,
+    )
+
+
+@router.post("/webui-build/stream")
+async def rebuild_webui_stream(
+    _: Annotated[Any, Depends(require_auth)],
+) -> StreamingResponse:
+    status = dashboard_service.get_web_ui_build_status()
+    if not status.can_build:
+        raise HTTPException(status_code=400, detail="build_tool_unavailable")
+    return StreamingResponse(
+        dashboard_service.stream_web_ui_rebuild(),
+        media_type="application/x-ndjson",
     )
 
 

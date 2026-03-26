@@ -58,6 +58,7 @@ Generated state:
 6. initialize the project and user extension environments using `apeiria init`
 7. install user plugins using `apeiria plugin install <package>`
 8. run your bot using `apeiria run`
+9. if you need to rebuild Web UI assets before startup, use `apeiria run --build`
 
 ## Environment Management
 
@@ -71,6 +72,8 @@ After activating `.venv`, use these commands:
    re-sync both environments from current managed files
 4. `apeiria env info`
    show current environment paths and status
+5. `apeiria run --build`
+   build Web UI frontend assets, then run the bot
 
 Main environment responsibilities:
 

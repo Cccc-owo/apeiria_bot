@@ -22,6 +22,7 @@ from apeiria.config import (
     plugin_config_service,
 )
 from apeiria.core.plugin_policy import is_framework_protected_plugin_module
+from apeiria.core.utils.webui_build import write_frontend_build_meta
 from apeiria.runtime_env import (
     add_plugin_requirement,
     ensure_plugin_project,
@@ -545,6 +546,32 @@ def _check_system_dependencies() -> None:
         )
 
 
+def _build_frontend() -> None:
+    web_dir = _project_root() / "web"
+    if not (web_dir / "package.json").is_file():
+        _fail(_("frontend workspace not found"))
+
+    if shutil.which("node") is None:
+        _fail(_("frontend toolchain missing: {deps}").format(deps="node"))
+
+    build_cmd: list[str]
+    if shutil.which("pnpm") is not None:
+        build_cmd = ["pnpm", "build"]
+    elif shutil.which("npm") is not None:
+        build_cmd = ["npm", "run", "build"]
+    else:
+        _fail(_("frontend toolchain missing: {deps}").format(deps="pnpm-or-npm"))
+
+    result = subprocess.run(
+        build_cmd,
+        cwd=web_dir,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise click.exceptions.Exit(result.returncode)
+    write_frontend_build_meta(_project_root())
+
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def cli() -> None:
     """Apeiria project tools."""
@@ -584,8 +611,16 @@ def repair() -> None:
 
 
 @cli.command(help=_("Run bot.py with the current project Python environment."))
+@click.option(
+    "--build",
+    "build_frontend",
+    is_flag=True,
+    help=_("Build Web UI frontend assets before running the bot."),
+)
 @click.argument("extra_args", nargs=-1)
-def run(extra_args: tuple[str, ...]) -> None:
+def run(*, build_frontend: bool, extra_args: tuple[str, ...]) -> None:
+    if build_frontend:
+        _build_frontend()
     result = subprocess.run(
         [sys.executable, "bot.py", *extra_args],
         cwd=_project_root(),

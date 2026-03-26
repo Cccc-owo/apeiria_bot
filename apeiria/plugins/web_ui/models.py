@@ -52,6 +52,8 @@ __all__ = [
     "DriverConfigResponse",
     "DashboardEventItem",
     "DashboardEventsResponse",
+    "WebUIBuildRunResponse",
+    "WebUIBuildStatusResponse",
     "EnvelopeVersion",
     "ErrorPayload",
     "GroupItem",
@@ -156,6 +158,22 @@ class DashboardEventsResponse(BaseModel):
     """Recent dashboard events response."""
 
     items: list[DashboardEventItem]
+
+
+class WebUIBuildStatusResponse(BaseModel):
+    """Current Web UI frontend build status."""
+
+    is_built: bool
+    is_stale: bool
+    can_build: bool
+    build_tool: str | None = None
+    detail: str | None = None
+
+
+class WebUIBuildRunResponse(WebUIBuildStatusResponse):
+    """Web UI frontend rebuild response with build logs."""
+
+    logs: str = ""
 
 
 class PluginItem(BaseModel):
