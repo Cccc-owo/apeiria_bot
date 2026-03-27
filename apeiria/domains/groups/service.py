@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from apeiria.core.utils.helpers import get_plugin_protection_reason, safe_json_loads
-from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
+from apeiria.domains.exceptions import ProtectedPluginError
+from apeiria.domains.groups.repository import group_repository
 from apeiria.domains.permissions import permission_service
 
 if TYPE_CHECKING:
@@ -28,14 +29,7 @@ class GroupService:
     """Manage persisted per-group settings."""
 
     async def list_groups(self) -> list[GroupRecord]:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.group import GroupConsole
-
-        async with get_session() as session:
-            result = await session.execute(select(GroupConsole))
-            rows = result.scalars().all()
+        rows = await group_repository.list_groups()
         return [self._to_record(row) for row in rows]
 
     async def get_group(self, group_id: str) -> GroupRecord:
@@ -52,11 +46,7 @@ class GroupService:
         if enabled is not None:
             row.bot_status = enabled
 
-        from nonebot_plugin_orm import get_session
-
-        async with get_session() as session:
-            session.add(row)
-            await session.commit()
+        await group_repository.save_group(row)
         await permission_service.invalidate_group_bot_status_cache(group_id)
 
     async def update_group_disabled_plugins(
@@ -75,11 +65,7 @@ class GroupService:
         row = await self._fetch_group(group_id)
         row.disabled_plugins = json.dumps(sorted(set(disabled_plugins)))
 
-        from nonebot_plugin_orm import get_session
-
-        async with get_session() as session:
-            session.add(row)
-            await session.commit()
+        await group_repository.save_group(row)
         await permission_service.invalidate_group_plugin_cache(group_id)
 
     async def toggle_group_plugin(
@@ -106,24 +92,10 @@ class GroupService:
         *,
         create_if_missing: bool = False,
     ) -> "GroupConsole":
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.group import GroupConsole
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(GroupConsole).where(GroupConsole.group_id == group_id)
-            )
-            row = result.scalar_one_or_none()
-            if row is None and create_if_missing:
-                row = GroupConsole(group_id=group_id, disabled_plugins="[]")
-                session.add(row)
-                await session.commit()
-                await session.refresh(row)
-            if row is None:
-                raise ResourceNotFoundError(group_id)
-            return row
+        return await group_repository.get_group(
+            group_id,
+            create_if_missing=create_if_missing,
+        )
 
     def _to_record(self, row: "GroupConsole") -> GroupRecord:
         raw_disabled = getattr(row, "disabled_plugins", "[]")

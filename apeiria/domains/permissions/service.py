@@ -2,25 +2,37 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import nonebot
 from nonebot.exception import IgnoredException
 from nonebot.log import logger
 
 from apeiria.core.i18n import t
-from apeiria.core.services.cache import get_cache
 from apeiria.core.utils.helpers import get_plugin_extra, is_plugin_protected
+from apeiria.domains.permissions.cache import permission_cache
+from apeiria.domains.permissions.context import (
+    ConversationType,
+    extract_group_id,
+    get_event_role_level,
+    group_id_from_event,
+    resolve_conversation_type,
+)
+from apeiria.domains.permissions.gateway import (
+    permission_feedback_gateway,
+    permission_runtime_gateway,
+)
+from apeiria.domains.permissions.policy import (
+    can_run_with_level,
+    effective_permission_level,
+    is_ban_active,
+    level_display_name,
+)
+from apeiria.domains.permissions.repository import permission_state_repository
 
 if TYPE_CHECKING:
     from nonebot.adapters import Bot, Event
-
-
-ConversationType = Literal["private", "group", "other"]
 
 
 @dataclass(frozen=True)
@@ -38,13 +50,7 @@ class PermissionService:
 
     def extract_group_id(self, session_id: str, user_id: str) -> str | None:
         """Extract a group identifier from a session id when adapter data is absent."""
-        if session_id == user_id:
-            return None
-        if "_" in session_id:
-            parts = session_id.split("_")
-            if len(parts) >= 2:  # noqa: PLR2004
-                return parts[1] if parts[0] == "group" else parts[0]
-        return None
+        return extract_group_id(session_id, user_id)
 
     async def build_context(self, bot: Bot, event: Event) -> PermissionContext | None:
         """Build a normalized permission context from an abstract event."""
@@ -53,12 +59,8 @@ class PermissionService:
         except Exception:  # noqa: BLE001
             return None
 
-        group_id = self._group_id_from_event(event)
-        conversation_type: ConversationType = "other"
-        if group_id is not None:
-            conversation_type = "group"
-        elif self._is_private_event(event, user_id):
-            conversation_type = "private"
+        group_id = group_id_from_event(event)
+        conversation_type = resolve_conversation_type(event, user_id, group_id)
 
         adapter_role_level = (
             await self.get_adapter_role_level(bot, event, group_id)
@@ -82,167 +84,70 @@ class PermissionService:
         if group_id is None:
             return 0
 
-        event_level = self._get_event_role_level(event)
+        event_level = get_event_role_level(event)
         if event_level > 0:
             return event_level
 
-        if not self._is_onebot_api_available(bot):
-            return 0
-
-        try:
-            user_id = event.get_user_id()
-            api_group_id = self._to_onebot_numeric_id(group_id)
-            api_user_id = self._to_onebot_numeric_id(user_id)
-            if api_group_id is None or api_user_id is None:
-                return 0
-
-            info = await bot.call_api(
-                "get_group_member_info",
-                group_id=api_group_id,
-                user_id=api_user_id,
-            )
-            return self._map_role_to_level(info.get("role"))
-        except Exception:  # noqa: BLE001
-            pass
-        return 0
+        return await permission_runtime_gateway.get_adapter_role_level(
+            bot,
+            event,
+            group_id=group_id,
+        )
 
     async def invalidate_user_level_cache(self, user_id: str, group_id: str) -> None:
-        await get_cache().delete(f"perm:{user_id}:{group_id}")
+        await permission_cache.invalidate_user_level(user_id, group_id)
 
     async def invalidate_ban_cache(
         self,
         user_id: str,
         group_id: str | None = None,
     ) -> None:
-        cache = get_cache()
-        await cache.delete(f"ban:{user_id}")
-        if group_id:
-            await cache.delete(f"ban:{user_id}:{group_id}")
+        await permission_cache.invalidate_ban(user_id, group_id)
 
     async def invalidate_group_plugin_cache(self, group_id: str) -> None:
-        await get_cache().delete(f"group_plugin:{group_id}")
+        await permission_cache.invalidate_group_disabled_plugins(group_id)
 
     async def invalidate_group_bot_status_cache(self, group_id: str) -> None:
-        await get_cache().delete(f"group_bot:{group_id}")
+        await permission_cache.invalidate_group_bot_enabled(group_id)
 
     async def invalidate_plugin_global_cache(self, plugin_module: str) -> None:
-        await get_cache().delete(f"plugin_global:{plugin_module}")
+        await permission_cache.invalidate_plugin_global_enabled(plugin_module)
 
     async def get_user_level(self, user_id: str, group_id: str) -> int:
-        cache = get_cache()
-        cache_key = f"perm:{user_id}:{group_id}"
-        cached = await cache.get(cache_key)
+        cached = await permission_cache.get_user_level(user_id, group_id)
         if cached is not None:
-            return int(cached)
+            return cached
 
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.level import LevelUser
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(LevelUser.level).where(
-                    LevelUser.user_id == user_id,
-                    LevelUser.group_id == group_id,
-                )
-            )
-            row = result.scalar_one_or_none()
-            level = row if row is not None else 0
-
-        await cache.set(cache_key, level, ttl=300)
+        level = await permission_state_repository.get_user_level(user_id, group_id)
+        await permission_cache.set_user_level(user_id, group_id, level)
         return level
 
     async def list_user_levels(self) -> list[tuple[str, str, int]]:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.level import LevelUser
-
-        async with get_session() as session:
-            result = await session.execute(select(LevelUser))
-            rows = result.scalars().all()
-        return [(row.user_id, row.group_id, row.level) for row in rows]
+        return await permission_state_repository.list_user_levels()
 
     async def set_user_level(self, user_id: str, group_id: str, level: int) -> None:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.level import LevelUser
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(LevelUser).where(
-                    LevelUser.user_id == user_id,
-                    LevelUser.group_id == group_id,
-                )
-            )
-            record = result.scalar_one_or_none()
-            if record:
-                record.level = level
-            else:
-                session.add(LevelUser(user_id=user_id, group_id=group_id, level=level))
-            await session.commit()
-
+        await permission_state_repository.set_user_level(user_id, group_id, level)
         await self.invalidate_user_level_cache(user_id, group_id)
         logger.debug("Set level {}:{} -> {}", user_id, group_id, level)
 
     async def is_banned(self, user_id: str, group_id: str | None = None) -> bool:
-        cache = get_cache()
-        cache_key = f"ban:{user_id}"
-        if group_id:
-            cache_key += f":{group_id}"
-
-        cached = await cache.get(cache_key)
+        cached = await permission_cache.get_ban(user_id, group_id)
         if cached is not None:
-            return bool(cached)
+            return cached
 
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
+        bans = await permission_state_repository.list_active_ban_candidates(
+            user_id,
+            group_id,
+        )
 
-        from apeiria.core.models.ban import BanConsole
-
-        async with get_session() as session:
-            stmt = select(BanConsole).where(BanConsole.user_id == user_id)
-            if group_id:
-                stmt = stmt.where(
-                    (BanConsole.group_id == group_id) | (BanConsole.group_id.is_(None))
-                )
-            result = await session.execute(stmt)
-            bans = result.scalars().all()
-
-        now = datetime.now(timezone.utc)
-        banned = False
-        for ban in bans:
-            if ban.duration == 0:
-                banned = True
-                break
-            if ban.ban_time and ban.duration > 0:
-                ban_time = ban.ban_time
-                if ban_time.tzinfo is None:
-                    ban_time = ban_time.replace(tzinfo=timezone.utc)
-                if (now - ban_time).total_seconds() < ban.duration:
-                    banned = True
-                    break
-
-        await cache.set(cache_key, banned, ttl=60)
+        banned = is_ban_active(bans)
+        await permission_cache.set_ban(user_id, group_id, banned=banned)
         return banned
 
     async def list_bans(
         self,
     ) -> list[tuple[int, str | None, str | None, int, str | None]]:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.ban import BanConsole
-
-        async with get_session() as session:
-            result = await session.execute(select(BanConsole))
-            rows = result.scalars().all()
-        return [
-            (row.id, row.user_id, row.group_id, row.duration, row.reason)
-            for row in rows
-        ]
+        return await permission_state_repository.list_bans()
 
     async def create_ban(
         self,
@@ -252,50 +157,22 @@ class PermissionService:
         duration: int,
         reason: str | None,
     ) -> tuple[int, str | None, str | None, int, str | None]:
-        from nonebot_plugin_orm import get_session
-
-        from apeiria.core.models.ban import BanConsole
-
-        async with get_session() as session:
-            record = BanConsole(
-                user_id=user_id,
-                group_id=group_id,
-                ban_time=datetime.now(timezone.utc),
-                duration=duration,
-                reason=reason,
-            )
-            session.add(record)
-            await session.commit()
-            await session.refresh(record)
-
-        await self.invalidate_ban_cache(user_id, group_id)
-        return (
-            record.id,
-            record.user_id,
-            record.group_id,
-            record.duration,
-            record.reason,
+        record = await permission_state_repository.create_ban(
+            user_id=user_id,
+            group_id=group_id,
+            duration=duration,
+            reason=reason,
         )
+        await self.invalidate_ban_cache(user_id, group_id)
+        return record
 
     async def delete_ban(self, ban_id: int) -> tuple[str | None, str | None]:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.ban import BanConsole
         from apeiria.domains.exceptions import ResourceNotFoundError
 
-        async with get_session() as session:
-            result = await session.execute(
-                select(BanConsole).where(BanConsole.id == ban_id)
-            )
-            record = result.scalar_one_or_none()
-            if record is None:
-                raise ResourceNotFoundError(t("web_ui.permissions.ban_not_found"))
-
-            user_id = record.user_id
-            group_id = record.group_id
-            await session.delete(record)
-            await session.commit()
+        try:
+            user_id, group_id = await permission_state_repository.delete_ban(ban_id)
+        except ResourceNotFoundError:
+            raise ResourceNotFoundError(t("web_ui.permissions.ban_not_found")) from None
 
         if user_id:
             await self.invalidate_ban_cache(user_id, group_id)
@@ -305,79 +182,41 @@ class PermissionService:
         if is_plugin_protected(plugin_module):
             return True
 
-        cache = get_cache()
-        cache_key = f"group_plugin:{group_id}"
-        cached = await cache.get(cache_key)
+        cached = await permission_cache.get_group_disabled_plugins(group_id)
         if cached is not None:
-            disabled = list(cached)
+            disabled = cached
         else:
-            from nonebot_plugin_orm import get_session
-            from sqlalchemy import select
-
-            from apeiria.core.models.group import GroupConsole
-
-            async with get_session() as session:
-                result = await session.execute(
-                    select(GroupConsole.disabled_plugins).where(
-                        GroupConsole.group_id == group_id
-                    )
-                )
-                raw = result.scalar_one_or_none()
-                try:
-                    disabled = json.loads(raw) if raw else []
-                except (json.JSONDecodeError, TypeError):
-                    disabled = []
-            await cache.set(cache_key, disabled, ttl=120)
+            disabled = await permission_state_repository.get_group_disabled_plugins(
+                group_id
+            )
+            await permission_cache.set_group_disabled_plugins(group_id, disabled)
 
         return plugin_module not in disabled
 
     async def is_group_bot_enabled(self, group_id: str) -> bool:
-        cache = get_cache()
-        cache_key = f"group_bot:{group_id}"
-        cached = await cache.get(cache_key)
+        cached = await permission_cache.get_group_bot_enabled(group_id)
         if cached is not None:
-            return bool(cached)
+            return cached
 
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.group import GroupConsole
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(GroupConsole.bot_status).where(GroupConsole.group_id == group_id)
-            )
-            bot_status = result.scalar_one_or_none()
-
-        enabled = bot_status is not False
-        await cache.set(cache_key, enabled, ttl=120)
+        enabled = await permission_state_repository.get_group_bot_status(group_id)
+        await permission_cache.set_group_bot_enabled(group_id, enabled=enabled)
         return enabled
 
     async def is_plugin_globally_enabled(self, plugin_module: str) -> bool:
         if is_plugin_protected(plugin_module):
             return True
 
-        cache = get_cache()
-        cache_key = f"plugin_global:{plugin_module}"
-        cached = await cache.get(cache_key)
+        cached = await permission_cache.get_plugin_global_enabled(plugin_module)
         if cached is not None:
-            return bool(cached)
+            return cached
 
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.plugin_info import PluginInfo
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(PluginInfo.is_global_enabled).where(
-                    PluginInfo.module_name == plugin_module
-                )
-            )
-            enabled = result.scalar_one_or_none()
-
-        value = True if enabled is None else bool(enabled)
-        await cache.set(cache_key, value, ttl=120)
+        value = await permission_state_repository.get_plugin_global_enabled(
+            plugin_module
+        )
+        await permission_cache.set_plugin_global_enabled(
+            plugin_module,
+            enabled=value,
+        )
         return value
 
     async def check_permission(
@@ -417,7 +256,11 @@ class PermissionService:
             context.user_id
         ):
             logger.debug("Blocked banned user {} in private", context.user_id)
-            await self._send_ignored_message(bot, event, t("auth.banned"))
+            await permission_feedback_gateway.send_ignored_message(
+                bot,
+                event,
+                t("auth.banned"),
+            )
             raise IgnoredException("user_banned")
 
         await self._assert_plugin_level(bot, event, context, plugin)
@@ -441,11 +284,19 @@ class PermissionService:
                 context.user_id,
                 context.group_id,
             )
-            await self._send_ignored_message(bot, event, t("auth.banned"))
+            await permission_feedback_gateway.send_ignored_message(
+                bot,
+                event,
+                t("auth.banned"),
+            )
             raise IgnoredException("user_banned")
 
         if not await self.is_plugin_enabled(context.group_id, plugin_module):
-            await self._send_ignored_message(bot, event, t("auth.plugin_disabled"))
+            await permission_feedback_gateway.send_ignored_message(
+                bot,
+                event,
+                t("auth.plugin_disabled"),
+            )
             raise IgnoredException("plugin_disabled")
 
     async def _assert_plugin_level(
@@ -460,86 +311,32 @@ class PermissionService:
         if required_level <= 0 or context.group_id is None:
             return
 
-        if context.adapter_role_level >= required_level:
-            return
-
         db_level = await self.get_user_level(context.user_id, context.group_id)
-        effective = max(context.adapter_role_level, db_level)
-        if effective < required_level:
+        if not can_run_with_level(
+            context,
+            required_level=required_level,
+            db_level=db_level,
+        ):
+            effective = effective_permission_level(context, db_level=db_level)
             logger.debug(
                 "Permission denied: {} needs level {} but has {}",
                 context.user_id,
                 required_level,
                 effective,
             )
-            level_names = {5: t("auth.level_admin"), 6: t("auth.level_owner")}
-            await self._send_ignored_message(
+            await permission_feedback_gateway.send_ignored_message(
                 bot,
                 event,
                 t(
                     "auth.permission_denied",
-                    need=level_names.get(required_level, f"Lv.{required_level}"),
+                    need=level_display_name(
+                        required_level,
+                        admin_name=t("auth.level_admin"),
+                        owner_name=t("auth.level_owner"),
+                    ),
                 ),
             )
             raise IgnoredException("insufficient_permission")
-
-    def _group_id_from_event(self, event: Event) -> str | None:
-        group_id = getattr(event, "group_id", None)
-        if group_id is not None:
-            return str(group_id)
-
-        try:
-            user_id = event.get_user_id()
-            return self.extract_group_id(event.get_session_id(), user_id)
-        except Exception:  # noqa: BLE001
-            return None
-
-    def _is_private_event(self, event: Event, user_id: str) -> bool:
-        detail_type = getattr(event, "detail_type", None)
-        if detail_type == "private":
-            return True
-        try:
-            return event.get_session_id() == user_id
-        except Exception:  # noqa: BLE001
-            return False
-
-    def _get_event_role_level(self, event: Event) -> int:
-        sender = getattr(event, "sender", None)
-        sender_role = getattr(sender, "role", None)
-        if isinstance(sender_role, str):
-            return self._map_role_to_level(sender_role)
-
-        role = getattr(event, "role", None)
-        if isinstance(role, str):
-            return self._map_role_to_level(role)
-        return 0
-
-    def _is_onebot_api_available(self, bot: Bot) -> bool:
-        adapter = getattr(bot, "adapter", None)
-        get_name = getattr(adapter, "get_name", None)
-        if not callable(get_name):
-            return False
-        adapter_name = str(get_name()).lower()
-        return "onebot" in adapter_name
-
-    def _to_onebot_numeric_id(self, value: str) -> int | None:
-        normalized = value.strip()
-        if not normalized.isdigit():
-            return None
-        return int(normalized)
-
-    def _map_role_to_level(self, role: object) -> int:
-        if not isinstance(role, str):
-            return 0
-        if role == "owner":
-            return 6
-        if role == "admin":
-            return 5
-        return 0
-
-    async def _send_ignored_message(self, bot: Bot, event: Event, message: str) -> None:
-        with contextlib.suppress(Exception):
-            await bot.send(event, message)
 
 
 permission_service = PermissionService()
