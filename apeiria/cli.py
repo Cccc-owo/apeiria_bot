@@ -17,6 +17,11 @@ from apeiria.cli_nb import (
     prompt_select_text,
     search_store_packages,
 )
+from apeiria.cli_store import (
+    StoreInstallError,
+    install_plugin_package,
+    uninstall_plugin_package,
+)
 from apeiria.config import (
     adapter_config_service,
     driver_config_service,
@@ -914,14 +919,10 @@ def plugin_install(
     target = _require_package_target(_store_package_dependency(package, package_name))
     resolved_module = _resolve_plugin_module(package, module_name)
     try:
-        add_plugin_requirement(target, pip_args)
-    except RuntimeError as exc:
-        _raise_click_runtime_error(exc)
-    try:
-        bind_project_plugin_package(target, resolved_module)
-    except Exception as exc:  # noqa: BLE001
-        _rollback_install(target, pip_args, exc)
-    click.echo(_("installed package: {package}").format(package=target))
+        result = install_plugin_package(target, resolved_module, pip_args)
+    except StoreInstallError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(_("installed package: {package}").format(package=result.requirement))
 
 
 @plugin.command("add", context_settings={"ignore_unknown_options": True}, hidden=True)
@@ -1001,17 +1002,10 @@ def plugin_uninstall(
     for registered_module in registered_modules:
         _ensure_plugin_can_be_removed(registered_module)
     try:
-        remove_plugin_requirement(target, pip_args)
-    except RuntimeError as exc:
-        _raise_click_runtime_error(exc)
-    try:
-        if get_project_plugin_package_modules(target):
-            unbind_project_plugin_package(target)
-        else:
-            for registered_module in registered_modules:
-                remove_project_plugin_module(registered_module)
-    except Exception as exc:  # noqa: BLE001
-        _rollback_uninstall(target, pip_args, exc)
+        for registered_module in registered_modules:
+            uninstall_plugin_package(target, registered_module, pip_args)
+    except StoreInstallError as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo(_("uninstalled package: {package}").format(package=target))
 
 

@@ -34,6 +34,18 @@ _WEB_DIR = Path(__file__).parent.parent.parent.parent / "web"
 _DIST_DIR = _WEB_DIR / "dist"
 
 
+def _web_ui_url() -> str:
+    """Build the current Web UI URL from driver config."""
+    import nonebot
+
+    config = nonebot.get_driver().config
+    host = str(getattr(config, "host", "127.0.0.1"))
+    port = int(getattr(config, "port", 8080))
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{port}/"
+
+
 def _mount_routes() -> None:
     """Mount API routes + static frontend into nonebot's ASGI app."""
     import logging
@@ -79,7 +91,7 @@ def _mount_routes() -> None:
             )
         logger.info(
             "{}",
-            t("web_ui.startup.ready", url="http://127.0.0.1:8080/"),
+            t("web_ui.startup.ready", url=_web_ui_url()),
         )
 
         from .secrets import get_secret_file_path

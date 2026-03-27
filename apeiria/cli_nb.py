@@ -28,20 +28,34 @@ def search_store_packages(
     module_type: MODULE_TYPE,
     query: str | None = None,
 ) -> list[object]:
+    return asyncio.run(search_store_packages_async(module_type, query))
+
+
+async def search_store_packages_async(
+    module_type: MODULE_TYPE,
+    query: str | None = None,
+) -> list[object]:
     list_plugins, list_adapters, list_drivers, _, _ = _load_handlers()
     if module_type == "plugin":
-        return list(asyncio.run(list_plugins(query)))
+        return list(await list_plugins(query))
     if module_type == "adapter":
-        return list(asyncio.run(list_adapters(query)))
-    return list(asyncio.run(list_drivers(query)))
+        return list(await list_adapters(query))
+    return list(await list_drivers(query))
 
 
 def find_exact_store_package(
     module_type: MODULE_TYPE,
     value: str,
 ) -> object | None:
+    return asyncio.run(find_exact_store_package_async(module_type, value))
+
+
+async def find_exact_store_package_async(
+    module_type: MODULE_TYPE,
+    value: str,
+) -> object | None:
     needle = value.lower()
-    for item in search_store_packages(module_type, value):
+    for item in await search_store_packages_async(module_type, value):
         if any(
             str(candidate).lower() == needle
             for candidate in (

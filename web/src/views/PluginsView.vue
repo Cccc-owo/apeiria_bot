@@ -2,9 +2,6 @@
   <div class="page-view">
     <div class="page-header">
       <h1 class="page-title">{{ t('plugins.title') }}</h1>
-      <div class="page-actions">
-        <v-btn :loading="loading" variant="tonal" @click="loadPluginManagement">{{ t('common.refresh') }}</v-btn>
-      </div>
     </div>
 
     <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
@@ -51,112 +48,112 @@
           </div>
         </div>
 
-        <v-data-table
-          class="page-table plugins-table"
-          density="compact"
-          :headers="pluginHeaders"
-          :items="visiblePlugins"
-          :loading="loading"
-        >
-          <template #item.name="{ item }">
-            <div class="plugins-table__name">
-              <div class="plugins-table__title-row">
-                <span class="font-weight-medium">{{ item.name || item.module_name }}</span>
-                <v-chip
-                  v-if="item.admin_level > 0"
-                  color="secondary"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  Lv.{{ item.admin_level }}
-                </v-chip>
-                <v-chip
-                  :color="item.plugin_type === 'admin' || item.plugin_type === 'superuser' ? 'warning' : 'default'"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ item.plugin_type }}
-                </v-chip>
-              </div>
-              <span class="text-caption text-medium-emphasis">{{ item.module_name }}</span>
-              <span v-if="item.description" class="text-caption text-medium-emphasis plugins-table__description">
-                {{ item.description }}
-              </span>
-              <div v-if="pluginMetaSummary(item)" class="text-caption text-medium-emphasis plugins-table__meta">
-                {{ pluginMetaSummary(item) }}
-              </div>
-              <div v-if="item.required_plugins.length > 0 || item.dependent_plugins.length > 0" class="plugins-table__relations">
-                <v-chip
-                  v-for="dependency in item.required_plugins"
-                  :key="`req:${item.module_name}:${dependency}`"
-                  color="info"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ t('plugins.requires', { name: dependency }) }}
-                </v-chip>
-                <v-chip
-                  v-for="dependent in item.dependent_plugins"
-                  :key="`dep:${item.module_name}:${dependent}`"
-                  color="warning"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ t('plugins.requiredBy', { name: dependent }) }}
-                </v-chip>
-              </div>
-            </div>
-          </template>
-          <template #item.source="{ value }">
-            <v-chip :color="sourceColor(value)" size="small" variant="tonal">
-              {{ sourceLabel(value) }}
-            </v-chip>
-          </template>
-          <template #item.is_global_enabled="{ item }">
-            <div class="plugin-status-card">
-              <div class="plugin-status-card__toolbar">
-                <div class="plugin-status-card__actions">
+        <div v-if="visiblePlugins.length > 0" class="plugins-grid">
+          <article
+            v-for="item in visiblePlugins"
+            :key="item.module_name"
+            class="plugin-card"
+          >
+            <div class="plugin-card__top">
+              <div class="plugin-card__headline">
+                <div class="plugin-card__title-row">
+                  <h2 class="plugin-card__title">{{ item.name || item.module_name }}</h2>
+                  <v-chip
+                    v-if="item.admin_level > 0"
+                    color="secondary"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    Lv.{{ item.admin_level }}
+                  </v-chip>
+                  <v-chip
+                    :color="item.plugin_type === 'admin' || item.plugin_type === 'superuser' ? 'warning' : 'default'"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ item.plugin_type }}
+                  </v-chip>
                   <v-chip
                     v-if="item.is_protected"
-                    class="plugin-status-card__protected-chip"
                     color="warning"
-                    size="small"
-                    :title="item.protected_reason || ''"
+                    size="x-small"
                     variant="tonal"
                   >
                     {{ t('plugins.protected') }}
                   </v-chip>
-                  <v-btn
-                    color="primary"
-                    :loading="settingsLoadingModule === item.module_name"
-                    size="small"
-                    variant="text"
-                    @click="openSettings(item)"
-                  >
-                    {{ t('plugins.settings') }}
-                  </v-btn>
-                  <v-switch
-                    color="success"
-                    :disabled="item.is_protected"
-                    hide-details
-                    inset
-                    :loading="pendingModule === item.module_name"
-                    :model-value="item.is_global_enabled"
-                    @update:model-value="togglePlugin(item, $event)"
-                  />
+                </div>
+                <div class="plugin-card__subline text-caption text-medium-emphasis">
+                  {{ item.module_name }}
+                </div>
+                <div v-if="pluginMetaSummary(item)" class="plugin-card__subline text-caption text-medium-emphasis">
+                  {{ pluginMetaSummary(item) }}
                 </div>
               </div>
-              <div v-if="pluginRiskLabel(item)" class="plugin-status-card__hint text-caption text-medium-emphasis">
+
+              <v-chip :color="sourceColor(item.source)" size="small" variant="tonal">
+                {{ sourceLabel(item.source) }}
+              </v-chip>
+            </div>
+
+            <p v-if="item.description" class="plugin-card__description">
+              {{ item.description }}
+            </p>
+
+            <div
+              v-if="item.required_plugins.length > 0 || item.dependent_plugins.length > 0"
+              class="plugin-card__relations"
+            >
+              <v-chip
+                v-for="dependency in item.required_plugins"
+                :key="`req:${item.module_name}:${dependency}`"
+                color="info"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ t('plugins.requires', { name: dependency }) }}
+              </v-chip>
+              <v-chip
+                v-for="dependent in item.dependent_plugins"
+                :key="`dep:${item.module_name}:${dependent}`"
+                color="warning"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ t('plugins.requiredBy', { name: dependent }) }}
+              </v-chip>
+            </div>
+
+            <div class="plugin-card__footer">
+              <div v-if="pluginRiskLabel(item)" class="plugin-card__hint text-caption text-medium-emphasis">
                 {{ pluginRiskLabel(item) }}
               </div>
+              <div class="plugin-card__actions">
+                <v-btn
+                  color="primary"
+                  :loading="settingsLoadingModule === item.module_name"
+                  size="small"
+                  variant="text"
+                  @click="openSettings(item)"
+                >
+                  {{ t('plugins.settings') }}
+                </v-btn>
+                <v-switch
+                  color="success"
+                  :disabled="item.is_protected"
+                  hide-details
+                  inset
+                  :loading="pendingModule === item.module_name"
+                  :model-value="item.is_global_enabled"
+                  @update:model-value="togglePlugin(item, $event)"
+                />
+              </div>
             </div>
-          </template>
-          <template #no-data>
-            <div class="py-6 text-body-2 text-medium-emphasis text-center">
-              {{ t('plugins.noVisiblePlugins') }}
-            </div>
-          </template>
-        </v-data-table>
+          </article>
+        </div>
+
+        <div v-else class="py-6 text-body-2 text-medium-emphasis text-center">
+          {{ t('plugins.noVisiblePlugins') }}
+        </div>
 
         <div class="settings-shell">
           <div class="settings-shell__toolbar">
@@ -649,12 +646,6 @@
     }
     return t('plugins.disableConfirmSummary', { count: 1 })
   })
-
-  const pluginHeaders = computed(() => [
-    { title: t('plugins.name'), key: 'name' },
-    { title: t('plugins.source'), key: 'source' },
-    { title: t('plugins.enabled'), key: 'is_global_enabled', sortable: false, align: 'end' as const },
-  ])
 
   const systemPlugins = computed(() =>
     plugins.value.filter(item => item.source === 'framework'),
@@ -1181,66 +1172,44 @@
   min-height: 32px;
 }
 
-.plugin-status-card {
-  width: 100%;
-  min-width: 0;
+.plugins-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.plugin-card {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.plugin-status-card__toolbar {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
   gap: 12px;
-  min-height: 36px;
+  min-height: 228px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background:
+    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.94)),
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.03), rgba(var(--v-theme-secondary), 0.03));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
-.plugin-status-card__actions {
+.plugin-card__top {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
+}
+
+.plugin-card__headline {
   min-width: 0;
-}
-
-.plugin-status-card__toolbar :deep(.v-btn) {
-  min-width: 44px;
-  padding-inline: 4px;
-}
-
-.plugin-status-card__toolbar :deep(.v-switch) {
-  width: 54px;
-  margin-inline: 0;
-}
-
-.plugin-status-card__toolbar :deep(.v-chip) {
-  min-width: 64px;
-  justify-content: center;
-}
-
-.plugin-status-card__protected-chip {
-  min-width: 0;
-}
-
-.plugin-status-card__hint {
-  width: 100%;
-  text-align: right;
-  line-height: 1.35;
-}
-
-.plugins-table__name {
   display: flex;
+  flex: 1 1 220px;
   flex-direction: column;
   gap: 4px;
 }
 
-.plugins-table__title-row,
-.plugins-table__relations,
+.plugin-card__title-row,
+.plugin-card__relations,
 .plugin-detail-tags,
 .confirm-plugin-item__relations {
   display: flex;
@@ -1249,9 +1218,56 @@
   flex-wrap: wrap;
 }
 
-.plugins-table__description,
-.plugins-table__meta {
+.plugin-card__title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.plugin-card__subline {
   line-height: 1.35;
+}
+
+.plugin-card__description {
+  margin: 0;
+  color: rgba(var(--v-theme-on-surface), 0.76);
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.plugin-card__footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.plugin-card__hint {
+  flex: 1 1 160px;
+  line-height: 1.35;
+}
+
+.plugin-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plugin-card__actions :deep(.v-btn) {
+  min-width: 44px;
+  padding-inline: 4px;
+}
+
+.plugin-card__actions :deep(.v-switch) {
+  width: 54px;
+  margin-inline: 0;
 }
 
 .plugin-config-section__header {
@@ -1302,12 +1318,23 @@
 }
 
 @media (max-width: 960px) {
+  .plugins-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .settings-list-row__main {
     grid-template-columns: 1fr;
   }
 
-  .plugin-status-card__toolbar {
-    justify-content: flex-end;
+  .plugin-card__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .plugins-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
