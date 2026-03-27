@@ -14,8 +14,9 @@ from apeiria.core.utils.helpers import (
     get_plugin_required_plugins,
     get_plugin_source,
 )
-from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
+from apeiria.domains.exceptions import ProtectedPluginError
 from apeiria.domains.permissions import permission_service
+from apeiria.domains.plugins.repository import plugin_catalog_repository
 
 
 @dataclass(frozen=True)
@@ -41,16 +42,7 @@ class PluginCatalogService:
     """List and mutate plugin registry state."""
 
     async def list_plugins(self) -> list[PluginCatalogItem]:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
-
-        from apeiria.core.models.plugin_info import PluginInfo
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(PluginInfo.module_name, PluginInfo.is_global_enabled)
-            )
-            enabled_map = {row[0]: row[1] for row in result.all()}
+        enabled_map = await plugin_catalog_repository.get_enabled_map()
 
         items: list[PluginCatalogItem] = []
         for plugin in nonebot.get_loaded_plugins():
@@ -77,26 +69,15 @@ class PluginCatalogService:
         return items
 
     async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> None:
-        from nonebot_plugin_orm import get_session
-        from sqlalchemy import select
+        if not enabled:
+            reason = get_plugin_protection_reason(module_name)
+            if reason:
+                raise ProtectedPluginError(reason)
 
-        from apeiria.core.models.plugin_info import PluginInfo
-
-        async with get_session() as session:
-            result = await session.execute(
-                select(PluginInfo).where(PluginInfo.module_name == module_name)
-            )
-            record = result.scalar_one_or_none()
-            if record is None:
-                raise ResourceNotFoundError(module_name)
-
-            if not enabled:
-                reason = get_plugin_protection_reason(module_name)
-                if reason:
-                    raise ProtectedPluginError(reason)
-
-            record.is_global_enabled = enabled
-            await session.commit()
+        await plugin_catalog_repository.set_plugin_enabled(
+            module_name,
+            enabled=enabled,
+        )
 
         await permission_service.invalidate_plugin_global_cache(module_name)
 

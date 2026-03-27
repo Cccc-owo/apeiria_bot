@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import HTTPException, WebSocket, WebSocketDisconnect
-from pydantic import ValidationError
-
 from apeiria.core.i18n import t
 from apeiria.core.services.web_chat import WebChatConnection, web_chat_service
 from apeiria.domains.chat.protocol import (
@@ -33,6 +30,10 @@ class ChatAssetFileMissingError(ValueError):
     """Raised when a chat asset record exists but its file is missing."""
 
 
+class ChatAuthError(ValueError):
+    """Raised when a chat auth flow fails."""
+
+
 class ChatGatewayService:
     """Adapt Web UI websocket frames onto the WebChat kernel.
 
@@ -52,48 +53,11 @@ class ChatGatewayService:
             return asset
         raise ChatAssetFileMissingError(asset_id)
 
-    async def serve_websocket(
-        self,
-        websocket: WebSocket,
-        token_verifier: Callable[[str], dict[str, object]],
-    ) -> None:
-        """Run the full websocket session loop for one browser connection."""
-        await websocket.accept()
-        connection = WebChatConnection(websocket)
-        active_session_id: str | None = None
+    def parse_frame(self, payload: object) -> ChatEnvelope:
+        """Validate one incoming transport payload as a chat envelope."""
+        return ChatEnvelope.model_validate(payload)
 
-        try:
-            while True:
-                frame = ChatEnvelope.model_validate(await websocket.receive_json())
-                active_session_id = await self._handle_frame(
-                    connection,
-                    frame,
-                    active_session_id,
-                    token_verifier,
-                )
-        except ValidationError as exc:
-            await web_chat_service.emit_error(
-                connection,
-                code="INVALID_FRAME",
-                message=f"{t('web_ui.chat.invalid_frame')}: {exc}",
-                type_="system.error",
-            )
-        except WebSocketDisconnect:
-            if active_session_id:
-                web_chat_service.close_session(active_session_id)
-        except Exception as exc:  # noqa: BLE001
-            await web_chat_service.emit_error(
-                connection,
-                code="INTERNAL_ERROR",
-                message=f"{t('web_ui.chat.internal_error')}: {exc}",
-                type_="system.error",
-            )
-            await websocket.close(
-                code=1011,
-                reason=t("web_ui.chat.websocket_close_reason"),
-            )
-
-    async def _handle_frame(
+    async def handle_frame(
         self,
         connection: WebChatConnection,
         frame: ChatEnvelope,
@@ -281,11 +245,11 @@ class ChatGatewayService:
                 t("web_ui.chat.auth_connected"),
             )
             await web_chat_service.emit_session_list(connection, principal)
-        except HTTPException as exc:
+        except ChatAuthError as exc:
             await web_chat_service.emit_error(
                 connection,
                 code="AUTH_FAILED",
-                message=str(exc.detail),
+                message=str(exc),
                 request_id=frame.request_id,
                 type_="auth.error",
             )
@@ -361,7 +325,7 @@ class ChatGatewayService:
         principal = connection.principal
         if principal is None:
             msg = t("web_ui.chat.auth_required")
-            raise HTTPException(status_code=401, detail=msg)
+            raise ChatAuthError(msg)
         return principal
 
 chat_gateway_service = ChatGatewayService()
@@ -369,6 +333,7 @@ chat_gateway_service = ChatGatewayService()
 __all__ = [
     "ChatAssetFileMissingError",
     "ChatAssetNotFoundError",
+    "ChatAuthError",
     "ChatGatewayService",
     "chat_gateway_service",
 ]

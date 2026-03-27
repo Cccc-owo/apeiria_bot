@@ -11,8 +11,10 @@ from apeiria.core.i18n import t
 from apeiria.domains.chat import (
     ChatAssetFileMissingError,
     ChatAssetNotFoundError,
+    ChatAuthError,
     chat_gateway_service,
 )
+from apeiria.domains.chat.transport import serve_chat_websocket
 from apeiria.plugins.web_ui.auth import require_control_panel, verify_token
 from apeiria.plugins.web_ui.roles import can_access_control_panel
 
@@ -56,10 +58,7 @@ async def chat_websocket(websocket: WebSocket) -> None:
     def _verify_admin_token(token: str) -> dict[str, object]:
         claims = verify_token(token)
         if not can_access_control_panel(claims.get("role")):
-            raise HTTPException(
-                status_code=403,
-                detail=t("web_ui.auth.permission_denied"),
-            )
+            raise ChatAuthError(t("web_ui.auth.permission_denied"))
         return claims
 
-    await chat_gateway_service.serve_websocket(websocket, _verify_admin_token)
+    await serve_chat_websocket(websocket, _verify_admin_token)
