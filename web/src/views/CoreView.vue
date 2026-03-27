@@ -211,52 +211,22 @@
       </v-window>
     </v-card>
 
-    <v-dialog v-model="previewDialogVisible" max-width="920">
-      <v-card>
-        <v-card-title>{{ previewTitle }}</v-card-title>
-        <v-card-text class="d-flex flex-column ga-4">
-          <v-alert density="comfortable" type="warning" variant="tonal">
-            {{ t('plugins.settingsRestartHint') }}
-          </v-alert>
-          <div v-if="previewMode === 'basic'" class="preview-list">
-            <div
-              v-for="item in previewItems"
-              :key="item.key"
-              class="preview-item"
-            >
-              <div class="preview-item__key">{{ item.key }}</div>
-              <div class="preview-item__values">
-                <div class="preview-item__block">
-                  <div class="text-caption text-medium-emphasis">{{ t('plugins.previewCurrent') }}</div>
-                  <pre class="preview-item__code">{{ item.current }}</pre>
-                </div>
-                <div class="preview-item__block">
-                  <div class="text-caption text-medium-emphasis">{{ t('plugins.previewNext') }}</div>
-                  <pre class="preview-item__code preview-item__code--next">{{ item.next }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="preview-raw-grid">
-            <div class="preview-item__block">
-              <div class="text-caption text-medium-emphasis">{{ t('plugins.previewCurrent') }}</div>
-              <pre class="preview-item__code">{{ previewCurrentText }}</pre>
-            </div>
-            <div class="preview-item__block">
-              <div class="text-caption text-medium-emphasis">{{ t('plugins.previewNext') }}</div>
-              <pre class="preview-item__code preview-item__code--next">{{ previewNextText }}</pre>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn variant="text" @click="previewDialogVisible = false">{{ t('common.cancel') }}</v-btn>
-          <v-spacer />
-          <v-btn color="primary" :loading="previewSaving" @click="confirmPreviewSave">
-            {{ t('plugins.confirmSave') }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <SettingsPreviewDialog
+      v-model="previewDialogVisible"
+      :cancel-label="t('common.cancel')"
+      :confirm-label="t('plugins.confirmSave')"
+      :current-label="t('plugins.previewCurrent')"
+      :current-text="previewCurrentText"
+      :items="previewItems"
+      :mode="previewMode"
+      :next-label="t('plugins.previewNext')"
+      :next-text="previewNextText"
+      :restart-hint="t('plugins.settingsRestartHint')"
+      :saving="previewSaving"
+      :title="previewTitle"
+      @cancel="previewDialogVisible = false"
+      @confirm="confirmPreviewSave"
+    />
   </div>
 </template>
 
@@ -278,12 +248,13 @@
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
   import {
-    buildChangedValues,
+    buildSettingsPreviewItems,
     displayFieldValue,
     type PluginSettingField,
   } from '@/views/plugins/settingsEditor'
   import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
+  import SettingsPreviewDialog from '@/views/plugins/SettingsPreviewDialog.vue'
   import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
 
   const loading = ref(false)
@@ -333,7 +304,12 @@
   const previewCurrentText = computed(() => coreRawInitialText.value)
   const previewNextText = computed(() => coreRawText.value)
   const previewItems = computed(() =>
-    buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value),
+    buildSettingsPreviewItems(
+      coreFields.value,
+      coreForm.value,
+      coreEditor.draftOverrides.value,
+      t('plugins.settingsInvalidJson'),
+    ),
   )
 
   function applyRouteFilters () {
@@ -362,28 +338,6 @@
   function applyCoreRawState (nextState: RawSettingsResponse) {
     coreRawText.value = nextState.text
     coreRawInitialText.value = nextState.text
-  }
-
-  function buildPreviewItems (
-    fields: PluginSettingField[],
-    form: Record<string, unknown>,
-    draftOverrides: Record<string, boolean>,
-  ) {
-    try {
-      const editableFields = fields.filter(field =>
-        field.editable && (field.has_local_override || Boolean(draftOverrides[field.key])),
-      )
-      const values = buildChangedValues(editableFields, form, t('plugins.settingsInvalidJson'))
-      return editableFields
-        .filter(field => Object.prototype.hasOwnProperty.call(values, field.key))
-        .map(field => ({
-          key: field.key,
-          current: displayFieldValue(field.current_value),
-          next: displayFieldValue(values[field.key]),
-        }))
-    } catch {
-      return []
-    }
   }
 
   async function loadCoreRawSettings () {
@@ -463,7 +417,7 @@
 
   function openCoreSettingsPreview () {
     if (!coreSettings.value) return
-    const items = buildPreviewItems(coreFields.value, coreForm.value, coreEditor.draftOverrides.value)
+    const items = previewItems.value
     if (items.length === 0) return
     previewMode.value = 'basic'
     previewAction.value = 'core-basic'
@@ -610,60 +564,8 @@
   min-height: 32px;
 }
 
-.preview-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.preview-item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(var(--v-theme-on-surface), 0.02);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.preview-item__key {
-  font-weight: 600;
-}
-
-.preview-item__values,
-.preview-raw-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.preview-item__block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.preview-item__code {
-  margin: 0;
-  min-height: 72px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.preview-item__code--next {
-  border-color: rgba(var(--v-theme-primary), 0.35);
-}
-
 @media (max-width: 960px) {
-  .settings-list-row__main,
-  .preview-item__values,
-  .preview-raw-grid {
+  .settings-list-row__main {
     grid-template-columns: 1fr;
   }
 }
