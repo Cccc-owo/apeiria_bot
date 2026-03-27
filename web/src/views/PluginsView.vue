@@ -1240,15 +1240,15 @@
 }
 
 .plugin-card__footer {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 12px;
   margin-top: auto;
 }
 
 .plugin-card__hint {
-  flex: 1 1 160px;
+  min-width: 0;
   line-height: 1.35;
 }
 
@@ -1256,6 +1256,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -1327,8 +1328,12 @@
   }
 
   .plugin-card__footer {
+    grid-template-columns: 1fr;
     align-items: flex-start;
-    flex-direction: column;
+  }
+
+  .plugin-card__actions {
+    justify-self: stretch;
   }
 }
 
