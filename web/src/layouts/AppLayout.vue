@@ -97,6 +97,61 @@
 
   <v-main class="app-main">
     <v-container class="app-container" fluid>
+      <v-alert
+        v-if="restartStore.hasPendingRestart"
+        class="app-restart-banner"
+        closable
+        color="warning"
+        density="comfortable"
+        icon="mdi-restart-alert"
+        variant="tonal"
+        @click:close="restartStore.clearPending()"
+      >
+        <div class="app-restart-banner__content">
+          <div class="app-restart-banner__text">
+            <div class="font-weight-medium">
+              {{ t('restart.bannerTitle', { count: restartStore.pendingCount }) }}
+            </div>
+            <div class="text-body-2">
+              {{ t('restart.bannerDescription') }}
+            </div>
+            <div class="app-restart-banner__chips">
+              <v-chip
+                v-for="entry in restartEntries"
+                :key="entry.id"
+                size="small"
+                variant="outlined"
+              >
+                {{ entry.summary }}
+              </v-chip>
+            </div>
+          </div>
+          <div class="app-restart-banner__actions">
+            <v-btn
+              color="warning"
+              :loading="restarting"
+              variant="tonal"
+              @click="handleRestart"
+            >
+              {{ t('dashboard.restart') }}
+            </v-btn>
+            <v-btn
+              :loading="reverting"
+              variant="text"
+              @click="handleRevertPendingChanges"
+            >
+              {{ t('restart.revert') }}
+            </v-btn>
+            <v-btn
+              variant="text"
+              @click="restartStore.clearPending()"
+            >
+              {{ t('restart.clear') }}
+            </v-btn>
+          </div>
+        </div>
+      </v-alert>
+
       <router-view />
     </v-container>
   </v-main>
@@ -116,8 +171,10 @@
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import { useTheme } from 'vuetify'
+  import { useRestartController } from '@/composables/useRestartController'
   import { useAuthStore } from '@/stores/auth'
   import { useNoticeStore } from '@/stores/notice'
+  import { useRestartStore } from '@/stores/restart'
   import type { SupportedLocale } from '@/plugins/i18n'
 
   const drawer = ref(true)
@@ -128,6 +185,8 @@
   const route = useRoute()
   const authStore = useAuthStore()
   const noticeStore = useNoticeStore()
+  const restartStore = useRestartStore()
+  const { reverting, restarting, restartAndReload, revertPendingChanges } = useRestartController()
 
   const navItems = computed(() => [
     { icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
@@ -153,6 +212,17 @@
     }
     return authStore.role || t('common.none')
   })
+  const restartEntries = computed(() => restartStore.entries.slice(0, 3))
+
+  async function handleRestart () {
+    if (!window.confirm(t('dashboard.restartConfirm'))) return
+    await restartAndReload()
+  }
+
+  async function handleRevertPendingChanges () {
+    if (!window.confirm(t('restart.revertConfirm'))) return
+    await revertPendingChanges()
+  }
 
   function toggleTheme () {
     const nextTheme = theme.global.current.value.dark ? 'light' : 'dark'
@@ -175,12 +245,46 @@
   }
 
   function handleLogout () {
+    restartStore.clearPending()
     authStore.logout()
     router.push('/login')
   }
 </script>
 
 <style scoped>
+.app-restart-banner {
+  margin-bottom: 16px;
+}
+
+.app-restart-banner__content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-restart-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 420px;
+}
+
+.app-restart-banner__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-restart-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .app-drawer {
   position: relative;
   background: rgb(var(--v-theme-surface));

@@ -247,7 +247,9 @@
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
+  import { useRestartStore } from '@/stores/restart'
   import {
+    buildRevertValues,
     buildSettingsPreviewItems,
     displayFieldValue,
     type PluginSettingField,
@@ -272,6 +274,7 @@
   const previewMode = ref<'basic' | 'raw'>('basic')
   const previewAction = ref<'core-basic' | 'core-raw'>('core-basic')
   const noticeStore = useNoticeStore()
+  const restartStore = useRestartStore()
   const { t } = useI18n()
   const route = useRoute()
 
@@ -285,6 +288,28 @@
       loadFailed: t('plugins.settingsLoadFailed'),
       saveFailed: t('plugins.settingsSaveFailed'),
       saveSuccess: t('plugins.settingsSaved'),
+    },
+    afterClear: field => {
+      restartStore.markPending({
+        id: `core:field:${field.key}`,
+        scope: 'core',
+        summary: t('restart.pendingCoreField', { key: field.key }),
+        undo: {
+          kind: 'core-settings',
+          values: { [field.key]: field.local_value },
+        },
+      })
+    },
+    afterSave: ({ previousState, values }) => {
+      restartStore.markPending({
+        id: 'core:settings',
+        scope: 'core',
+        summary: t('restart.pendingCoreSettings'),
+        undo: {
+          kind: 'core-settings',
+          values: buildRevertValues(previousState.fields, values),
+        },
+      })
     },
   })
 
@@ -428,11 +453,21 @@
     if (!hasPendingCoreRawChanges.value) return
     coreRawSaving.value = true
     coreRawErrorMessage.value = ''
+    const previousText = coreRawInitialText.value
     try {
       const rawResponse = await updateCoreSettingsRaw({ text: coreRawText.value })
       const settingsResponse = await getCoreSettings()
       applyCoreRawState(rawResponse.data)
       coreEditor.applyState(settingsResponse.data)
+      restartStore.markPending({
+        id: 'core:raw',
+        scope: 'core',
+        summary: t('restart.pendingCoreRaw'),
+        undo: {
+          kind: 'core-raw',
+          text: previousText,
+        },
+      })
       noticeStore.show(t('plugins.settingsRawSaved'), 'success')
     } catch (error) {
       const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))

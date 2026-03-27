@@ -238,8 +238,9 @@
   import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
   import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
-  import { getDashboardEvents, getStatus, getWebUIBuildStatus, restartBot, streamRebuildWebUI } from '@/api'
+  import { getDashboardEvents, getStatus, getWebUIBuildStatus, streamRebuildWebUI } from '@/api'
   import { getErrorMessage } from '@/api/client'
+  import { useRestartController } from '@/composables/useRestartController'
   import { useNoticeStore } from '@/stores/notice'
 
   const status = ref<DashboardStatus | null>(null)
@@ -247,7 +248,6 @@
   const webuiBuildStatus = ref<WebUIBuildStatus | null>(null)
   const loading = ref(false)
   const dashboardError = ref('')
-  const restarting = ref(false)
   const rebuildingWebUI = ref(false)
   const buildDialogVisible = ref(false)
   const buildLogs = ref('')
@@ -255,6 +255,7 @@
   const buildLogCardRef = ref<HTMLElement | null>(null)
   const { t } = useI18n()
   const noticeStore = useNoticeStore()
+  const { restarting, restartAndReload } = useRestartController()
   let refreshTimer: number | null = null
 
   const statusColor = computed(() => status.value?.status === 'running' ? 'success' : 'warning')
@@ -373,37 +374,7 @@
 
   async function handleRestart () {
     if (!window.confirm(t('dashboard.restartConfirm'))) return
-    restarting.value = true
-    try {
-      const res = await restartBot()
-      noticeStore.show(res.data.detail || t('dashboard.restartScheduled'), 'success')
-      await waitForRestartTransition()
-      window.location.reload()
-    } catch (error) {
-      const message = getErrorMessage(error, t('dashboard.restartFailed'))
-      noticeStore.show(message, 'error')
-    } finally {
-      restarting.value = false
-    }
-  }
-
-  async function waitForRestartTransition () {
-    await waitForStatus(false, 30, 1000)
-    await waitForStatus(true, 60, 1000)
-  }
-
-  async function waitForStatus (expectedOnline: boolean, maxAttempts: number, delayMs: number) {
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      await sleep(delayMs)
-      try {
-        await getStatus()
-        if (expectedOnline) return
-      } catch {
-        if (!expectedOnline) return
-      }
-    }
-
-    throw new Error(t('dashboard.restartFailed'))
+    await restartAndReload()
   }
 
   function sleep (ms: number) {
