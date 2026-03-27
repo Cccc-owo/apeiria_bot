@@ -14,6 +14,7 @@ web_ui:
     password_changed: "密码已更新"
     account_not_found: "账号不存在"
     owner_self_demotion_forbidden: "Owner 账号不能将自己降级"
+    sessions_revoked: "其他会话已注销"
     register_failed: "注册失败"
     register_success: "注册成功，请登录"
   chat:

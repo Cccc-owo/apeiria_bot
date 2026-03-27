@@ -12,6 +12,8 @@ export interface WebUIAccountItem {
   username: string
   role: string
   is_disabled: boolean
+  last_login_at: string | null
+  password_changed_at: string | null
 }
 
 export interface RegistrationCodeItem {
@@ -19,6 +21,14 @@ export interface RegistrationCodeItem {
   role: string
   created_at: string
   created_by: string
+}
+
+export interface SecurityAuditEventItem {
+  event_type: string
+  occurred_at: string
+  actor_username: string | null
+  target_username: string | null
+  detail: string | null
 }
 
 export interface SettingsFieldItem {
@@ -101,9 +111,25 @@ export interface LogItem {
 
 export interface LogHistoryResponse {
   items: LogItem[]
+  total: number
   before: number
   next_before: number | null
   has_more: boolean
+}
+
+export interface LogSourcesResponse {
+  items: string[]
+}
+
+export interface LogHistoryQuery {
+  before?: number
+  limit?: number
+  level?: string
+  source?: string
+  search?: string
+  start?: string
+  end?: string
+  include_access?: boolean
 }
 
 export interface WebUIBuildStatus {
@@ -182,7 +208,7 @@ export const changePassword = (payload: {
   current_password: string
   new_password: string
 }) =>
-  client.post<{ status: string; detail?: string | null }>('/auth/password', payload)
+  client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/password', payload)
 
 export const getAccounts = () =>
   client.get<WebUIAccountItem[]>('/auth/accounts')
@@ -196,11 +222,17 @@ export const updateAccountRole = (
 export const getRegistrationCodes = () =>
   client.get<RegistrationCodeItem[]>('/auth/registration-codes')
 
+export const getSecurityAuditEvents = () =>
+  client.get<SecurityAuditEventItem[]>('/auth/audit-events')
+
 export const createRegistrationCode = (payload: { role: string }) =>
   client.post<RegistrationCodeItem>('/auth/registration-codes', payload)
 
 export const revokeRegistrationCode = (code: string) =>
   client.delete<{ status: string; detail?: string | null }>(`/auth/registration-codes/${encodeURIComponent(code)}`)
+
+export const revokeOtherSessions = () =>
+  client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/sessions/revoke-others')
 
 export const getStatus = () =>
   client.get<DashboardStatus>('/dashboard/status')
@@ -281,8 +313,14 @@ export async function streamRebuildWebUI (
 export const restartBot = () =>
   client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
 
-export const getLogHistory = (params?: { before?: number; limit?: number }) =>
-  client.get<LogHistoryResponse>('/logs/history', { params })
+export const getLogHistory = (
+  params?: LogHistoryQuery,
+  signal?: AbortSignal,
+) =>
+  client.get<LogHistoryResponse>('/logs/history', { params, signal })
+
+export const getLogSources = (signal?: AbortSignal) =>
+  client.get<LogSourcesResponse>('/logs/sources', { signal })
 
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')

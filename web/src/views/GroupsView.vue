@@ -162,8 +162,9 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { useRoute } from 'vue-router'
   import { getGroups, getPlugins, updateGroup, updateGroupPlugins } from '@/api'
   import type { PluginItem } from '@/api'
   import { getErrorMessage } from '@/api/client'
@@ -197,6 +198,7 @@
   const pluginFilter = ref<'all' | 'customized' | 'clean'>('all')
   const noticeStore = useNoticeStore()
   const { t } = useI18n()
+  const route = useRoute()
 
   const headers = computed(() => [
     { title: t('groups.name'), key: 'group_name' },
@@ -240,6 +242,17 @@
       return matchesKeyword && matchesStatus && matchesPluginState
     })
   })
+
+  function applyRouteFilters () {
+    const statusQuery = route.query.status
+    if (
+      statusQuery === 'all'
+      || statusQuery === 'enabled'
+      || statusQuery === 'disabled'
+    ) {
+      statusFilter.value = statusQuery
+    }
+  }
 
   async function loadGroups () {
     loading.value = true
@@ -314,7 +327,11 @@
   }
 
   onMounted(() => {
+    applyRouteFilters()
     void loadGroups()
+  })
+  watch(() => route.query, () => {
+    applyRouteFilters()
   })
 </script>
 

@@ -50,6 +50,8 @@ class WebUIAccountItem(BaseModel):
     username: str
     role: str
     is_disabled: bool = False
+    last_login_at: str | None = None
+    password_changed_at: str | None = None
 
 
 class RegistrationCodeItem(BaseModel):
@@ -78,6 +80,25 @@ class RoleUpdateRequest(BaseModel):
     """Request payload used to change an account role."""
 
     role: str = Field(min_length=1, max_length=32)
+
+
+class SessionRefreshResponse(BaseModel):
+    """Response used when the current session must rotate in place."""
+
+    status: str = "ok"
+    detail: str | None = None
+    token: str
+    principal: WebUIPrincipalResponse
+
+
+class SecurityAuditEventItem(BaseModel):
+    """Security audit event returned to account managers."""
+
+    event_type: str
+    occurred_at: str
+    actor_username: str | None = None
+    target_username: str | None = None
+    detail: str | None = None
 
 
 class StatusResponse(BaseModel):
@@ -117,13 +138,31 @@ class LogItem(BaseModel):
     extra: dict[str, object] = {}
 
 
+class LogHistoryQuery(BaseModel):
+    """History log query parameters."""
+
+    level: str = ""
+    source: str = ""
+    search: str = ""
+    start: str = ""
+    end: str = ""
+    include_access: bool = True
+
+
 class LogHistoryResponse(BaseModel):
     """Paginated persisted log history response."""
 
     items: list[LogItem]
+    total: int = 0
     before: int
     next_before: int | None = None
     has_more: bool = False
+
+
+class LogSourcesResponse(BaseModel):
+    """Available log sources for history filtering."""
+
+    items: list[str]
 
 
 class WebUIBuildStatusResponse(BaseModel):

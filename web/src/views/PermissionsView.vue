@@ -229,8 +229,9 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, onMounted, reactive, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { useRoute } from 'vue-router'
   import { createBan, deleteBan, getBans, getUsers, updateUserLevel } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
@@ -263,6 +264,7 @@
   const levelFilter = ref<string>('all')
   const noticeStore = useNoticeStore()
   const { t } = useI18n()
+  const route = useRoute()
 
   const levelOptions = [0, 1, 2, 3, 4, 5, 6]
   const highLevelThreshold = 4
@@ -335,6 +337,13 @@
       return matchesKeyword && matchesLevel
     })
   })
+
+  function applyRouteFilters () {
+    const tabQuery = route.query.tab
+    if (tabQuery === 'bans' || tabQuery === 'users') {
+      tab.value = tabQuery
+    }
+  }
 
   async function loadAll () {
     loading.value = true
@@ -419,7 +428,11 @@
   }
 
   onMounted(() => {
+    applyRouteFilters()
     void loadAll()
+  })
+  watch(() => route.query, () => {
+    applyRouteFilters()
   })
 </script>
 

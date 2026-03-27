@@ -43,6 +43,9 @@ class WebUIAccount:
     password_hash: str
     role: str = ROLE_OWNER
     is_disabled: bool = False
+    last_login_at: str | None = None
+    password_changed_at: str | None = None
+    session_version: int = 0
 
     def to_principal(self) -> WebUIPrincipalResponse:
         """Convert the account into the API principal shape."""
@@ -62,6 +65,17 @@ class WebUIRegistrationCode:
     role: str
     created_at: str
     created_by: str
+
+
+@dataclass(frozen=True)
+class WebUISecurityAuditEvent:
+    """Stored security audit event."""
+
+    event_type: str
+    occurred_at: str
+    actor_username: str | None = None
+    target_username: str | None = None
+    detail: str | None = None
 
 
 def _apply_secret_permissions(secret_file: "Path") -> None:
@@ -111,6 +125,28 @@ def _new_registration_code(*, role: str, created_by: str) -> dict[str, str]:
     }
 
 
+def _record_audit_event(
+    event_type: str,
+    *,
+    actor_username: str | None = None,
+    target_username: str | None = None,
+    detail: str | None = None,
+) -> None:
+    current_events = [
+        item for item in _auth_store.get("audit_events", []) if isinstance(item, dict)
+    ]
+    current_events.append(
+        {
+            "event_type": event_type,
+            "occurred_at": _iso_now(),
+            "actor_username": actor_username,
+            "target_username": target_username,
+            "detail": detail,
+        }
+    )
+    _auth_store["audit_events"] = current_events[-100:]
+
+
 def _normalize_user_item(item: object, *, index: int) -> dict[str, object] | None:
     if not isinstance(item, dict):
         return None
@@ -127,6 +163,17 @@ def _normalize_user_item(item: object, *, index: int) -> dict[str, object] | Non
         "password_hash": str(item.get("password_hash") or ""),
         "role": role,
         "is_disabled": bool(item.get("is_disabled", False)),
+        "last_login_at": (
+            str(item.get("last_login_at"))
+            if item.get("last_login_at") is not None
+            else None
+        ),
+        "password_changed_at": (
+            str(item.get("password_changed_at"))
+            if item.get("password_changed_at") is not None
+            else None
+        ),
+        "session_version": int(item.get("session_version") or 0),
     }
 
 
@@ -193,6 +240,7 @@ def _load_or_create_raw() -> dict[str, Any]:
         "registration_codes": [
             _new_registration_code(role=ROLE_OWNER, created_by="system")
         ],
+        "audit_events": [],
     }
     _persist_raw(data)
     logger.info("{}", t("web_ui.secrets.generated"))
@@ -226,6 +274,11 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
             "token_secret": str(data["token_secret"]),
             "users": normalized_users,
             "registration_codes": normalized_registration_codes,
+            "audit_events": [
+                item
+                for item in data.get("audit_events", [])
+                if isinstance(item, dict)
+            ],
         }
 
     upgraded = {
@@ -234,6 +287,7 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
         "registration_codes": [
             _new_registration_code(role=ROLE_OWNER, created_by="system")
         ],
+        "audit_events": [],
     }
     legacy_password = data.get("password")
     if isinstance(legacy_password, str) and legacy_password:
@@ -289,6 +343,17 @@ def list_accounts() -> list[WebUIAccount]:
                     password_hash=str(item["password_hash"]),
                     role=role,
                     is_disabled=bool(item.get("is_disabled", False)),
+                    last_login_at=(
+                        str(item.get("last_login_at"))
+                        if item.get("last_login_at") is not None
+                        else None
+                    ),
+                    password_changed_at=(
+                        str(item.get("password_changed_at"))
+                        if item.get("password_changed_at") is not None
+                        else None
+                    ),
+                    session_version=int(item.get("session_version") or 0),
                 )
             )
         except KeyError:
@@ -301,6 +366,14 @@ def get_account_by_username(username: str) -> WebUIAccount | None:
     normalized = _normalize_username(username)
     return next(
         (account for account in list_accounts() if account.username == normalized),
+        None,
+    )
+
+
+def get_account_by_id(user_id: str) -> WebUIAccount | None:
+    """Look up an account by user identifier."""
+    return next(
+        (account for account in list_accounts() if account.user_id == user_id),
         None,
     )
 
@@ -340,6 +413,30 @@ def list_registration_codes() -> list[WebUIRegistrationCode]:
     return registration_codes
 
 
+def list_security_audit_events(limit: int = 20) -> list[WebUISecurityAuditEvent]:
+    """List recent security audit events."""
+    items = [
+        WebUISecurityAuditEvent(
+            event_type=str(item.get("event_type") or "unknown"),
+            occurred_at=str(item.get("occurred_at") or ""),
+            actor_username=(
+                str(item.get("actor_username"))
+                if item.get("actor_username") is not None
+                else None
+            ),
+            target_username=(
+                str(item.get("target_username"))
+                if item.get("target_username") is not None
+                else None
+            ),
+            detail=str(item.get("detail")) if item.get("detail") is not None else None,
+        )
+        for item in _auth_store.get("audit_events", [])
+        if isinstance(item, dict)
+    ]
+    return items[-limit:][::-1]
+
+
 def create_registration_code(
     *,
     role: str,
@@ -360,11 +457,16 @@ def create_registration_code(
         registration_code,
     ]
     _auth_store.pop("invite_codes", None)
+    _record_audit_event(
+        "registration_code_created",
+        actor_username=created_by,
+        detail=registration_code["code"],
+    )
     _persist_raw(_auth_store)
     return WebUIRegistrationCode(**registration_code)
 
 
-def revoke_registration_code(code: str) -> bool:
+def revoke_registration_code(code: str, *, revoked_by: str | None = None) -> bool:
     """Delete one registration code."""
     normalized = code.strip()
     current = [
@@ -382,6 +484,11 @@ def revoke_registration_code(code: str) -> bool:
         return False
     _auth_store["registration_codes"] = next_registration_codes
     _auth_store.pop("invite_codes", None)
+    _record_audit_event(
+        "registration_code_revoked",
+        actor_username=revoked_by,
+        detail=normalized,
+    )
     _persist_raw(_auth_store)
     return True
 
@@ -394,6 +501,13 @@ def update_account_password(user_id: str, password: str) -> WebUIAccount | None:
         if str(item.get("user_id")) != user_id:
             continue
         item["password_hash"] = _hash_password(password)
+        item["password_changed_at"] = _iso_now()
+        item["session_version"] = int(item.get("session_version") or 0) + 1
+        _record_audit_event(
+            "password_changed",
+            actor_username=str(item.get("username") or ""),
+            target_username=str(item.get("username") or ""),
+        )
         _persist_raw(_auth_store)
         return get_account_by_username(str(item.get("username") or ""))
     return None
@@ -410,6 +524,46 @@ def update_account_role(user_id: str, role: str) -> WebUIAccount | None:
         if str(item.get("user_id")) != user_id:
             continue
         item["role"] = normalized_role
+        _persist_raw(_auth_store)
+        return get_account_by_username(str(item.get("username") or ""))
+    return None
+
+
+def rotate_account_session_version(
+    user_id: str,
+    *,
+    actor_username: str,
+) -> WebUIAccount | None:
+    """Invalidate previous sessions for one account and return the updated record."""
+    for item in _auth_store.get("users", []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("user_id")) != user_id:
+            continue
+        item["session_version"] = int(item.get("session_version") or 0) + 1
+        _record_audit_event(
+            "sessions_revoked",
+            actor_username=actor_username,
+            target_username=str(item.get("username") or ""),
+        )
+        _persist_raw(_auth_store)
+        return get_account_by_username(str(item.get("username") or ""))
+    return None
+
+
+def record_login_success(user_id: str) -> WebUIAccount | None:
+    """Update last-login metadata for one account."""
+    for item in _auth_store.get("users", []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("user_id")) != user_id:
+            continue
+        item["last_login_at"] = _iso_now()
+        _record_audit_event(
+            "login_succeeded",
+            actor_username=str(item.get("username") or ""),
+            target_username=str(item.get("username") or ""),
+        )
         _persist_raw(_auth_store)
         return get_account_by_username(str(item.get("username") or ""))
     return None
@@ -475,5 +629,11 @@ def register_account(
         )
     ]
     _auth_store.pop("invite_codes", None)
+    _record_audit_event(
+        "registration_code_used",
+        actor_username=normalized_username,
+        target_username=normalized_username,
+        detail=normalized_registration_code,
+    )
     _persist_raw(_auth_store)
     return account

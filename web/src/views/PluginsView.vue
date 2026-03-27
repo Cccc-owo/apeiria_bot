@@ -731,8 +731,9 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { useRoute } from 'vue-router'
   import {
     type DirConfigItem,
     type DriverConfigItem,
@@ -802,6 +803,7 @@
   const toggleConfirmItem = ref<PluginItem | null>(null)
   const noticeStore = useNoticeStore()
   const { t } = useI18n()
+  const route = useRoute()
 
   const coreEditor = useSettingsEditor({
     load: getCoreSettings,
@@ -874,11 +876,28 @@
   const visiblePlugins = computed(() =>
     (hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value)
       .filter(item => {
+        if (route.query.enabled === 'disabled' && item.is_global_enabled) {
+          return false
+        }
         const keyword = pluginSearch.value.trim().toLowerCase()
         if (!keyword) return true
         return `${item.name || ''} ${item.module_name} ${item.description || ''} ${item.source}`.toLowerCase().includes(keyword)
       }),
   )
+
+  function applyRouteFilters () {
+    const sectionQuery = route.query.section
+    if (
+      sectionQuery === 'core'
+      || sectionQuery === 'plugins'
+      || sectionQuery === 'adapters'
+      || sectionQuery === 'drivers'
+    ) {
+      sectionTab.value = sectionQuery
+    }
+    const searchQuery = route.query.search
+    pluginSearch.value = typeof searchQuery === 'string' ? searchQuery : ''
+  }
   const previewSaving = computed(() =>
     settingsSaving.value || settingsRawSaving.value || coreSaving.value || coreRawSaving.value,
   )
@@ -1355,7 +1374,11 @@
   }
 
   onMounted(() => {
+    applyRouteFilters()
     void loadPlugins()
+  })
+  watch(() => route.query, () => {
+    applyRouteFilters()
   })
 </script>
 

@@ -1,14 +1,15 @@
 <template>
   <div class="page-view">
     <div class="page-header">
-      <h1 class="page-title">{{ t('logs.title') }}</h1>
+      <h1 class="page-title">{{ t('logs.liveTitle') }}</h1>
       <div class="page-actions">
-        <v-chip :color="connected ? 'success' : 'error'" variant="tonal">
+        <v-chip :color="connected ? 'success' : 'error'" size="small" variant="tonal">
           {{ connected ? t('logs.connected') : t('logs.disconnected') }}
         </v-chip>
         <v-btn
           :prepend-icon="connected ? 'mdi-lan-disconnect' : 'mdi-connection'"
-          variant="tonal"
+          size="small"
+          variant="text"
           @click="toggleConnection"
         >
           {{ connected ? t('logs.disconnect') : t('logs.connect') }}
@@ -16,6 +17,7 @@
         <v-btn
           :disabled="filteredLogs.length === 0"
           prepend-icon="mdi-download-outline"
+          size="small"
           variant="text"
           @click="exportLogs"
         >
@@ -24,15 +26,16 @@
         <v-btn
           :disabled="logs.length === 0"
           prepend-icon="mdi-delete-sweep"
+          size="small"
           variant="text"
-          @click="logs = []"
+          @click="clearLogs"
         >
           {{ t('logs.clear') }}
         </v-btn>
       </div>
     </div>
 
-    <div class="page-toolbar-form">
+    <div class="page-toolbar-form live-toolbar">
       <v-text-field
         v-model.trim="search"
         density="compact"
@@ -67,126 +70,59 @@
         inset
         :label="t('logs.autoScroll')"
       />
-    </div>
-
-    <div class="logs-quick-filters">
-      <v-chip
-        v-for="level in quickLevelFilters"
-        :key="level"
-        class="logs-quick-filters__chip"
-        :color="levelColor(level)"
-        size="small"
-        :variant="selectedLevels.includes(level) ? 'flat' : 'tonal'"
-        @click="toggleQuickLevel(level)"
-      >
-        {{ level }}
-      </v-chip>
-      <v-btn
-        v-if="selectedLevels.length"
-        class="logs-quick-filters__reset"
-        size="small"
-        variant="text"
-        @click="selectedLevels = []"
-      >
-        {{ t('logs.resetLevels') }}
-      </v-btn>
-    </div>
-
-    <div class="page-summary-grid mb-4">
-      <v-sheet class="summary-card" rounded="lg">
-        <div class="summary-card__label">{{ t('logs.totalCount') }}</div>
-        <div class="summary-card__value">{{ logs.length }}</div>
-      </v-sheet>
-      <v-sheet class="summary-card" rounded="lg">
-        <div class="summary-card__label">{{ t('logs.visibleCount') }}</div>
-        <div class="summary-card__value">{{ filteredLogs.length }}</div>
-      </v-sheet>
-      <v-sheet class="summary-card" rounded="lg">
-        <div class="summary-card__label">{{ t('logs.errorCount') }}</div>
-        <div class="summary-card__value">{{ highSignalCount }}</div>
-      </v-sheet>
+      <v-switch
+        v-model="showAccessLogs"
+        color="primary"
+        hide-details
+        inset
+        :label="t('logs.showAccessLogs')"
+      />
     </div>
 
     <v-alert
-      v-if="historyError"
+      v-if="bootstrapError"
       class="mb-4"
       density="comfortable"
       type="warning"
       variant="tonal"
     >
-      {{ historyError }}
+      {{ bootstrapError }}
     </v-alert>
 
-    <v-card class="page-panel log-card">
-      <div v-if="hasMoreHistory || loadingOlder" class="log-card__history">
-        <v-btn
-          :loading="loadingOlder"
-          size="small"
-          variant="text"
-          @click="loadOlderHistory"
-        >
-          {{ t('logs.loadOlder') }}
-        </v-btn>
-      </div>
-
-      <div v-if="filteredLogs.length > 0" class="log-table-head">
-        <span>{{ t('logs.level') }}</span>
-        <span>{{ t('logs.timestamp') }}</span>
-        <span>{{ t('logs.source') }}</span>
-        <span>{{ t('logs.message') }}</span>
-        <span />
+    <v-card class="page-panel live-log-viewer">
+      <div class="live-log-viewer__head">
+        <div class="live-log-viewer__dots">
+          <span />
+          <span />
+          <span />
+        </div>
+        <span class="live-log-viewer__title">logs://live</span>
       </div>
 
       <div v-if="filteredLogs.length === 0" class="text-medium-emphasis text-center pa-8">
-        {{ loadingHistory ? t('common.loading') : logs.length === 0 ? t('logs.waiting') : t('logs.noResults') }}
+        {{ loadingHistory ? t('common.loading') : t('logs.waiting') }}
       </div>
 
-      <div v-else ref="logContainer" class="structured-log-list" @scroll="handleLogScroll">
-        <v-expansion-panels variant="accordion">
-          <v-expansion-panel
-            v-for="entry in filteredLogs"
-            :key="entry.id"
-            :class="`log-entry log-entry--${entry.level.toLowerCase()}`"
-          >
-            <v-expansion-panel-title v-slot="{ expanded }" hide-actions>
-              <div class="log-entry__summary">
-                <v-chip
-                  class="log-entry__level-chip"
-                  :color="levelColor(entry.level)"
-                  size="small"
-                  variant="tonal"
-                >
-                  {{ entry.level }}
-                </v-chip>
-                <span class="log-entry__time">{{ entry.timestamp }}</span>
-                <span class="log-entry__source" :title="entry.source">{{ entry.source }}</span>
-                <span class="log-entry__message">{{ entry.message }}</span>
-                <span aria-hidden="true" class="log-entry__toggle">
-                  <v-icon size="18">
-                    {{ expanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
-                  </v-icon>
-                </span>
-              </div>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <div class="log-entry__details">
-                <div class="text-caption text-medium-emphasis">{{ t('logs.raw') }}</div>
-                <pre class="log-entry__raw">{{ entry.raw }}</pre>
-                <div v-if="Object.keys(entry.extra).length" class="text-caption text-medium-emphasis">
-                  {{ t('logs.extra') }}
-                </div>
-                <pre v-if="Object.keys(entry.extra).length" class="log-entry__raw">{{ JSON.stringify(entry.extra, null, 2) }}</pre>
-              </div>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
+      <div v-else ref="logContainer" class="live-log-stream">
+        <div
+          v-for="entry in filteredLogs"
+          :key="entry.id"
+          class="live-log-row"
+        >
+          <span class="live-log-row__time">[{{ entry.timestamp.slice(11) }}]</span>
+          <span class="live-log-row__level" :class="`live-log-row__level--${entry.level.toLowerCase()}`">
+            {{ entry.level }}
+          </span>
+          <span class="live-log-row__source">{{ entry.source }}</span>
+          <span class="live-log-row__message">{{ entry.message }}</span>
+        </div>
       </div>
     </v-card>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
+  import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { getLogHistory } from '@/api'
   import type { LogItem } from '@/api'
@@ -208,26 +144,25 @@
   const search = ref('')
   const selectedLevels = ref<string[]>([])
   const selectedSources = ref<string[]>([])
+  const showAccessLogs = ref(false)
   const logContainer = ref<HTMLElement>()
   const loadingHistory = ref(false)
-  const loadingOlder = ref(false)
-  const hasMoreHistory = ref(false)
-  const nextBefore = ref<number | null>(0)
-  const historyError = ref('')
-  const historyLogCount = ref(0)
+  const bootstrapError = ref('')
+  const recentHistoryCount = ref(0)
   const { t } = useI18n()
   let ws: WebSocket | null = null
-  const quickLevelFilters = ['ERROR', 'WARNING', 'INFO']
-  const pendingLiveLogs: LogEntry[] = []
   let primingHistory = false
+  const pendingLiveLogs: LogEntry[] = []
   const MAX_LIVE_LOGS = 500
 
   const levelOptions = computed(() => Array.from(new Set(logs.value.map(item => item.level))).sort())
-  const sourceOptions = computed(() => Array.from(new Set(logs.value.map(item => item.source))).sort())
-  const highSignalCount = computed(() =>
-    logs.value.filter(entry => entry.level === 'ERROR' || entry.level === 'CRITICAL' || entry.level === 'WARNING').length,
-  )
+  const sourceOptions = computed(() => Array.from(new Set(logs.value
+    .filter(item => showAccessLogs.value || item.source !== 'uvicorn.access')
+    .map(item => item.source))).sort())
   const filteredLogs = computed(() => logs.value.filter(entry => {
+    if (!showAccessLogs.value && entry.source === 'uvicorn.access') {
+      return false
+    }
     if (selectedLevels.value.length > 0 && !selectedLevels.value.includes(entry.level)) {
       return false
     }
@@ -249,7 +184,9 @@
 
     ws.onopen = () => {
       const token = localStorage.getItem('token')
-      if (token) ws?.send(token)
+      if (token) {
+        ws?.send(token)
+      }
       connected.value = true
     }
 
@@ -260,15 +197,12 @@
         return
       }
       appendLiveLog(entry)
-      if (!autoScroll.value) {
-        return
-      }
-      nextTick(() => {
-        logContainer.value?.scrollTo(0, logContainer.value.scrollHeight)
-      })
+      scrollToBottomIfNeeded()
     }
 
-    ws.onclose = () => { connected.value = false }
+    ws.onclose = () => {
+      connected.value = false
+    }
   }
 
   function disconnect () {
@@ -277,15 +211,20 @@
     connected.value = false
   }
 
+  function clearLogs () {
+    logs.value = []
+    recentHistoryCount.value = 0
+  }
+
   function resetLogsView () {
+    disconnect()
     logs.value = []
     selectedLevels.value = []
     selectedSources.value = []
+    showAccessLogs.value = false
     search.value = ''
-    hasMoreHistory.value = false
-    nextBefore.value = 0
-    historyError.value = ''
-    historyLogCount.value = 0
+    bootstrapError.value = ''
+    recentHistoryCount.value = 0
     pendingLiveLogs.length = 0
     primingHistory = false
   }
@@ -302,61 +241,23 @@
     }
   }
 
-  async function loadInitialHistory () {
+  async function loadRecentHistory () {
     loadingHistory.value = true
-    historyError.value = ''
+    bootstrapError.value = ''
     try {
-      const response = await getLogHistory({ before: 0, limit: 50 })
-      logs.value = response.data.items
-        .slice()
-        .reverse()
-        .map(item => toLogEntry(item))
-      historyLogCount.value = logs.value.length
-      hasMoreHistory.value = response.data.has_more
-      nextBefore.value = response.data.next_before
+      const response = await getLogHistory({
+        before: 0,
+        limit: 50,
+        include_access: showAccessLogs.value,
+      })
+      logs.value = response.data.items.slice().reverse().map(item => toLogEntry(item))
+      recentHistoryCount.value = logs.value.length
       await nextTick()
       logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })
     } catch (error) {
-      historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
+      bootstrapError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
     } finally {
       loadingHistory.value = false
-    }
-  }
-
-  async function loadOlderHistory () {
-    if (loadingOlder.value || nextBefore.value === null) return
-    const container = logContainer.value
-    const previousHeight = container?.scrollHeight || 0
-    loadingOlder.value = true
-    try {
-      const response = await getLogHistory({ before: nextBefore.value, limit: 50 })
-      const olderEntries = response.data.items
-        .slice()
-        .reverse()
-        .map(item => toLogEntry(item))
-      logs.value = [...olderEntries, ...logs.value]
-      historyLogCount.value += olderEntries.length
-      hasMoreHistory.value = response.data.has_more
-      nextBefore.value = response.data.next_before
-      await nextTick()
-      if (container) {
-        const nextHeight = container.scrollHeight
-        container.scrollTop = nextHeight - previousHeight
-      }
-    } catch (error) {
-      historyError.value = getErrorMessage(error, t('logs.historyLoadFailed'))
-    } finally {
-      loadingOlder.value = false
-    }
-  }
-
-  function handleLogScroll (event: Event) {
-    const target = event.target as HTMLElement | null
-    if (!target || loadingOlder.value || !hasMoreHistory.value) {
-      return
-    }
-    if (target.scrollTop <= 24) {
-      void loadOlderHistory()
     }
   }
 
@@ -365,7 +266,7 @@
     primingHistory = true
     connect()
     try {
-      await loadInitialHistory()
+      await loadRecentHistory()
     } finally {
       flushPendingLiveLogs()
       primingHistory = false
@@ -409,19 +310,8 @@
     }
   }
 
-  function levelColor (level: string) {
-    if (level === 'ERROR' || level === 'CRITICAL') return 'error'
-    if (level === 'WARNING') return 'warning'
-    if (level === 'SUCCESS') return 'success'
-    return 'info'
-  }
-
-  function toggleQuickLevel (level: string) {
-    if (selectedLevels.value.includes(level)) {
-      selectedLevels.value = selectedLevels.value.filter(item => item !== level)
-      return
-    }
-    selectedLevels.value = [...selectedLevels.value, level]
+  function buildLogKey (entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
+    return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
   }
 
   function flushPendingLiveLogs () {
@@ -434,19 +324,25 @@
       existingKeys.add(entryKey)
       appendLiveLog(entry)
     }
-  }
-
-  function buildLogKey (entry: Pick<LogEntry, 'timestamp' | 'level' | 'source' | 'raw'>) {
-    return `${entry.timestamp}|${entry.level}|${entry.source}|${entry.raw}`
+    scrollToBottomIfNeeded()
   }
 
   function appendLiveLog (entry: LogEntry) {
     logs.value.push(entry)
-    const maxLogs = historyLogCount.value + MAX_LIVE_LOGS
+    const maxLogs = recentHistoryCount.value + MAX_LIVE_LOGS
     if (logs.value.length <= maxLogs) {
       return
     }
-    logs.value.splice(historyLogCount.value, logs.value.length - maxLogs)
+    logs.value.splice(recentHistoryCount.value, logs.value.length - maxLogs)
+  }
+
+  function scrollToBottomIfNeeded () {
+    if (!autoScroll.value) {
+      return
+    }
+    nextTick(() => {
+      logContainer.value?.scrollTo(0, logContainer.value.scrollHeight)
+    })
   }
 
   function exportLogs () {
@@ -457,162 +353,148 @@
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `apeiria-logs-${Date.now()}.jsonl`
+    link.download = `apeiria-live-logs-${Date.now()}.jsonl`
     link.click()
     URL.revokeObjectURL(url)
   }
 
-  onMounted(() => { void initializeLogsView() })
-  onActivated(() => { void initializeLogsView() })
+  onMounted(() => {
+    void initializeLogsView()
+  })
+  watch(showAccessLogs, enabled => {
+    if (enabled) {
+      return
+    }
+    selectedSources.value = selectedSources.value.filter(source => source !== 'uvicorn.access')
+  })
+  onActivated(() => {
+    if (!connected.value) {
+      void initializeLogsView()
+    }
+  })
   onDeactivated(disconnect)
   onUnmounted(disconnect)
 </script>
 
 <style scoped>
-.log-card {
-  background: rgb(var(--v-theme-surface-container-low));
-  min-height: 60vh;
-}
-
-.log-card__history {
-  display: flex;
-  justify-content: center;
-  padding: 10px 12px 0;
+.live-toolbar {
+  margin-bottom: 16px;
 }
 
 .logs-filter {
   min-width: 180px;
 }
 
-.structured-log-list {
-  max-height: 70vh;
-  overflow-y: auto;
-  padding: 0 12px 12px;
-}
-
-.logs-quick-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.logs-quick-filters__chip {
-  cursor: pointer;
-}
-
-.logs-quick-filters__reset {
-  min-width: 0;
-}
-
-.log-table-head {
-  display: grid;
-  grid-template-columns: 110px 176px 220px minmax(0, 1fr) 28px;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 20px 10px;
-  margin: 0 12px;
-  border-bottom: 1px solid rgba(var(--v-theme-outline-variant), 0.5);
-  background: rgb(var(--v-theme-surface-container-low));
-  color: rgba(var(--v-theme-on-surface), 0.56);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.log-entry {
-  margin-bottom: 8px;
-}
-
-.log-entry__summary {
-  display: grid;
-  grid-template-columns: 110px 176px 220px minmax(0, 1fr) 28px;
-  gap: 12px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-}
-
-.log-entry__time,
-.log-entry__source {
-  min-width: 0;
+.live-log-viewer {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background:
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.05), transparent 40%),
+    rgb(var(--v-theme-surface-container-low));
+}
+
+.live-log-viewer__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(var(--v-theme-outline-variant), 0.3);
+  background: rgba(var(--v-theme-on-surface), 0.05);
+}
+
+.live-log-viewer__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.live-log-viewer__dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(var(--v-theme-on-surface), 0.3);
+}
+
+.live-log-viewer__dots span:nth-child(1) {
+  background: #ff5f57;
+}
+
+.live-log-viewer__dots span:nth-child(2) {
+  background: #febc2e;
+}
+
+.live-log-viewer__dots span:nth-child(3) {
+  background: #28c840;
+}
+
+.live-log-viewer__title {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
   font-size: 0.82rem;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+}
+
+.live-log-stream {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+}
+
+.live-log-row {
+  display: grid;
+  grid-template-columns: 92px 76px 180px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.live-log-row__time,
+.live-log-row__source {
   color: rgba(var(--v-theme-on-surface), 0.64);
 }
 
-.log-entry__level-chip {
-  width: 96px;
+.live-log-row__level {
+  display: inline-flex;
   justify-content: center;
+  min-width: 64px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
-.log-entry__message {
+.live-log-row__level--info {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+}
+
+.live-log-row__level--warning {
+  background: rgba(250, 204, 21, 0.18);
+  color: #facc15;
+}
+
+.live-log-row__level--error,
+.live-log-row__level--critical {
+  background: rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+.live-log-row__level--success {
+  background: rgba(96, 165, 250, 0.18);
+  color: #60a5fa;
+}
+
+.live-log-row__message {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.log-entry__toggle {
-  display: inline-flex;
-  justify-content: center;
-  color: rgba(var(--v-theme-on-surface), 0.52);
-}
-
-:deep(.log-entry .v-expansion-panel-title) {
-  min-height: 62px;
-  padding: 14px 18px;
-}
-
-:deep(.log-entry .v-expansion-panel-title__overlay) {
-  opacity: 0 !important;
-}
-
-:deep(.log-entry .v-expansion-panel-text__wrapper) {
-  padding-top: 0;
-}
-
-.log-entry__details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0 18px 18px;
-}
-
-.log-entry__raw {
-  margin: 0;
-  padding: 12px;
-  background: rgba(var(--v-theme-on-surface), 0.04);
-  border-radius: 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  font-size: 12px;
 }
 
 @media (max-width: 960px) {
-  .log-table-head {
-    display: none;
-  }
-
-  .log-entry__summary {
+  .live-log-row {
     grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .log-entry__message {
-    white-space: normal;
-  }
-
-  .log-entry__toggle {
-    justify-content: flex-start;
+    gap: 4px;
+    padding: 10px 0;
   }
 }
 </style>

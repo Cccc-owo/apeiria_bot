@@ -18,12 +18,13 @@ client.interceptors.response.use(
   res => res,
   err => {
     const status = err.response?.status
+    const requestUrl = typeof err.config?.url === 'string' ? err.config.url : ''
     const authStore = useAuthStore()
     if (status === 401 && authStore.token) {
       authStore.handleUnauthorized()
       window.location.href = '/login'
     }
-    if (status === 403 && authStore.token) {
+    if (status === 403 && authStore.token && requestUrl.includes('/auth/me')) {
       authStore.handleForbidden()
       window.location.href = '/login'
     }
