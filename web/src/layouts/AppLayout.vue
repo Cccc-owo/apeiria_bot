@@ -137,6 +137,7 @@
     { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
     { icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
     { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
+    { icon: 'mdi-history', title: t('layout.logsHistory'), to: '/logs/history' },
     ...(authStore.isOwner ? [{ icon: 'mdi-account-cog-outline', title: t('layout.accounts'), to: '/accounts' }] : []),
   ])
 

@@ -16,7 +16,12 @@ from apeiria.plugins.web_ui.auth import (
     require_control_panel,
     verify_token,
 )
-from apeiria.plugins.web_ui.models import LogHistoryResponse, LogItem
+from apeiria.plugins.web_ui.models import (
+    LogHistoryQuery,
+    LogHistoryResponse,
+    LogItem,
+    LogSourcesResponse,
+)
 from apeiria.plugins.web_ui.roles import can_access_control_panel
 
 router = APIRouter()
@@ -34,10 +39,15 @@ async def get_log_history(
     _: Annotated[Any, Depends(require_control_panel)],
     before: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    filters: Annotated[LogHistoryQuery, Depends()] = LogHistoryQuery(),
 ) -> LogHistoryResponse:
-    from apeiria.core.services.log import load_history_logs
+    from apeiria.core.services.log import HistoryLogFilters, load_history_logs
 
-    items, has_more = load_history_logs(before=before, limit=limit)
+    items, has_more, total = load_history_logs(
+        before=before,
+        limit=limit,
+        filters=HistoryLogFilters(**filters.model_dump()),
+    )
     return LogHistoryResponse(
         items=[
             LogItem(
@@ -50,10 +60,20 @@ async def get_log_history(
             )
             for item in items
         ],
+        total=total,
         before=before,
         next_before=before + len(items) if has_more else None,
         has_more=has_more,
     )
+
+
+@router.get("/sources", response_model=LogSourcesResponse)
+async def get_log_sources(
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> LogSourcesResponse:
+    from apeiria.core.services.log import load_history_log_sources
+
+    return LogSourcesResponse(items=load_history_log_sources())
 
 
 @router.websocket("/ws")
@@ -67,8 +87,12 @@ async def log_websocket(websocket: WebSocket) -> None:
     # Auth: first message must be JWT token
     try:
         token = await websocket.receive_text()
+    except WebSocketDisconnect:
+        return
+
+    try:
         _require_log_stream_claims(token)
-    except Exception:  # noqa: BLE001
+    except ValueError:
         await websocket.close(code=4001, reason="Unauthorized")
         return
 

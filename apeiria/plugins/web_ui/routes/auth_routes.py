@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from apeiria.core.i18n import t
 from apeiria.plugins.web_ui.auth import (
@@ -22,6 +22,8 @@ from apeiria.plugins.web_ui.models import (
     RegistrationCodeCreateRequest,
     RegistrationCodeItem,
     RoleUpdateRequest,
+    SecurityAuditEventItem,
+    SessionRefreshResponse,
     WebUIAccountItem,
     WebUIPrincipalResponse,
 )
@@ -36,8 +38,11 @@ from apeiria.plugins.web_ui.secrets import (
     create_registration_code,
     list_accounts,
     list_registration_codes,
+    list_security_audit_events,
+    record_login_success,
     register_account,
     revoke_registration_code,
+    rotate_account_session_version,
     update_account_password,
     update_account_role,
     verify_account_password,
@@ -47,7 +52,7 @@ router = APIRouter()
 
 
 @router.post("/login")
-async def login(body: LoginRequest) -> LoginResponse:
+async def login(body: LoginRequest, request: Request) -> LoginResponse:
     """Authenticate a Web UI account and return a JWT token."""
     account = verify_account_password(body.username, body.password)
     if account is None:
@@ -60,6 +65,7 @@ async def login(body: LoginRequest) -> LoginResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=t("web_ui.auth.permission_denied"),
         )
+    account = record_login_success(account.user_id) or account
     principal = account.to_principal()
     return LoginResponse(
         token=create_token(
@@ -69,6 +75,8 @@ async def login(body: LoginRequest) -> LoginResponse:
                 "username": principal.username,
                 "role": principal.role,
                 "capabilities": capabilities_for_role(principal.role),
+                "session_version": account.session_version,
+                "client_ip": request.client.host if request.client else "",
             }
         ),
         principal=WebUIPrincipalResponse(
@@ -129,6 +137,8 @@ async def get_accounts(
             username=account.username,
             role=account.role,
             is_disabled=account.is_disabled,
+            last_login_at=account.last_login_at,
+            password_changed_at=account.password_changed_at,
         )
         for account in list_accounts()
     ]
@@ -147,6 +157,23 @@ async def get_registration_codes(
             created_by=registration_code.created_by,
         )
         for registration_code in list_registration_codes()
+    ]
+
+
+@router.get("/audit-events")
+async def get_security_audit_events(
+    _: Annotated[Any, Depends(require_account_manage)],
+) -> list[SecurityAuditEventItem]:
+    """List recent security audit events."""
+    return [
+        SecurityAuditEventItem(
+            event_type=event.event_type,
+            occurred_at=event.occurred_at,
+            actor_username=event.actor_username,
+            target_username=event.target_username,
+            detail=event.detail,
+        )
+        for event in list_security_audit_events()
     ]
 
 
@@ -184,10 +211,13 @@ async def create_registration_code_route(
 @router.delete("/registration-codes/{code}")
 async def delete_registration_code(
     code: str,
-    _: Annotated[Any, Depends(require_account_manage)],
+    claims: Annotated[dict[str, Any], Depends(require_account_manage)],
 ) -> OperationStatusResponse:
     """Revoke one registration code."""
-    if not revoke_registration_code(code):
+    if not revoke_registration_code(
+        code,
+        revoked_by=str(claims.get("username") or claims.get("sub") or "unknown"),
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=t("web_ui.auth.registration_code_not_found"),
@@ -199,7 +229,7 @@ async def delete_registration_code(
 async def change_password(
     body: PasswordChangeRequest,
     claims: Annotated[dict[str, Any], Depends(require_control_panel)],
-) -> OperationStatusResponse:
+) -> SessionRefreshResponse:
     """Change the current account password."""
     username = str(claims.get("username") or claims.get("sub") or "")
     user_id = str(claims.get("user_id") or "")
@@ -214,8 +244,60 @@ async def change_password(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=t("web_ui.auth.invalid_credentials"),
         )
-    update_account_password(user_id, body.new_password)
-    return OperationStatusResponse(detail=t("web_ui.auth.password_changed"))
+    updated_account = update_account_password(user_id, body.new_password)
+    if updated_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("web_ui.auth.account_not_found"),
+        )
+    updated_principal = updated_account.to_principal()
+    return SessionRefreshResponse(
+        detail=t("web_ui.auth.password_changed"),
+        token=create_token(
+            {
+                "sub": updated_principal.username,
+                "user_id": updated_principal.user_id,
+                "username": updated_principal.username,
+                "role": updated_principal.role,
+                "capabilities": capabilities_for_role(updated_principal.role),
+                "session_version": updated_account.session_version,
+            }
+        ),
+        principal=updated_principal,
+    )
+
+
+@router.post("/sessions/revoke-others")
+async def revoke_other_sessions(
+    claims: Annotated[dict[str, Any], Depends(require_control_panel)],
+) -> SessionRefreshResponse:
+    """Invalidate previous sessions and return a fresh token for the current account."""
+    user_id = str(claims.get("user_id") or "")
+    actor_username = str(claims.get("username") or claims.get("sub") or "")
+    updated_account = rotate_account_session_version(
+        user_id,
+        actor_username=actor_username,
+    )
+    if updated_account is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("web_ui.auth.account_not_found"),
+        )
+    updated_principal = updated_account.to_principal()
+    return SessionRefreshResponse(
+        detail=t("web_ui.auth.sessions_revoked"),
+        token=create_token(
+            {
+                "sub": updated_principal.username,
+                "user_id": updated_principal.user_id,
+                "username": updated_principal.username,
+                "role": updated_principal.role,
+                "capabilities": capabilities_for_role(updated_principal.role),
+                "session_version": updated_account.session_version,
+            }
+        ),
+        principal=updated_principal,
+    )
 
 
 @router.patch("/accounts/{user_id}/role")

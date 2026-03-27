@@ -5,9 +5,6 @@
         <div class="dashboard-hero__intro">
           <span class="text-overline dashboard-kicker">{{ t('layout.brand') }}</span>
           <h1 class="page-title">{{ t('dashboard.title') }}</h1>
-          <div class="text-caption text-medium-emphasis">
-            {{ lastUpdatedText }}
-          </div>
         </div>
         <div class="page-actions">
           <v-btn color="warning" :loading="restarting" variant="tonal" @click="handleRestart">
@@ -69,6 +66,15 @@
       <div class="dashboard-section__header">
         <div class="dashboard-section__title">{{ t('dashboard.overview') }}</div>
       </div>
+      <v-alert
+        v-if="dashboardError"
+        class="mb-4"
+        density="comfortable"
+        type="warning"
+        variant="tonal"
+      >
+        {{ dashboardError }}
+      </v-alert>
       <v-row class="dashboard-overview">
         <v-col cols="12" md="3" sm="6">
           <v-card class="metric-card metric-card--status">
@@ -148,7 +154,7 @@
 
       <div class="dashboard-grid__side">
         <div class="dashboard-section__header dashboard-section__header--tight">
-          <div class="dashboard-section__title">附加统计</div>
+          <div class="dashboard-section__title">{{ t('dashboard.extraStats') }}</div>
         </div>
         <v-row>
           <v-col cols="12" md="6" sm="6">
@@ -240,31 +246,19 @@
   const recentEvents = ref<DashboardEventItem[]>([])
   const webuiBuildStatus = ref<WebUIBuildStatus | null>(null)
   const loading = ref(false)
+  const dashboardError = ref('')
   const restarting = ref(false)
   const rebuildingWebUI = ref(false)
   const buildDialogVisible = ref(false)
   const buildLogs = ref('')
   const buildDialogStatus = ref('')
   const buildLogCardRef = ref<HTMLElement | null>(null)
-  const lastUpdatedAt = ref<Date | null>(null)
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const noticeStore = useNoticeStore()
   let refreshTimer: number | null = null
 
   const statusColor = computed(() => status.value?.status === 'running' ? 'success' : 'warning')
   const statusIcon = computed(() => status.value?.status === 'running' ? 'mdi-check-circle' : 'mdi-alert-circle')
-  const lastUpdatedText = computed(() => {
-    if (!lastUpdatedAt.value) {
-      return t('common.loading')
-    }
-    return t('dashboard.lastUpdated', {
-      time: lastUpdatedAt.value.toLocaleTimeString(locale.value === 'zh_CN' ? 'zh-CN' : 'en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }),
-    })
-  })
   const webuiBuildHeadline = computed(() => {
     if (!webuiBuildStatus.value) return ''
     if (!webuiBuildStatus.value.is_built) return t('dashboard.webuiBuildMissing')
@@ -281,7 +275,7 @@
     Boolean(webuiBuildStatus.value && (!webuiBuildStatus.value.is_built || webuiBuildStatus.value.is_stale)),
   )
 
-  async function refreshDashboard () {
+  async function refreshDashboard (options: { silent?: boolean } = {}) {
     loading.value = true
     try {
       const [statusResponse, eventsResponse, buildStatusResponse] = await Promise.all([
@@ -292,7 +286,12 @@
       status.value = statusResponse.data
       recentEvents.value = eventsResponse.data.items
       webuiBuildStatus.value = buildStatusResponse.data
-      lastUpdatedAt.value = new Date()
+      dashboardError.value = ''
+    } catch (error) {
+      dashboardError.value = getErrorMessage(error, t('dashboard.refreshFailed'))
+      if (!options.silent) {
+        noticeStore.show(dashboardError.value, 'error')
+      }
     } finally {
       loading.value = false
     }
@@ -427,7 +426,7 @@
   function startAutoRefresh () {
     stopAutoRefresh()
     refreshTimer = window.setInterval(() => {
-      void refreshDashboard()
+      void refreshDashboard({ silent: true })
     }, 15000)
   }
 

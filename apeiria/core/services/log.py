@@ -8,6 +8,7 @@ import heapq
 import re
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -50,6 +51,18 @@ class StructuredLogEntry:
             "raw": self.raw,
             "extra": self.extra,
         }
+
+
+@dataclass(frozen=True)
+class HistoryLogFilters:
+    """History log query filters."""
+
+    level: str = ""
+    source: str = ""
+    search: str = ""
+    start: str = ""
+    end: str = ""
+    include_access: bool = True
 
 
 class LogBuffer:
@@ -188,28 +201,116 @@ def load_history_logs(
     *,
     before: int = 0,
     limit: int = 50,
-) -> tuple[list[StructuredLogEntry], bool]:
+    filters: HistoryLogFilters | None = None,
+) -> tuple[list[StructuredLogEntry], bool, int]:
     """Load persisted logs from disk, newest first.
 
     Args:
         before: Number of newest history entries to skip.
         limit: Maximum number of history entries to return.
+        filters: Optional history log query filters.
 
     Returns:
         A tuple of `(items, has_more)` where items are ordered newest first.
     """
     if limit <= 0:
-        return [], False
+        return [], False, 0
 
     log_dir = _log_dir()
     if not log_dir.exists():
-        return [], False
+        return [], False, 0
 
-    return _collect_history_page(
+    active_filters = filters or HistoryLogFilters()
+    items = _collect_history_entries(
         sorted(log_dir.glob("*.log"), reverse=True),
-        before=before,
-        limit=limit,
+        filters=active_filters,
     )
+    page = items[before : before + limit]
+    return page, before + len(page) < len(items), len(items)
+
+
+def load_history_log_sources() -> list[str]:
+    """Load available history log sources."""
+    log_dir = _log_dir()
+    if not log_dir.exists():
+        return []
+
+    sources = {
+        entry.source
+        for entry in _collect_history_entries(
+            sorted(log_dir.glob("*.log"), reverse=True),
+            filters=HistoryLogFilters(),
+        )
+    }
+    return sorted(sources)
+
+
+def _collect_history_entries(
+    paths: list[Path],
+    *,
+    filters: HistoryLogFilters,
+) -> list[StructuredLogEntry]:
+    """Collect persisted logs, filtered and ordered newest first."""
+    start_ts = _normalize_filter_timestamp(filters.start)
+    end_ts = _normalize_filter_timestamp(filters.end)
+    normalized_level = filters.level.strip().upper()
+    normalized_source = filters.source.strip().lower()
+    normalized_search = filters.search.strip().lower()
+    items: list[StructuredLogEntry] = []
+
+    for path in paths:
+        for entry in _iter_log_entries_reverse(path):
+            if not filters.include_access and entry.source == "uvicorn.access":
+                continue
+            if normalized_level and entry.level.upper() != normalized_level:
+                continue
+            if normalized_source and normalized_source not in entry.source.lower():
+                continue
+            if start_ts and entry.timestamp < start_ts:
+                continue
+            if end_ts and entry.timestamp > end_ts:
+                continue
+            if normalized_search and not _matches_log_search(entry, normalized_search):
+                continue
+            items.append(entry)
+
+    items.sort(key=lambda item: (item.timestamp, item.level, item.source, item.raw))
+    items.reverse()
+    return items
+
+
+def _normalize_filter_timestamp(value: str | None) -> str:
+    """Normalize user-provided time filters into persisted log format."""
+    if not value:
+        return ""
+
+    candidate = value.strip()
+    if not candidate:
+        return ""
+
+    if "T" in candidate:
+        try:
+            parsed = datetime.fromisoformat(candidate)
+        except ValueError:
+            return candidate.replace("T", " ")
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+    return candidate
+
+
+def _matches_log_search(entry: StructuredLogEntry, keyword: str) -> bool:
+    """Return whether the log entry matches the free-text query."""
+    haystack = " ".join(
+        [
+            entry.timestamp,
+            entry.level,
+            entry.source,
+            entry.message,
+            entry.raw,
+            str(entry.extra),
+        ]
+    ).lower()
+    return keyword in haystack
 
 
 def _parse_log_text(text: str, *, source_hint: str = "") -> list[StructuredLogEntry]:
@@ -408,4 +509,3 @@ def _iter_lines_reverse(
 def _invert_timestamp(value: str) -> str:
     """Invert sortable timestamp text so heapq yields newest entries first."""
     return "".join(chr(255 - ord(char)) for char in value)
-

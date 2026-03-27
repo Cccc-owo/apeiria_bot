@@ -20,12 +20,16 @@ from .roles import (
     has_capability,
     normalize_role,
 )
-from .secrets import get_token_secret
+from .secrets import get_account_by_id, get_token_secret
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 _security = HTTPBearer()
+
+
+def _raise_invalid_token() -> None:
+    raise jwt.InvalidTokenError
 
 
 def create_token(data: dict[str, Any] | None = None) -> str:
@@ -45,8 +49,18 @@ def verify_token(token: str) -> dict[str, Any]:
     """Verify a JWT token. Raises HTTPException on failure."""
     try:
         claims = jwt.decode(token, get_token_secret(), algorithms=["HS256"])
-        claims["role"] = normalize_role(claims.get("role"))
-        claims["capabilities"] = capabilities_for_role(claims.get("role"))
+        user_id = str(claims.get("user_id") or "")
+        account = get_account_by_id(user_id) if user_id else None
+        if account is None or account.is_disabled:
+            _raise_invalid_token()
+        token_session_version = int(claims.get("session_version") or 0)
+        if token_session_version != account.session_version:
+            _raise_invalid_token()
+        claims["user_id"] = account.user_id
+        claims["username"] = account.username
+        claims["role"] = normalize_role(account.role)
+        claims["capabilities"] = capabilities_for_role(account.role)
+        claims["session_version"] = account.session_version
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

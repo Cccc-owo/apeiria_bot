@@ -57,6 +57,9 @@ export const useAuthStore = defineStore('auth', () => {
       status.value = 'anonymous'
       return
     }
+    if (status.value === 'authenticated' && principal.value) {
+      return
+    }
     if (restorePromise.value) {
       await restorePromise.value
       return
@@ -108,6 +111,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function ensureInitialized () {
+    if (status.value === 'authenticated' && principal.value) {
+      return
+    }
     await initialize()
   }
 
