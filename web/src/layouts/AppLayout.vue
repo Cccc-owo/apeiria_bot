@@ -6,7 +6,7 @@
     permanent
     :rail="rail"
     :rail-width="56"
-    :width="208"
+    :width="228"
   >
     <div class="app-drawer__header">
       <v-list-item
@@ -30,15 +30,42 @@
 
     <div class="app-drawer__nav">
       <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.navigation') }}</div>
-      <v-list class="app-drawer__list" density="compact" nav>
-        <v-list-item
-          v-for="item in navItems"
-          :key="item.to"
-          :prepend-icon="item.icon"
-          rounded="lg"
-          :title="item.title"
-          :to="item.to"
-        />
+      <v-list v-model:opened="openedGroups" class="app-drawer__list" density="compact" nav>
+        <template v-for="item in navItems" :key="item.key">
+          <v-list-group
+            v-if="item.children"
+            class="app-drawer__group"
+            :value="item.key"
+          >
+            <template #activator="{ props }">
+              <v-list-item
+                v-bind="props"
+                class="app-drawer__group-activator"
+                :prepend-icon="item.icon"
+                rounded="lg"
+                :title="item.title"
+              />
+            </template>
+            <div class="app-drawer__group-panel">
+              <v-list-item
+                v-for="child in item.children"
+                :key="child.to"
+                class="app-drawer__child-item"
+                :prepend-icon="child.icon"
+                rounded="xl"
+                :title="child.title"
+                :to="child.to"
+              />
+            </div>
+          </v-list-group>
+          <v-list-item
+            v-else
+            :prepend-icon="item.icon"
+            rounded="lg"
+            :title="item.title"
+            :to="item.to"
+          />
+        </template>
       </v-list>
     </div>
 
@@ -167,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import { useTheme } from 'vuetify'
@@ -179,6 +206,7 @@
 
   const drawer = ref(true)
   const rail = ref(false)
+  const openedGroups = ref<string[]>([])
   const { t, locale } = useI18n()
   const theme = useTheme()
   const router = useRouter()
@@ -189,16 +217,26 @@
   const { reverting, restarting, restartAndReload, revertPendingChanges } = useRestartController()
 
   const navItems = computed(() => [
-    { icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
-    { icon: 'mdi-cog-outline', title: t('layout.core'), to: '/core' },
-    { icon: 'mdi-puzzle', title: t('layout.plugins'), to: '/plugins' },
-    { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
-    { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
-    { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
-    { icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
-    { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
-    { icon: 'mdi-history', title: t('layout.logsHistory'), to: '/logs/history' },
-    ...(authStore.isOwner ? [{ icon: 'mdi-account-cog-outline', title: t('layout.accounts'), to: '/accounts' }] : []),
+    { key: 'dashboard', icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
+    { key: 'core', icon: 'mdi-cog-outline', title: t('layout.core'), to: '/core' },
+    {
+      key: 'plugins-group',
+      icon: 'mdi-puzzle',
+      title: t('layout.pluginsGroup'),
+      children: [
+        { icon: 'mdi-puzzle-outline', title: t('layout.plugins'), to: '/plugins/config' },
+        { icon: 'mdi-storefront-outline', title: t('layout.pluginStore'), to: '/plugins/store' },
+      ],
+    },
+    { key: 'permissions', icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
+    { key: 'groups', icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
+    { key: 'data', icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
+    { key: 'chat', icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
+    { key: 'logs', icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
+    { key: 'logs-history', icon: 'mdi-history', title: t('layout.logsHistory'), to: '/logs/history' },
+    ...(authStore.isOwner
+      ? [{ key: 'accounts', icon: 'mdi-account-cog-outline', title: t('layout.accounts'), to: '/accounts' }]
+      : []),
   ])
 
   const themeToggleLabel = computed(() => theme.global.current.value.dark ? t('layout.toLight') : t('layout.toDark'))
@@ -213,6 +251,16 @@
     return authStore.role || t('common.none')
   })
   const restartEntries = computed(() => restartStore.entries.slice(0, 3))
+
+  watch(
+    () => route.path,
+    nextPath => {
+      if (nextPath.startsWith('/plugins')) {
+        openedGroups.value = Array.from(new Set([...openedGroups.value, 'plugins-group']))
+      }
+    },
+    { immediate: true },
+  )
 
   async function handleRestart () {
     if (!window.confirm(t('dashboard.restartConfirm'))) return
@@ -340,6 +388,84 @@
 .app-drawer__list {
   padding: 0;
   background: transparent;
+}
+
+.app-drawer__group-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0 2px 10px;
+  padding: 10px 8px 6px 10px;
+}
+
+.app-drawer__group-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: rgba(var(--v-theme-primary), 0.06);
+}
+
+.app-drawer__group-activator:deep(.v-list-item-title) {
+  font-weight: 700;
+}
+
+.app-drawer__child-item {
+  position: relative;
+  z-index: 1;
+  margin-inline-start: 0;
+  min-height: 52px;
+  padding-inline-start: 10px;
+  color: rgba(var(--v-theme-on-surface), 0.86);
+  background: transparent;
+}
+
+.app-drawer__group :deep(.v-list-group__items) {
+  margin-top: 2px;
+  padding: 0;
+}
+
+.app-drawer__group :deep(.v-list-group__header .v-list-item) {
+  font-weight: 600;
+  min-height: 52px;
+}
+
+.app-drawer__group :deep(.v-list-group__items .v-list-item) {
+  opacity: 0.96;
+}
+
+.app-drawer__child-item:deep(.v-list-item__prepend) {
+  opacity: 0.72;
+}
+
+.app-drawer__child-item:deep(.v-list-item-title) {
+  overflow: hidden;
+  font-size: 0.98rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-drawer__child-item:deep(.v-list-item__content) {
+  min-width: 0;
+}
+
+.app-drawer__child-item:deep(.v-list-item--active) {
+  background: rgba(var(--v-theme-primary), 0.14);
+  color: rgb(var(--v-theme-primary));
+}
+
+.app-drawer__child-item:deep(.v-list-item--active .v-list-item__prepend) {
+  opacity: 1;
+}
+
+.app-drawer--rail .app-drawer__child-item {
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+}
+
+.app-drawer--rail .app-drawer__group-panel {
+  display: none;
 }
 
 .app-drawer__section-label {

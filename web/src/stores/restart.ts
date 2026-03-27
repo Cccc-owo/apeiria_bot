@@ -8,6 +8,7 @@ export type RestartUndoAction =
   | { kind: 'plugin-raw'; moduleName: string; text: string }
   | { kind: 'plugin-config'; modules: string[]; dirs: string[] }
   | { kind: 'plugin-toggle'; moduleName: string; enabled: boolean }
+  | { kind: 'plugin-install'; packageName: string; moduleName: string }
 
 export interface RestartPendingEntry {
   id: string

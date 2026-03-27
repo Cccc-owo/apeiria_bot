@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import {
   getStatus,
   restartBot,
+  revertPluginStoreInstall,
   updateCoreSettings,
   updateCoreSettingsRaw,
   updatePlugin,
@@ -90,6 +91,13 @@ async function revertEntry (undo: RestartUndoAction) {
       return
     case 'plugin-toggle':
       await updatePlugin(undo.moduleName, undo.enabled)
+      return
+    case 'plugin-install':
+      await revertPluginStoreInstall({
+        package_name: undo.packageName,
+        module_name: undo.moduleName,
+      })
+      return
   }
 }
 

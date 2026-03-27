@@ -167,6 +167,60 @@ export interface PluginItem {
   dependent_plugins: string[]
 }
 
+export interface PluginStoreSource {
+  source_id: string
+  name: string
+  kind: string
+  enabled: boolean
+  is_builtin: boolean
+  is_official: boolean
+  base_url: string | null
+  last_synced_at: string | null
+  last_error: string | null
+}
+
+export interface PluginStoreItem {
+  source_id: string
+  source_name: string
+  plugin_id: string
+  name: string
+  module_name: string
+  package_name: string
+  description: string | null
+  project_link: string | null
+  homepage: string | null
+  author: string | null
+  author_link: string | null
+  version: string | null
+  tags: string[]
+  is_official: boolean
+  publish_time: string | null
+  extra: Record<string, unknown>
+  is_installed: boolean
+  is_registered: boolean
+  installed_package: string | null
+  installed_module_names: string[]
+}
+
+export interface PluginStoreItemsResponse {
+  items: PluginStoreItem[]
+  total: number
+  page: number
+  per_page: number
+}
+
+export interface PluginStoreTask {
+  task_id: string
+  title: string
+  status: string
+  logs: string
+  error: string | null
+  result: Record<string, unknown>
+  created_at: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
 export interface BanItem {
   id: number
   user_id: string | null
@@ -324,6 +378,38 @@ export const getLogSources = (signal?: AbortSignal) =>
 
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')
+
+export const getPluginStoreSources = () =>
+  client.get<PluginStoreSource[]>('/plugins/store/sources')
+
+export const getPluginStoreItems = (params?: {
+  source?: string
+  search?: string
+  category?: string
+  sort?: string
+  installed_only?: boolean
+  uninstalled_only?: boolean
+  page?: number
+  per_page?: number
+}) =>
+  client.get<PluginStoreItemsResponse>('/plugins/store/items', { params })
+
+export const installPluginStoreItem = (payload: {
+  source_id: string
+  plugin_id: string
+  package_name: string
+  module_name: string
+}) =>
+  client.post<PluginStoreTask>('/plugins/store/install', payload)
+
+export const getPluginStoreTask = (taskId: string) =>
+  client.get<PluginStoreTask>(`/plugins/store/tasks/${taskId}`)
+
+export const revertPluginStoreInstall = (payload: {
+  package_name: string
+  module_name: string
+}) =>
+  client.post<{ status: string }>('/plugins/store/revert-install', payload)
 
 export const getCoreSettings = () =>
   client.get<SettingsResponse>('/plugins/core/settings')

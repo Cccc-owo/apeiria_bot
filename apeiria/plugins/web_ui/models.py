@@ -197,6 +197,84 @@ class PluginItem(BaseModel):
     dependent_plugins: list[str] = []
 
 
+class PluginStoreSourceItem(BaseModel):
+    """Plugin store source returned to the Web UI."""
+
+    source_id: str
+    name: str
+    kind: str
+    enabled: bool = True
+    is_builtin: bool = False
+    is_official: bool = False
+    base_url: str | None = None
+    last_synced_at: str | None = None
+    last_error: str | None = None
+
+
+class PluginStoreItem(BaseModel):
+    """Plugin store item returned to the Web UI."""
+
+    source_id: str
+    source_name: str
+    plugin_id: str
+    name: str
+    module_name: str
+    package_name: str
+    description: str | None = None
+    project_link: str | None = None
+    homepage: str | None = None
+    author: str | None = None
+    author_link: str | None = None
+    version: str | None = None
+    tags: list[str] = []
+    is_official: bool = False
+    publish_time: str | None = None
+    extra: dict[str, object] = {}
+    is_installed: bool = False
+    is_registered: bool = False
+    installed_package: str | None = None
+    installed_module_names: list[str] = []
+
+
+class PluginStoreItemsResponse(BaseModel):
+    """Paginated plugin store items response."""
+
+    items: list[PluginStoreItem]
+    total: int
+    page: int
+    per_page: int
+
+
+class PluginStoreInstallRequest(BaseModel):
+    """Plugin store install request payload."""
+
+    source_id: str = Field(min_length=1, max_length=128)
+    plugin_id: str = Field(min_length=1, max_length=256)
+    package_name: str = Field(min_length=1, max_length=256)
+    module_name: str = Field(min_length=1, max_length=256)
+
+
+class PluginStoreRevertInstallRequest(BaseModel):
+    """Revert one pending plugin-store install."""
+
+    package_name: str = Field(min_length=1, max_length=256)
+    module_name: str = Field(min_length=1, max_length=256)
+
+
+class PluginStoreTaskItem(BaseModel):
+    """Plugin store task item returned to the Web UI."""
+
+    task_id: str
+    title: str
+    status: str
+    logs: str
+    error: str | None = None
+    result: dict[str, object] = {}
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+
+
 class OperationStatusResponse(BaseModel):
     status: str = "ok"
     detail: str | None = None
