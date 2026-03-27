@@ -5,6 +5,7 @@ import { useNoticeStore } from '@/stores/notice'
 
 import {
   buildChangedValues,
+  buildFieldFormValue,
   buildOverrideInitialValue,
   buildSettingsForm,
   hasPendingChanges,
@@ -134,8 +135,17 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     }
   }
 
+  function cancelField (field: PluginSettingField) {
+    const nextDraftOverrides = { ...draftOverrides.value }
+    delete nextDraftOverrides[field.key]
+    draftOverrides.value = nextDraftOverrides
+    form.value[field.key] = buildFieldFormValue(field)
+    errorMessage.value = ''
+  }
+
   return {
     applyState,
+    cancelField,
     clearField,
     clearingKey,
     draftOverrides,

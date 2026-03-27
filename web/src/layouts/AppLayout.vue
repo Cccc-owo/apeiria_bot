@@ -131,7 +131,8 @@
 
   const navItems = computed(() => [
     { icon: 'mdi-view-dashboard', title: t('layout.dashboard'), to: '/dashboard' },
-    { icon: 'mdi-puzzle', title: t('layout.plugins'), to: '/core' },
+    { icon: 'mdi-cog-outline', title: t('layout.core'), to: '/core' },
+    { icon: 'mdi-puzzle', title: t('layout.plugins'), to: '/plugins' },
     { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
     { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
     { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
