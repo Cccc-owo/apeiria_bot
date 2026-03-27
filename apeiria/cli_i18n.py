@@ -200,6 +200,19 @@ MESSAGES_ZH_CN = {
     "Driver builtin name to unregister when package metadata is unavailable.": (
         "当包元数据不可用时，要取消登记的驱动 builtin 名。"
     ),
+    "Install from a raw requirement string such as a git URL or local path.": (
+        "从原始 requirement 字符串安装，例如 git URL 或本地路径。"
+    ),
+    "--store and --requirement cannot be used together": (
+        "--store 和 --requirement 不能同时使用"
+    ),
+    "package name cannot be used with --requirement": (
+        "使用 --requirement 时不能同时提供包名"
+    ),
+    "Choose which store source to use.": "选择要使用的商店源。",
+    "unknown store source: {source}": "未知商店源：{source}",
+    "requested module is not bound to package": "指定模块未绑定到该包",
+    "requested builtin is not bound to package": "指定 builtin 未绑定到该包",
     "plugin module name is required when package is not from store": (
         "当包不来自官方商店时，需要通过 --module 指定插件模块名"
     ),
