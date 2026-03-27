@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from apeiria.domains.data import data_browser_service
 from apeiria.domains.exceptions import ResourceNotFoundError
-from apeiria.plugins.web_ui.auth import require_auth
+from apeiria.plugins.web_ui.auth import require_control_panel
 from apeiria.plugins.web_ui.models import (
     DataListResponse,
     DataRecordResponse,
@@ -19,7 +19,9 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[DataTableInfo])
-async def list_tables(_: Annotated[Any, Depends(require_auth)]) -> list[DataTableInfo]:
+async def list_tables(
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[DataTableInfo]:
     return [
         DataTableInfo(
             name=table.name,
@@ -33,7 +35,7 @@ async def list_tables(_: Annotated[Any, Depends(require_auth)]) -> list[DataTabl
 @router.get("/{table}", response_model=DataListResponse)
 async def list_records(
     table: str,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
     page: int = 1,
     page_size: int = 20,
     search: str = "",
@@ -64,7 +66,7 @@ async def list_records(
 async def get_record(
     table: str,
     record_id: str,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
 ) -> DataRecordResponse:
     """Fetch one record from a browsable internal table."""
     try:

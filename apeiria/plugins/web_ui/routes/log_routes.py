@@ -7,21 +7,31 @@ from typing import Annotated, Any
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     Query,
     WebSocket,
     WebSocketDisconnect,
 )
 
-from apeiria.plugins.web_ui.auth import require_auth, verify_token
+from apeiria.plugins.web_ui.auth import (
+    require_control_panel,
+    verify_token,
+)
 from apeiria.plugins.web_ui.models import LogHistoryResponse, LogItem
+from apeiria.plugins.web_ui.roles import can_access_control_panel
 
 router = APIRouter()
 
 
+def _require_log_stream_claims(token: str) -> None:
+    claims = verify_token(token)
+    if not can_access_control_panel(claims.get("role")):
+        msg = "forbidden"
+        raise ValueError(msg)
+
+
 @router.get("/history", response_model=LogHistoryResponse)
 async def get_log_history(
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
     before: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> LogHistoryResponse:
@@ -57,7 +67,7 @@ async def log_websocket(websocket: WebSocket) -> None:
     # Auth: first message must be JWT token
     try:
         token = await websocket.receive_text()
-        verify_token(token)
+        _require_log_stream_claims(token)
     except Exception:  # noqa: BLE001
         await websocket.close(code=4001, reason="Unauthorized")
         return
@@ -68,8 +78,6 @@ async def log_websocket(websocket: WebSocket) -> None:
     try:
         while True:
             await websocket.send_json((await subscription.queue.get()).to_payload())
-    except HTTPException:
-        pass
     except WebSocketDisconnect:
         pass
     finally:

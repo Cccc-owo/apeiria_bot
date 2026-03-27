@@ -49,7 +49,7 @@
           <v-list-item
             prepend-icon="mdi-account-circle-outline"
             rounded="lg"
-            :subtitle="authStore.principal?.role || t('layout.adminRole')"
+            :subtitle="currentRoleLabel"
             :title="authStore.principal?.username || t('layout.unknownUser')"
           />
           <v-menu location="top" offset="8">
@@ -137,6 +137,7 @@
     { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
     { icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
     { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
+    ...(authStore.isOwner ? [{ icon: 'mdi-account-cog-outline', title: t('layout.accounts'), to: '/accounts' }] : []),
   ])
 
   const themeToggleLabel = computed(() => theme.global.current.value.dark ? t('layout.toLight') : t('layout.toDark'))
@@ -144,6 +145,12 @@
   const currentLocaleLabel = computed(() => (
     locale.value === 'zh_CN' ? t('layout.chinese') : t('layout.english')
   ))
+  const currentRoleLabel = computed(() => {
+    if (authStore.role === 'owner') {
+      return t('accounts.roles.owner')
+    }
+    return authStore.role || t('common.none')
+  })
 
   function toggleTheme () {
     const nextTheme = theme.global.current.value.dark ? 'light' : 'dark'

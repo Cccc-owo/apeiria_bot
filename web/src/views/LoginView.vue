@@ -82,8 +82,13 @@
         username: username.value.trim(),
         password: password.value,
       })
-      authStore.setSession(res.data.token, res.data.principal)
-      router.push('/dashboard')
+      authStore.acceptSession(res.data.token, res.data.principal)
+      if (authStore.isAuthenticated) {
+        router.push('/dashboard')
+      } else {
+        authStore.handleForbidden()
+        error.value = t('login.forbidden')
+      }
     } catch (err) {
       error.value = getErrorMessage(err, t('login.wrongPassword'))
     } finally {

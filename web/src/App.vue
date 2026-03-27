@@ -1,6 +1,9 @@
 <template>
   <v-app class="app-root">
-    <router-view />
+    <div v-if="!authStore.isReady" class="app-loading">
+      {{ t('common.loading') }}
+    </div>
+    <router-view v-else />
   </v-app>
 </template>
 
@@ -8,7 +11,6 @@
   import { computed, onMounted, watchEffect } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
-  import { getCurrentUser } from '@/api'
   import { useAuthStore } from '@/stores/auth'
 
   const route = useRoute()
@@ -29,23 +31,18 @@
   })
 
   onMounted(async () => {
-    if (!authStore.token) {
-      return
-    }
-    if (authStore.principal) {
-      return
-    }
-    try {
-      const response = await getCurrentUser()
-      authStore.setPrincipal(response.data)
-    } catch {
-      authStore.logout()
-    }
+    await authStore.initialize()
   })
 </script>
 
 <style scoped>
 .app-root {
   background: rgb(var(--v-theme-background));
+}
+
+.app-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
 }
 </style>

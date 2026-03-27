@@ -13,7 +13,8 @@ from apeiria.domains.chat import (
     ChatAssetNotFoundError,
     chat_gateway_service,
 )
-from apeiria.plugins.web_ui.auth import require_optional_auth, verify_token
+from apeiria.plugins.web_ui.auth import require_control_panel, verify_token
+from apeiria.plugins.web_ui.roles import can_access_control_panel
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ router = APIRouter()
 @router.get("/assets/{asset_id}", response_model=None)
 async def get_chat_asset(
     asset_id: str,
-    _: Annotated[Any, Depends(require_optional_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
 ) -> FileResponse | RedirectResponse:
     try:
         asset = chat_gateway_service.get_asset(asset_id)
@@ -52,4 +53,13 @@ async def get_chat_asset(
 
 @router.websocket("/ws")
 async def chat_websocket(websocket: WebSocket) -> None:
-    await chat_gateway_service.serve_websocket(websocket, verify_token)
+    def _verify_admin_token(token: str) -> dict[str, object]:
+        claims = verify_token(token)
+        if not can_access_control_panel(claims.get("role")):
+            raise HTTPException(
+                status_code=403,
+                detail=t("web_ui.auth.permission_denied"),
+            )
+        return claims
+
+    await chat_gateway_service.serve_websocket(websocket, _verify_admin_token)

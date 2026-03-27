@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from apeiria.core.i18n import t
 from apeiria.domains.exceptions import ResourceNotFoundError
 from apeiria.domains.permissions import permission_service
-from apeiria.plugins.web_ui.auth import require_auth
+from apeiria.plugins.web_ui.auth import require_control_panel
 from apeiria.plugins.web_ui.models import (
     BanCreateRequest,
     BanItem,
@@ -21,7 +21,9 @@ router = APIRouter()
 
 
 @router.get("/users", response_model=list[UserLevelItem])
-async def list_users(_: Annotated[Any, Depends(require_auth)]) -> list[UserLevelItem]:
+async def list_users(
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[UserLevelItem]:
     rows = await permission_service.list_user_levels()
     return [
         UserLevelItem(user_id=user_id, group_id=group_id, level=level)
@@ -34,7 +36,7 @@ async def list_users(_: Annotated[Any, Depends(require_auth)]) -> list[UserLevel
 async def update_user_level(
     user_id: str,
     body: UpdateLevelRequest,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
     group_id: str = "",
 ) -> dict[str, str]:
     if not group_id:
@@ -48,7 +50,9 @@ async def update_user_level(
 
 
 @router.get("/bans", response_model=list[BanItem])
-async def list_bans(_: Annotated[Any, Depends(require_auth)]) -> list[BanItem]:
+async def list_bans(
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[BanItem]:
     rows = await permission_service.list_bans()
     return [
         BanItem(
@@ -65,7 +69,7 @@ async def list_bans(_: Annotated[Any, Depends(require_auth)]) -> list[BanItem]:
 @router.post("/bans", response_model=BanItem)
 async def create_ban(
     body: BanCreateRequest,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
 ) -> BanItem:
     ban_id, user_id, group_id, duration, reason = await permission_service.create_ban(
         user_id=body.user_id,
@@ -85,7 +89,7 @@ async def create_ban(
 @router.delete("/bans/{ban_id}")
 async def delete_ban(
     ban_id: int,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
 ) -> dict[str, str]:
     try:
         await permission_service.delete_ban(ban_id)

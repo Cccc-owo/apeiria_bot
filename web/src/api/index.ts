@@ -4,6 +4,21 @@ export interface WebUIPrincipal {
   user_id: string
   username: string
   role: string
+  capabilities: string[]
+}
+
+export interface WebUIAccountItem {
+  user_id: string
+  username: string
+  role: string
+  is_disabled: boolean
+}
+
+export interface RegistrationCodeItem {
+  code: string
+  role: string
+  created_at: string
+  created_by: string
 }
 
 export interface SettingsFieldItem {
@@ -154,7 +169,7 @@ export const login = (payload: {
   client.post<{ token: string; principal: WebUIPrincipal }>('/auth/login', payload)
 
 export const register = (payload: {
-  invite_code: string
+  registration_code: string
   username: string
   password: string
 }) =>
@@ -162,6 +177,30 @@ export const register = (payload: {
 
 export const getCurrentUser = () =>
   client.get<WebUIPrincipal>('/auth/me')
+
+export const changePassword = (payload: {
+  current_password: string
+  new_password: string
+}) =>
+  client.post<{ status: string; detail?: string | null }>('/auth/password', payload)
+
+export const getAccounts = () =>
+  client.get<WebUIAccountItem[]>('/auth/accounts')
+
+export const updateAccountRole = (
+  userId: string,
+  payload: { role: string },
+) =>
+  client.patch<WebUIAccountItem>(`/auth/accounts/${userId}/role`, payload)
+
+export const getRegistrationCodes = () =>
+  client.get<RegistrationCodeItem[]>('/auth/registration-codes')
+
+export const createRegistrationCode = (payload: { role: string }) =>
+  client.post<RegistrationCodeItem>('/auth/registration-codes', payload)
+
+export const revokeRegistrationCode = (code: string) =>
+  client.delete<{ status: string; detail?: string | null }>(`/auth/registration-codes/${encodeURIComponent(code)}`)
 
 export const getStatus = () =>
   client.get<DashboardStatus>('/dashboard/status')
@@ -175,6 +214,12 @@ export const getWebUIBuildStatus = () =>
 export const rebuildWebUI = () =>
   client.post<WebUIBuildRunResult>('/dashboard/webui-build')
 
+function clearSessionAndRedirect () {
+  localStorage.removeItem('token')
+  localStorage.removeItem('apeiria-principal')
+  window.location.href = '/login'
+}
+
 export async function streamRebuildWebUI (
   onEvent: (event: WebUIBuildStreamEvent) => void | Promise<void>,
 ) {
@@ -184,10 +229,8 @@ export async function streamRebuildWebUI (
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
-  if (response.status === 401) {
-    localStorage.removeItem('token')
-    localStorage.removeItem('apeiria-principal')
-    window.location.href = '/login'
+  if (response.status === 401 || response.status === 403) {
+    clearSessionAndRedirect()
     throw new Error('Unauthorized')
   }
 
