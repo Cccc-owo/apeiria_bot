@@ -26,6 +26,12 @@ export interface PluginSettingsState {
   fields: PluginSettingField[]
 }
 
+export interface SettingsPreviewItem {
+  key: string
+  current: string
+  next: string
+}
+
 export function displayFieldValue (value: unknown) {
   if (value == null) return 'null'
   if (typeof value === 'string') return value
@@ -230,6 +236,30 @@ export function buildChangedValues (
     }
   }
   return values
+}
+
+export function buildSettingsPreviewItems (
+  fields: PluginSettingField[],
+  form: Record<string, unknown>,
+  draftOverrides: Record<string, boolean>,
+  invalidJsonMessage: string,
+) {
+  try {
+    const editableFields = fields.filter(field =>
+      field.editable && (field.has_local_override || Boolean(draftOverrides[field.key])),
+    )
+
+    const values = buildChangedValues(editableFields, form, invalidJsonMessage)
+    return editableFields
+      .filter(field => Object.prototype.hasOwnProperty.call(values, field.key))
+      .map<SettingsPreviewItem>(field => ({
+        key: field.key,
+        current: displayFieldValue(field.current_value),
+        next: displayFieldValue(values[field.key]),
+      }))
+  } catch {
+    return []
+  }
 }
 
 export function hasPendingChanges (
