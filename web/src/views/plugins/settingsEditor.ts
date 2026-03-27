@@ -75,10 +75,14 @@ export function toEditorValue (field: PluginSettingField, sourceValue: unknown) 
 export function buildSettingsForm (fields: PluginSettingField[]) {
   const next: Record<string, unknown> = {}
   for (const field of fields) {
-    const sourceValue = field.has_local_override ? field.local_value : null
-    next[field.key] = toEditorValue(field, sourceValue)
+    next[field.key] = buildFieldFormValue(field)
   }
   return next
+}
+
+export function buildFieldFormValue (field: PluginSettingField) {
+  const sourceValue = field.has_local_override ? field.local_value : null
+  return toEditorValue(field, sourceValue)
 }
 
 export function buildOverrideInitialValue (field: PluginSettingField) {
