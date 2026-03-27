@@ -39,8 +39,8 @@ Create `apeiria.*.toml` from the example files before first run:
 3. `cp apeiria.adapters.example.toml apeiria.adapters.toml`
 4. `cp apeiria.drivers.example.toml apeiria.drivers.toml`
 
-`apeiria init` only creates missing `.env`, `.env.dev`, and `.env.prod` as empty
-files. It does not create or rewrite any `apeiria.*.toml`.
+`apeiria env init` only creates missing `.env`, `.env.dev`, and `.env.prod`
+as empty files. It does not create or rewrite any `apeiria.*.toml`.
 
 Generated state:
 
@@ -55,7 +55,8 @@ Generated state:
 3. activate the virtual environment
 4. POSIX shells: `source .venv/bin/activate`
 5. create `apeiria.*.toml` from the example files
-6. initialize the project and user extension environments using `apeiria init`
+6. initialize the project and user extension environments using
+   `apeiria env init`
 7. install user plugins using `apeiria plugin install <package>`
 8. run your bot using `apeiria run`
 9. if you need to rebuild Web UI assets before startup, use `apeiria run --build`
@@ -64,11 +65,11 @@ Generated state:
 
 After activating `.venv`, use these commands:
 
-1. `apeiria init`
+1. `apeiria env init`
    create missing empty `.env*` files, then sync the main project environment and the user extension environment
-2. `apeiria init --no-dev`
+2. `apeiria env init --no-dev`
    sync the main project environment without development dependencies
-3. `apeiria repair`
+3. `apeiria env repair`
    re-sync both environments from current managed files
 4. `apeiria env info`
    show current environment paths and status
@@ -89,7 +90,9 @@ User extension environment responsibilities:
 The extension environment is managed under `.apeiria/extensions/` and is ignored by git.
 If `APEIRIA_CONFIG_DIR` is set, Apeiria reads and writes `apeiria.*.toml` in that
 directory instead of the project root.
-`apeiria init` does not create or rewrite these TOML files.
+`apeiria env init` does not create or rewrite these TOML files.
+The root aliases `apeiria init` and `apeiria repair` are still available for
+compatibility, but `apeiria env init|repair` is the primary interface.
 
 ## User Packages
 
@@ -98,6 +101,19 @@ Use Apeiria commands to manage packages in the user extension environment:
 1. `apeiria plugin install <package>`
 2. `apeiria adapter install <package>`
 3. `apeiria driver install <package>`
+
+Common install modes:
+
+1. `apeiria plugin install`
+   browse the default store interactively when no package is specified
+2. `apeiria plugin install <package>`
+   install by package name, with store metadata used automatically when available
+3. `apeiria plugin install --requirement "<requirement>"`
+   install from a raw requirement such as a git URL, local path, or version range
+4. `apeiria plugin install --store --source official-nonebot`
+   choose from a specific store source explicitly
+
+The same patterns also apply to `adapter install` and `driver install`.
 
 Installed user packages are declared in `.apeiria/extensions/pyproject.toml`.
 Their project registrations remain in these files:
@@ -121,7 +137,7 @@ To move local runtime state to another machine:
 3. install project environment using `uv sync --locked`
 4. activate the virtual environment
 5. POSIX shells: `source .venv/bin/activate`
-6. initialize environments with `apeiria init`
+6. initialize environments with `apeiria env init`
 7. import local state with `apeiria env import .apeiria/export`
 
 ## Documentation
@@ -145,7 +161,7 @@ docker compose up --build
 The container command is:
 
 ```bash
-APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria init --no-dev
+APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria env init --no-dev
 APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run
 ```
 
@@ -169,8 +185,8 @@ That means Docker keeps:
 4. environment files in `.env*`
 
 The bind-mounted `apeiria.*.toml` files must exist on the host before `docker compose up`.
-Missing `.env*` files can be created by `apeiria init`, including the container startup
-command, as empty files.
+Missing `.env*` files can be created by `apeiria env init`, including the
+container startup command, as empty files.
 
 The compose service also sets `HOST=0.0.0.0`, so the Web UI is reachable from the
 host on `http://127.0.0.1:8080/`.

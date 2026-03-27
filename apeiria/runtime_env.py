@@ -149,7 +149,8 @@ def update_plugin_requirement(
     extra_args: tuple[str, ...] = (),
 ) -> None:
     root = ensure_plugin_project()
-    _run_uv(["add", "--upgrade", requirement, *extra_args], cwd=root)
+    target = normalize_package_id(requirement) or requirement
+    _run_uv(["add", "--upgrade", target, *extra_args], cwd=root)
 
 
 def remove_plugin_requirement(
@@ -157,7 +158,8 @@ def remove_plugin_requirement(
     extra_args: tuple[str, ...] = (),
 ) -> None:
     root = ensure_plugin_project()
-    _run_uv(["remove", requirement, *extra_args], cwd=root)
+    target = normalize_package_id(requirement) or requirement
+    _run_uv(["remove", target, *extra_args], cwd=root)
 
 
 def declared_plugin_requirements() -> dict[str, str]:

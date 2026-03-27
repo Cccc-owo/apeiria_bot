@@ -41,4 +41,4 @@ RUN mkdir -p /app/.apeiria /app/data
 
 EXPOSE 8080
 
-CMD ["/bin/sh", "-lc", "APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria init --no-dev && exec env APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run"]
+CMD ["/bin/sh", "-lc", "APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria env init --no-dev && exec env APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run"]
