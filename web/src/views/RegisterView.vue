@@ -14,10 +14,10 @@
           <v-card-text>
             <v-form @submit.prevent="handleRegister">
               <v-text-field
-                v-model.trim="inviteCode"
+                v-model.trim="registrationCode"
                 autocomplete="one-time-code"
                 autofocus
-                :label="t('register.inviteCode')"
+                :label="t('register.registrationCode')"
                 prepend-inner-icon="mdi-ticket-confirmation-outline"
               />
               <v-text-field
@@ -75,7 +75,7 @@
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
 
-  const inviteCode = ref('')
+  const registrationCode = ref('')
   const username = ref('')
   const password = ref('')
   const confirmPassword = ref('')
@@ -86,7 +86,7 @@
   const noticeStore = useNoticeStore()
 
   async function handleRegister () {
-    if (!inviteCode.value.trim() || !username.value.trim() || !password.value || !confirmPassword.value) {
+    if (!registrationCode.value.trim() || !username.value.trim() || !password.value || !confirmPassword.value) {
       error.value = t('register.missingFields')
       return
     }
@@ -99,7 +99,7 @@
     error.value = ''
     try {
       const response = await register({
-        invite_code: inviteCode.value.trim(),
+        registration_code: registrationCode.value.trim(),
         username: username.value.trim(),
         password: password.value,
       })

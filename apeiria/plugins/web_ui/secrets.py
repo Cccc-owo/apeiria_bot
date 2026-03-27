@@ -8,6 +8,7 @@ import hmac
 import json
 import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from nonebot.log import logger
@@ -17,6 +18,11 @@ from apeiria.core.i18n import t
 from apeiria.core.utils.files import atomic_write_text
 
 from .models import WebUIPrincipalResponse
+from .roles import (
+    ROLE_OWNER,
+    capabilities_for_role,
+    normalize_supported_role,
+)
 
 _PLUGIN_DATA_ID = "apeiria.plugins.web_ui"
 _PASSWORD_HASH_N = 2**14
@@ -35,7 +41,8 @@ class WebUIAccount:
     user_id: str
     username: str
     password_hash: str
-    role: str = "admin"
+    role: str = ROLE_OWNER
+    is_disabled: bool = False
 
     def to_principal(self) -> WebUIPrincipalResponse:
         """Convert the account into the API principal shape."""
@@ -43,7 +50,18 @@ class WebUIAccount:
             user_id=self.user_id,
             username=self.username,
             role=self.role,
+            capabilities=capabilities_for_role(self.role),
         )
+
+
+@dataclass(frozen=True)
+class WebUIRegistrationCode:
+    """Stored registration code metadata."""
+
+    code: str
+    role: str
+    created_at: str
+    created_by: str
 
 
 def _apply_secret_permissions(secret_file: "Path") -> None:
@@ -78,6 +96,62 @@ def _verify_password_hash(password: str, encoded: str) -> bool:
 def _normalize_username(username: str) -> str:
     """Normalize usernames for storage and comparison."""
     return username.strip().lower()
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _new_registration_code(*, role: str, created_by: str) -> dict[str, str]:
+    return {
+        "code": secrets.token_urlsafe(12),
+        "role": normalize_supported_role(role, fallback=ROLE_OWNER),
+        "created_at": _iso_now(),
+        "created_by": created_by,
+    }
+
+
+def _normalize_user_item(item: object, *, index: int) -> dict[str, object] | None:
+    if not isinstance(item, dict):
+        return None
+
+    role = normalize_supported_role(
+        item.get("role"),
+        fallback=ROLE_OWNER if index == 0 else "",
+    )
+
+    generated_user_id = f"webui_{secrets.token_hex(8)}"
+    return {
+        "user_id": str(item.get("user_id") or generated_user_id),
+        "username": _normalize_username(str(item.get("username") or "")),
+        "password_hash": str(item.get("password_hash") or ""),
+        "role": role,
+        "is_disabled": bool(item.get("is_disabled", False)),
+    }
+
+
+def _normalize_registration_code_item(item: object) -> dict[str, str] | None:
+    if isinstance(item, str):
+        return {
+            "code": item.strip(),
+            "role": ROLE_OWNER,
+            "created_at": _iso_now(),
+            "created_by": "legacy",
+        }
+
+    if not isinstance(item, dict):
+        return None
+
+    code = str(item.get("code") or "").strip()
+    if not code:
+        return None
+
+    return {
+        "code": code,
+        "role": normalize_supported_role(item.get("role"), fallback=ROLE_OWNER),
+        "created_at": str(item.get("created_at") or _iso_now()),
+        "created_by": str(item.get("created_by") or "unknown"),
+    }
 
 
 def _load_or_create_raw() -> dict[str, Any]:
@@ -116,7 +190,9 @@ def _load_or_create_raw() -> dict[str, Any]:
     data = {
         "token_secret": secrets.token_urlsafe(32),
         "users": [],
-        "invite_codes": [secrets.token_urlsafe(12)],
+        "registration_codes": [
+            _new_registration_code(role=ROLE_OWNER, created_by="system")
+        ],
     }
     _persist_raw(data)
     logger.info("{}", t("web_ui.secrets.generated"))
@@ -126,14 +202,38 @@ def _load_or_create_raw() -> dict[str, Any]:
 def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
     """Upgrade legacy single-password storage into the current account schema."""
     users = data.get("users")
-    invite_codes = data.get("invite_codes")
-    if isinstance(users, list) and isinstance(invite_codes, list):
-        return data
+    registration_codes = data.get("registration_codes")
+    if not isinstance(registration_codes, list):
+        registration_codes = data.get("invite_codes")
+    if isinstance(users, list) and isinstance(registration_codes, list):
+        normalized_users = [
+            normalized
+            for index, item in enumerate(users)
+            if (normalized := _normalize_user_item(item, index=index)) is not None
+        ]
+        normalized_registration_codes = [
+            normalized
+            for item in registration_codes
+            if (normalized := _normalize_registration_code_item(item)) is not None
+        ]
+
+        if not normalized_users and not normalized_registration_codes:
+            normalized_registration_codes = [
+                _new_registration_code(role=ROLE_OWNER, created_by="system")
+            ]
+
+        return {
+            "token_secret": str(data["token_secret"]),
+            "users": normalized_users,
+            "registration_codes": normalized_registration_codes,
+        }
 
     upgraded = {
         "token_secret": str(data["token_secret"]),
         "users": [],
-        "invite_codes": [secrets.token_urlsafe(12)],
+        "registration_codes": [
+            _new_registration_code(role=ROLE_OWNER, created_by="system")
+        ],
     }
     legacy_password = data.get("password")
     if isinstance(legacy_password, str) and legacy_password:
@@ -142,7 +242,8 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
                 "user_id": "webui_admin",
                 "username": "admin",
                 "password_hash": _hash_password(legacy_password),
-                "role": "admin",
+                "role": ROLE_OWNER,
+                "is_disabled": False,
             }
         )
     return upgraded
@@ -178,12 +279,16 @@ def list_accounts() -> list[WebUIAccount]:
         if not isinstance(item, dict):
             continue
         try:
+            role = normalize_supported_role(item.get("role"))
+            if not role:
+                continue
             accounts.append(
                 WebUIAccount(
                     user_id=str(item["user_id"]),
                     username=str(item["username"]),
                     password_hash=str(item["password_hash"]),
-                    role=str(item.get("role") or "admin"),
+                    role=role,
+                    is_disabled=bool(item.get("is_disabled", False)),
                 )
             )
         except KeyError:
@@ -205,21 +310,132 @@ def verify_account_password(username: str, password: str) -> WebUIAccount | None
     account = get_account_by_username(username)
     if account is None:
         return None
+    if account.is_disabled:
+        return None
     if not _verify_password_hash(password, account.password_hash):
         return None
     return account
 
 
-def register_account(invite_code: str, username: str, password: str) -> WebUIAccount:
-    """Create a new account by consuming one registration code."""
-    normalized_invite = invite_code.strip()
-    available_invites = [
-        str(item).strip()
-        for item in _auth_store.get("invite_codes", [])
-        if isinstance(item, str)
+def list_registration_codes() -> list[WebUIRegistrationCode]:
+    """List all registration codes."""
+    registration_codes: list[WebUIRegistrationCode] = []
+    for item in _auth_store.get(
+        "registration_codes",
+        _auth_store.get("invite_codes", []),
+    ):
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("code") or "").strip()
+        if not code:
+            continue
+        registration_codes.append(
+            WebUIRegistrationCode(
+                code=code,
+                role=normalize_supported_role(item.get("role"), fallback=ROLE_OWNER),
+                created_at=str(item.get("created_at") or ""),
+                created_by=str(item.get("created_by") or "unknown"),
+            )
+        )
+    return registration_codes
+
+
+def create_registration_code(
+    *,
+    role: str,
+    created_by: str,
+) -> WebUIRegistrationCode:
+    """Create and persist one registration code."""
+    registration_code = _new_registration_code(role=role, created_by=created_by)
+    current_registration_codes = [
+        item
+        for item in _auth_store.get(
+            "registration_codes",
+            _auth_store.get("invite_codes", []),
+        )
+        if isinstance(item, dict)
     ]
-    if normalized_invite not in available_invites:
-        raise ValueError("invite_invalid")
+    _auth_store["registration_codes"] = [
+        *current_registration_codes,
+        registration_code,
+    ]
+    _auth_store.pop("invite_codes", None)
+    _persist_raw(_auth_store)
+    return WebUIRegistrationCode(**registration_code)
+
+
+def revoke_registration_code(code: str) -> bool:
+    """Delete one registration code."""
+    normalized = code.strip()
+    current = [
+        item
+        for item in _auth_store.get(
+            "registration_codes",
+            _auth_store.get("invite_codes", []),
+        )
+        if isinstance(item, dict)
+    ]
+    next_registration_codes = [
+        item for item in current if str(item.get("code") or "").strip() != normalized
+    ]
+    if len(next_registration_codes) == len(current):
+        return False
+    _auth_store["registration_codes"] = next_registration_codes
+    _auth_store.pop("invite_codes", None)
+    _persist_raw(_auth_store)
+    return True
+
+
+def update_account_password(user_id: str, password: str) -> WebUIAccount | None:
+    """Update one account password."""
+    for item in _auth_store.get("users", []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("user_id")) != user_id:
+            continue
+        item["password_hash"] = _hash_password(password)
+        _persist_raw(_auth_store)
+        return get_account_by_username(str(item.get("username") or ""))
+    return None
+
+
+def update_account_role(user_id: str, role: str) -> WebUIAccount | None:
+    """Update one account role."""
+    normalized_role = normalize_supported_role(role)
+    if not normalized_role:
+        return None
+    for item in _auth_store.get("users", []):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("user_id")) != user_id:
+            continue
+        item["role"] = normalized_role
+        _persist_raw(_auth_store)
+        return get_account_by_username(str(item.get("username") or ""))
+    return None
+
+
+def register_account(
+    registration_code: str,
+    username: str,
+    password: str,
+) -> WebUIAccount:
+    """Create a new account by consuming one registration code."""
+    normalized_registration_code = registration_code.strip()
+    registration_code_item = next(
+        (
+            item
+            for item in _auth_store.get(
+                "registration_codes",
+                _auth_store.get("invite_codes", []),
+            )
+            if isinstance(item, dict)
+            if str(item.get("code") or "").strip() == normalized_registration_code
+        ),
+        None,
+    )
+    if registration_code_item is None:
+        raise ValueError("registration_code_invalid")
 
     normalized_username = _normalize_username(username)
     if not normalized_username:
@@ -231,7 +447,11 @@ def register_account(invite_code: str, username: str, password: str) -> WebUIAcc
         user_id=f"webui_{secrets.token_hex(8)}",
         username=normalized_username,
         password_hash=_hash_password(password),
-        role="admin",
+        role=normalize_supported_role(
+            registration_code_item.get("role"),
+            fallback=ROLE_OWNER,
+        ),
+        is_disabled=False,
     )
     _auth_store["users"] = [
         *[item for item in _auth_store.get("users", []) if isinstance(item, dict)],
@@ -240,10 +460,20 @@ def register_account(invite_code: str, username: str, password: str) -> WebUIAcc
             "username": account.username,
             "password_hash": account.password_hash,
             "role": account.role,
+            "is_disabled": account.is_disabled,
         },
     ]
-    _auth_store["invite_codes"] = [
-        item for item in available_invites if item != normalized_invite
+    _auth_store["registration_codes"] = [
+        item
+        for item in _auth_store.get(
+            "registration_codes",
+            _auth_store.get("invite_codes", []),
+        )
+        if not (
+            isinstance(item, dict)
+            and str(item.get("code") or "").strip() == normalized_registration_code
+        )
     ]
+    _auth_store.pop("invite_codes", None)
     _persist_raw(_auth_store)
     return account

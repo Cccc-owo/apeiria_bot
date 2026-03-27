@@ -4,100 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from apeiria.domains.chat.protocol import (
-    AuthHelloPayload,
-    AuthOkPayload,
-    CapabilitiesResponsePayload,
-    ChatCapabilities,
-    ChatEnvelope,
-    ChatSegment,
-    ChatSessionState,
-    EnvelopeVersion,
-    ErrorPayload,
-    ImageSegment,
-    MentionSegment,
-    MessageAckPayload,
-    MessageReceivePayload,
-    MessageSendPayload,
-    RawSegment,
-    ReplySegment,
-    SessionCreatePayload,
-    SessionDeletedPayload,
-    SessionDeletePayload,
-    SessionListItem,
-    SessionListPayload,
-    SessionStatePayload,
-    SessionStatus,
-    SessionUpdatePayload,
-    SystemMessagePayload,
-    TextSegment,
-    WebUIPrincipal,
-)
-
-__all__ = [
-    "AdapterConfigItem",
-    "AdapterConfigRequest",
-    "AdapterConfigResponse",
-    "AuthHelloPayload",
-    "AuthOkPayload",
-    "BanCreateRequest",
-    "BanItem",
-    "CapabilitiesResponsePayload",
-    "ChatCapabilities",
-    "ChatEnvelope",
-    "ChatSegment",
-    "ChatSessionState",
-    "DashboardEventItem",
-    "DashboardEventsResponse",
-    "DriverConfigItem",
-    "DriverConfigRequest",
-    "DriverConfigResponse",
-    "EnvelopeVersion",
-    "ErrorPayload",
-    "GroupItem",
-    "ImageSegment",
-    "LogHistoryResponse",
-    "LogItem",
-    "LoginRequest",
-    "LoginResponse",
-    "MentionSegment",
-    "MessageAckPayload",
-    "MessageReceivePayload",
-    "MessageSendPayload",
-    "OperationStatusResponse",
-    "PluginConfigDirItem",
-    "PluginConfigModuleItem",
-    "PluginConfigRequest",
-    "PluginConfigResponse",
-    "PluginItem",
-    "PluginRawSettingsResponse",
-    "PluginSettingFieldItem",
-    "PluginSettingsRawUpdateRequest",
-    "PluginSettingsResponse",
-    "PluginSettingsUpdateRequest",
-    "RawSegment",
-    "RegisterRequest",
-    "RegisterResponse",
-    "ReplySegment",
-    "SessionCreatePayload",
-    "SessionDeletePayload",
-    "SessionDeletedPayload",
-    "SessionListItem",
-    "SessionListPayload",
-    "SessionStatePayload",
-    "SessionStatus",
-    "SessionUpdatePayload",
-    "StatusResponse",
-    "SystemMessagePayload",
-    "TextSegment",
-    "UpdateLevelRequest",
-    "UserLevelItem",
-    "WebUIBuildRunResponse",
-    "WebUIBuildStatusResponse",
-    "WebUIPrincipal",
-    "WebUIPrincipalResponse",
-]
-
 
 class LoginRequest(BaseModel):
     """Credentials used by the Web UI login endpoint."""
@@ -112,6 +18,7 @@ class WebUIPrincipalResponse(BaseModel):
     user_id: str
     username: str
     role: str
+    capabilities: list[str] = []
 
 
 class LoginResponse(BaseModel):
@@ -124,7 +31,7 @@ class LoginResponse(BaseModel):
 class RegisterRequest(BaseModel):
     """Payload used to create a new Web UI account with a registration code."""
 
-    invite_code: str = Field(min_length=1, max_length=128)
+    registration_code: str = Field(min_length=1, max_length=128)
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=8, max_length=128)
 
@@ -134,6 +41,43 @@ class RegisterResponse(BaseModel):
 
     status: str = "ok"
     detail: str | None = None
+
+
+class WebUIAccountItem(BaseModel):
+    """Stored Web UI account information returned to account managers."""
+
+    user_id: str
+    username: str
+    role: str
+    is_disabled: bool = False
+
+
+class RegistrationCodeItem(BaseModel):
+    """Registration code returned to account managers."""
+
+    code: str
+    role: str
+    created_at: str
+    created_by: str
+
+
+class RegistrationCodeCreateRequest(BaseModel):
+    """Request payload used to create a registration code."""
+
+    role: str = Field(default="owner", min_length=1, max_length=32)
+
+
+class PasswordChangeRequest(BaseModel):
+    """Request payload used to rotate a password."""
+
+    current_password: str | None = Field(default=None, min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class RoleUpdateRequest(BaseModel):
+    """Request payload used to change an account role."""
+
+    role: str = Field(min_length=1, max_length=32)
 
 
 class StatusResponse(BaseModel):

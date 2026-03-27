@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from apeiria.core.i18n import t
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
 from apeiria.domains.groups import group_service
-from apeiria.plugins.web_ui.auth import require_auth
+from apeiria.plugins.web_ui.auth import require_control_panel
 from apeiria.plugins.web_ui.models import GroupItem
 
 router = APIRouter()
@@ -25,14 +25,16 @@ def _to_group_item(r: Any) -> GroupItem:
 
 
 @router.get("/", response_model=list[GroupItem])
-async def list_groups(_: Annotated[Any, Depends(require_auth)]) -> list[GroupItem]:
+async def list_groups(
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[GroupItem]:
     rows = await group_service.list_groups()
     return [_to_group_item(r) for r in rows]
 
 
 @router.get("/{group_id}", response_model=GroupItem)
 async def get_group(
-    group_id: str, _: Annotated[Any, Depends(require_auth)]
+    group_id: str, _: Annotated[Any, Depends(require_control_panel)]
 ) -> GroupItem:
     try:
         r = await group_service.get_group(group_id)
@@ -47,7 +49,7 @@ async def get_group(
 @router.patch("/{group_id}")
 async def update_group(
     group_id: str,
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
     *,
     bot_status: bool | None = None,
 ) -> dict[str, str]:
@@ -65,7 +67,7 @@ async def update_group(
 async def update_group_plugins(
     group_id: str,
     disabled_plugins: list[str],
-    _: Annotated[Any, Depends(require_auth)],
+    _: Annotated[Any, Depends(require_control_panel)],
 ) -> dict[str, str]:
     try:
         await group_service.update_group_disabled_plugins(group_id, disabled_plugins)

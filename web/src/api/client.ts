@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
 
 const client = axios.create({
   baseURL: '/api',
@@ -16,9 +17,14 @@ client.interceptors.request.use(config => {
 client.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('apeiria-principal')
+    const status = err.response?.status
+    const authStore = useAuthStore()
+    if (status === 401 && authStore.token) {
+      authStore.handleUnauthorized()
+      window.location.href = '/login'
+    }
+    if (status === 403 && authStore.token) {
+      authStore.handleForbidden()
       window.location.href = '/login'
     }
     return Promise.reject(err)
