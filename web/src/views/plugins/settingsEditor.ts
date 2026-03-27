@@ -262,6 +262,19 @@ export function buildSettingsPreviewItems (
   }
 }
 
+export function buildRevertValues (
+  fields: PluginSettingField[],
+  values: Record<string, unknown>,
+) {
+  const revertValues: Record<string, unknown> = {}
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(values, field.key)) {
+      revertValues[field.key] = field.current_value
+    }
+  }
+  return revertValues
+}
+
 export function hasPendingChanges (
   fields: PluginSettingField[],
   form: Record<string, unknown>,

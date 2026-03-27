@@ -531,7 +531,9 @@
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
+  import { useRestartStore } from '@/stores/restart'
   import {
+    buildRevertValues,
     buildSettingsPreviewItems,
     displayFieldValue,
     type PluginSettingField,
@@ -568,6 +570,7 @@
   const toggleConfirmLoading = ref(false)
   const toggleConfirmItem = ref<PluginItem | null>(null)
   const noticeStore = useNoticeStore()
+  const restartStore = useRestartStore()
   const { t } = useI18n()
   const route = useRoute()
 
@@ -580,6 +583,37 @@
       loadFailed: t('plugins.settingsLoadFailed'),
       saveFailed: t('plugins.settingsSaveFailed'),
       saveSuccess: t('plugins.settingsSaved'),
+    },
+    afterClear: field => {
+      if (!settingsPlugin.value) return
+      restartStore.markPending({
+        id: `plugin:field:${settingsPlugin.value.module_name}:${field.key}`,
+        scope: 'plugins',
+        summary: t('restart.pendingPluginField', {
+          name: settingsPlugin.value.name || settingsPlugin.value.module_name,
+          key: field.key,
+        }),
+        undo: {
+          kind: 'plugin-settings',
+          moduleName: settingsPlugin.value.module_name,
+          values: { [field.key]: field.local_value },
+        },
+      })
+    },
+    afterSave: ({ previousState, values }) => {
+      if (!settingsPlugin.value) return
+      restartStore.markPending({
+        id: `plugin:settings:${settingsPlugin.value.module_name}`,
+        scope: 'plugins',
+        summary: t('restart.pendingPluginSettings', {
+          name: settingsPlugin.value.name || settingsPlugin.value.module_name,
+        }),
+        undo: {
+          kind: 'plugin-settings',
+          moduleName: settingsPlugin.value.module_name,
+          values: buildRevertValues(previousState.fields, values),
+        },
+      })
     },
   })
 
@@ -819,6 +853,7 @@
     if (!settingsPlugin.value || !hasPendingPluginRawChanges.value) return
     settingsRawSaving.value = true
     settingsRawErrorMessage.value = ''
+    const previousText = settingsRawInitialText.value
     try {
       const rawResponse = await updatePluginSettingsRaw(settingsPlugin.value.module_name, {
         text: settingsRawText.value,
@@ -826,6 +861,18 @@
       const settingsResponse = await getPluginSettings(settingsPlugin.value.module_name)
       applyPluginRawState(rawResponse.data)
       pluginEditor.applyState(settingsResponse.data)
+      restartStore.markPending({
+        id: `plugin:raw:${settingsPlugin.value.module_name}`,
+        scope: 'plugins',
+        summary: t('restart.pendingPluginRaw', {
+          name: settingsPlugin.value.name || settingsPlugin.value.module_name,
+        }),
+        undo: {
+          kind: 'plugin-raw',
+          moduleName: settingsPlugin.value.module_name,
+          text: previousText,
+        },
+      })
       noticeStore.show(t('plugins.settingsRawSaved'), 'success')
     } catch (error) {
       const message = getErrorMessage(error, t('plugins.settingsRawSaveFailed'))
@@ -858,10 +905,22 @@
   async function savePluginConfig (modules: string[], dirs: string[]) {
     configSaving.value = true
     errorMessage.value = ''
+    const previousModules = pluginModules.value.map(item => item.name)
+    const previousDirs = pluginDirs.value.map(item => item.path)
     try {
       const response = await updatePluginConfig({ modules, dirs })
       pluginModules.value = response.data.modules
       pluginDirs.value = response.data.dirs
+      restartStore.markPending({
+        id: 'plugin:loading-rules',
+        scope: 'plugins',
+        summary: t('restart.pendingPluginLoadingRules'),
+        undo: {
+          kind: 'plugin-config',
+          modules: previousModules,
+          dirs: previousDirs,
+        },
+      })
       noticeStore.show(t('plugins.configSaved'), 'success')
     } catch (error) {
       errorMessage.value = getErrorMessage(error, t('plugins.configSaveFailed'))
@@ -952,6 +1011,18 @@
     errorMessage.value = ''
     try {
       await updatePlugin(item.module_name, enabled)
+      restartStore.markPending({
+        id: `plugin:toggle:${item.module_name}`,
+        scope: 'plugins',
+        summary: t('restart.pendingPluginToggle', {
+          name: item.name || item.module_name,
+        }),
+        undo: {
+          kind: 'plugin-toggle',
+          moduleName: item.module_name,
+          enabled: previous,
+        },
+      })
       noticeStore.show(
         t('plugins.toggled', {
           name: item.name || item.module_name,

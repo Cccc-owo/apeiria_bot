@@ -26,6 +26,11 @@ interface SettingsEditorResponse {
 }
 
 interface UseSettingsEditorOptions {
+  afterClear?: (field: PluginSettingField) => void
+  afterSave?: (context: {
+    previousState: PluginSettingsState
+    values: Record<string, unknown>
+  }) => void
   clear: (key: string) => Promise<SettingsEditorResponse>
   load?: () => Promise<SettingsEditorResponse>
   messages: SettingsEditorMessages
@@ -108,12 +113,18 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     errorMessage.value = ''
     try {
       const response = await options.save(values)
+      const previousState = state.value
       applyState(response.data)
+      if (previousState) {
+        options.afterSave?.({ previousState, values })
+      }
       noticeStore.show(options.messages.saveSuccess, 'success')
+      return true
     } catch (error) {
       const message = getErrorMessage(error, options.messages.saveFailed)
       errorMessage.value = message
       noticeStore.show(message, 'error')
+      return false
     } finally {
       saving.value = false
     }
@@ -125,11 +136,14 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     try {
       const response = await options.clear(field.key)
       applyState(response.data)
+      options.afterClear?.(field)
       noticeStore.show(options.messages.clearSuccess, 'success')
+      return true
     } catch (error) {
       const message = getErrorMessage(error, options.messages.saveFailed)
       errorMessage.value = message
       noticeStore.show(message, 'error')
+      return false
     } finally {
       clearingKey.value = ''
     }
