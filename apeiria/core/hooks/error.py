@@ -1,4 +1,4 @@
-"""Error hook — post-run exception handling with Sentry + friendly message."""
+"""Error hook — post-run exception handling with friendly user feedback."""
 
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
@@ -30,24 +30,6 @@ async def error_hook(
         plugin_name,
         user_id,
     )
-
-    # Report to Sentry
-    try:
-        import sentry_sdk
-
-        sentry_sdk.set_context(
-            "nonebot",
-            {
-                "plugin": plugin_name,
-                "user_id": user_id,
-                "session_id": event.get_session_id(),
-            },
-        )
-        sentry_sdk.capture_exception(exception)
-    except ImportError:
-        pass
-    except Exception:  # noqa: BLE001
-        logger.debug("Failed to report to Sentry")
 
     # Send friendly error message
     try:
