@@ -10,6 +10,8 @@ import click
 
 from apeiria.cli_i18n import _
 from apeiria.core.utils.webui_build import write_frontend_build_meta
+from apeiria.domains.system import system_health_service
+from apeiria.runtime_bootstrap import initialize_nonebot
 from apeiria.runtime_env import (
     ensure_plugin_project,
     find_uv_executable,
@@ -259,6 +261,85 @@ def env_info() -> None:
     ]
     for line in lines:
         click.echo(line)
+
+
+def _echo_system_health(*, include_checks: bool) -> None:
+    snapshot = system_health_service.get_snapshot()
+    click.echo(f"status={snapshot.status}")
+    click.echo(f"project_root={snapshot.project_root}")
+    if include_checks:
+        failed_checks = [check for check in snapshot.checks if not check.ok]
+        if not failed_checks:
+            click.echo("checks=ok (0 issues)")
+            return
+
+        click.echo(f"checks=warning ({len(failed_checks)} issues)")
+        for check in failed_checks:
+            click.echo(f"- {check.key}: {check.message}")
+            if check.hint:
+                click.echo(f"  hint: {check.hint}")
+
+
+def _startup_check_hint(error_text: str) -> str | None:
+    normalized = error_text.lower()
+    config_files = (
+        "apeiria.config.toml",
+        "apeiria.plugins.toml",
+        "apeiria.adapters.toml",
+        "apeiria.drivers.toml",
+    )
+    if "no such file" in normalized and any(
+        file_name in normalized for file_name in config_files
+    ):
+        return _(
+            "create project config files from examples, then run `apeiria env init`"
+        )
+
+    rules: tuple[tuple[str, str], ...] = (
+        (
+            "failed to bootstrap plugin config",
+            "check plugin config conflicts in project plugins and rerun check",
+        ),
+        (
+            "web_ui auth storage is corrupted",
+            (
+                "fix or restore `data/apeiria.plugins.web_ui/secret.json`, "
+                "then rerun check"
+            ),
+        ),
+    )
+    for pattern, hint in rules:
+        if pattern in normalized:
+            return _(hint)
+    return None
+
+
+@env.command("doctor", help=_("Run non-mutating environment health checks."))
+def env_doctor() -> None:
+    _echo_system_health(include_checks=True)
+
+
+@click.command(help=_("Show Apeiria system health summary."))
+def status() -> None:
+    _echo_system_health(include_checks=True)
+
+
+@click.command(help=_("Validate bot startup without entering the event loop."))
+def check() -> None:
+    try:
+        initialize_nonebot()
+    except Exception as exc:
+        hint = _startup_check_hint(str(exc))
+        if hint:
+            raise click.ClickException(
+                _(
+                    "startup check failed: {error}\nnext step: {hint}"
+                ).format(error=str(exc), hint=hint)
+            ) from exc
+        raise click.ClickException(
+            _("startup check failed: {error}").format(error=str(exc))
+        ) from exc
+    click.echo(_("startup check passed"))
 
 
 @env.command("export", help=_("Export local runtime state for migration."))

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import click
 
-from apeiria.cli_env_commands import env, init, repair, run
+from apeiria.cli_env_commands import check, env, init, repair, run, status
 from apeiria.cli_resource_commands import adapter, driver, plugin
 
 
@@ -15,6 +15,8 @@ cli.add_command(env)
 cli.add_command(init)
 cli.add_command(repair)
 cli.add_command(run)
+cli.add_command(status)
+cli.add_command(check)
 cli.add_command(plugin)
 cli.add_command(adapter)
 cli.add_command(driver)

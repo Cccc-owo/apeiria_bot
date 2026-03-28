@@ -17,9 +17,46 @@ MESSAGES_ZH_CN = {
     "Show current Apeiria environment paths and status.": (
         "显示当前 Apeiria 环境路径和状态。"
     ),
+    "Validate bot startup without entering the event loop.": (
+        "校验 bot 是否可启动（不进入事件循环）。"
+    ),
+    "Run non-mutating environment health checks.": "执行只读环境健康检查。",
+    "Show Apeiria system health summary.": "显示 Apeiria 系统健康摘要。",
+    "startup check passed": "启动校验通过",
+    "startup check failed: {error}": "启动校验失败：{error}",
+    "startup check failed: {error}\nnext step: {hint}": (
+        "启动校验失败：{error}\n下一步：{hint}"
+    ),
+    "create project config files from examples, then run `apeiria env init`": (
+        "先从示例创建项目配置文件，再执行 `apeiria env init`"
+    ),
+    "check plugin config conflicts in project plugins and rerun check": (
+        "检查项目插件配置冲突后，重新执行校验"
+    ),
+    "fix or restore `data/apeiria.plugins.web_ui/secret.json`, then rerun check": (
+        "修复或恢复 `data/apeiria.plugins.web_ui/secret.json` 后，重新执行校验"
+    ),
     "Export local runtime state for migration.": "导出本地运行态以便迁移。",
     "Import local runtime state from a migration bundle.": ("从迁移包导入本地运行态。"),
     "Manage Apeiria project plugins.": "管理 Apeiria 项目插件。",
+    "Show plugin registration diagnostics.": "显示插件注册诊断信息。",
+    "plugin diagnose failed: {error}": "插件诊断失败：{error}",
+    "registered plugin diagnostics:": "已注册插件诊断：",
+    "no registered plugin modules": "没有已注册插件模块",
+    "registered plugin dirs:": "已注册插件目录：",
+    "plugin diagnose summary:": "插件诊断摘要：",
+    "module total: {count}": "模块总数：{count}",
+    "module not importable: {count}": "不可导入模块：{count}",
+    "module not loaded: {count}": "未加载模块：{count}",
+    "dir total: {count}": "目录总数：{count}",
+    "dir missing: {count}": "缺失目录：{count}",
+    "dir not loaded: {count}": "未加载目录：{count}",
+    "loaded": "已加载",
+    "not loaded": "未加载",
+    "importable": "可导入",
+    "not importable": "不可导入",
+    "exists": "存在",
+    "missing": "不存在",
     "Manage Apeiria project adapters.": "管理 Apeiria 项目适配器。",
     "Manage Apeiria project drivers.": "管理 Apeiria 项目驱动。",
     "config: {path}": "配置文件：{path}",

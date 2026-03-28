@@ -75,6 +75,8 @@ After activating `.venv`, use these commands:
    show current environment paths and status
 5. `apeiria run --build`
    build Web UI frontend assets, then run the bot
+6. `apeiria check`
+   validate bot startup without entering the event loop
 
 Main environment responsibilities:
 
