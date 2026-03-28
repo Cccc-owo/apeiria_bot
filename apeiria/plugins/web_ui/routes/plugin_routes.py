@@ -21,6 +21,9 @@ from apeiria.domains.plugins import (
     plugin_catalog_service,
     plugin_config_view_service,
 )
+from apeiria.domains.plugins import (
+    OrphanPluginConfigItem as DomainOrphanPluginConfigItem,
+)
 from apeiria.plugins.web_ui.auth import require_control_panel, require_owner
 from apeiria.plugins.web_ui.models import (
     AdapterConfigItem,
@@ -30,6 +33,8 @@ from apeiria.plugins.web_ui.models import (
     DriverConfigRequest,
     DriverConfigResponse,
     OperationStatusResponse,
+    OrphanPluginConfigItem,
+    OrphanPluginConfigResponse,
     PluginConfigDirItem,
     PluginConfigModuleItem,
     PluginConfigRequest,
@@ -43,9 +48,26 @@ from apeiria.plugins.web_ui.models import (
     PluginSettingsResponse,
     PluginSettingsUpdateRequest,
     PluginStoreTaskItem,
+    PluginUninstallRequest,
 )
 
 router = APIRouter()
+
+
+def _to_orphan_plugin_config_response(
+    items: list[DomainOrphanPluginConfigItem],
+) -> OrphanPluginConfigResponse:
+    return OrphanPluginConfigResponse(
+        items=[
+            OrphanPluginConfigItem(
+                section=item.section,
+                module_name=item.module_name,
+                has_section=item.has_section,
+                reason=item.reason,
+            )
+            for item in items
+        ]
+    )
 
 
 def _to_adapter_config_response(state: AdapterConfigState) -> AdapterConfigResponse:
@@ -412,10 +434,14 @@ async def update_plugin(
 @router.post("/{module_name}/uninstall", response_model=OperationStatusResponse)
 async def uninstall_plugin(
     module_name: str,
+    payload: PluginUninstallRequest,
     _: Annotated[Any, Depends(require_owner)],
 ) -> OperationStatusResponse:
     try:
-        await plugin_catalog_service.uninstall_plugin(module_name)
+        await plugin_catalog_service.uninstall_plugin(
+            module_name,
+            remove_config=payload.remove_config,
+        )
     except ResourceNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -429,6 +455,22 @@ async def uninstall_plugin(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return OperationStatusResponse(status="ok")
+
+
+@router.get("/orphan-configs", response_model=OrphanPluginConfigResponse)
+async def list_orphan_plugin_configs(
+    _: Annotated[Any, Depends(require_owner)],
+) -> OrphanPluginConfigResponse:
+    items = await plugin_catalog_service.list_orphan_plugin_configs()
+    return _to_orphan_plugin_config_response(items)
+
+
+@router.post("/orphan-configs/cleanup", response_model=OrphanPluginConfigResponse)
+async def cleanup_orphan_plugin_configs(
+    _: Annotated[Any, Depends(require_owner)],
+) -> OrphanPluginConfigResponse:
+    items = await plugin_catalog_service.cleanup_orphan_plugin_configs()
+    return _to_orphan_plugin_config_response(items)
 
 
 @router.post("/install/manual", response_model=PluginStoreTaskItem)

@@ -44,6 +44,14 @@
             >
               {{ t('plugins.manualInstall') }}
             </v-btn>
+            <v-btn
+              v-if="authStore.role === 'owner'"
+              color="warning"
+              variant="text"
+              @click="openOrphanConfigDialog"
+            >
+              {{ t('plugins.orphanConfigCleanup') }}
+            </v-btn>
           </div>
           <div class="section-heading__actions">
             <v-switch
@@ -477,6 +485,89 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="uninstallConfirmVisible" max-width="560">
+      <v-card>
+        <v-card-title>{{ t('plugins.settingsUninstall') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-alert density="comfortable" type="warning" variant="tonal">
+            {{ uninstallConfirmSummary }}
+          </v-alert>
+          <v-checkbox
+            v-model="uninstallRemoveConfig"
+            color="warning"
+            density="comfortable"
+            hide-details
+            :label="t('plugins.settingsUninstallRemoveConfig')"
+          />
+          <div class="text-body-2 text-medium-emphasis">
+            {{ t('plugins.settingsUninstallRemoveConfigHint') }}
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="closeUninstallConfirm">{{ t('common.cancel') }}</v-btn>
+          <v-spacer />
+          <v-btn
+            color="warning"
+            :loading="Boolean(uninstallingModule)"
+            @click="confirmUninstallPlugin"
+          >
+            {{ t('plugins.settingsUninstall') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="orphanConfigDialogVisible" max-width="680">
+      <v-card>
+        <v-card-title>{{ t('plugins.orphanConfigCleanup') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-alert density="comfortable" type="info" variant="tonal">
+            {{ t('plugins.orphanConfigCleanupHint') }}
+          </v-alert>
+          <v-progress-linear
+            v-if="orphanConfigLoading"
+            color="primary"
+            indeterminate
+          />
+          <div
+            v-else-if="orphanConfigItems.length === 0"
+            class="text-body-2 text-medium-emphasis"
+          >
+            {{ t('plugins.orphanConfigCleanupEmpty') }}
+          </div>
+          <div v-else class="confirm-plugin-list">
+            <div
+              v-for="item in orphanConfigItems"
+              :key="`${item.section}:${item.module_name || ''}`"
+              class="confirm-plugin-item"
+            >
+              <div class="confirm-plugin-item__title">
+                <span class="font-weight-medium">[plugins.{{ item.section }}]</span>
+                <span class="text-caption text-medium-emphasis">
+                  {{ item.module_name || t('plugins.orphanConfigNoModule') }}
+                </span>
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ item.reason }}
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="orphanConfigDialogVisible = false">{{ t('common.cancel') }}</v-btn>
+          <v-spacer />
+          <v-btn
+            color="warning"
+            :disabled="orphanConfigItems.length === 0"
+            :loading="orphanConfigCleaning"
+            @click="confirmCleanupOrphanConfigs"
+          >
+            {{ t('plugins.orphanConfigCleanupAction') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="manualInstallDialogVisible" max-width="640">
       <v-card rounded="xl">
         <v-card-title>{{ t('plugins.manualInstall') }}</v-card-title>
@@ -565,11 +656,14 @@
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
   import {
+    cleanupOrphanPluginConfigs,
+    getOrphanPluginConfigs,
     getPluginInstallTask,
     getPlugins,
     getPluginSettings,
     getPluginSettingsRaw,
     installManualPlugin,
+    type OrphanPluginConfigItem,
     type PluginItem,
     type PluginStoreTask,
     type RawSettingsResponse,
@@ -627,6 +721,13 @@
   const toggleConfirmLoading = ref(false)
   const toggleConfirmItem = ref<PluginItem | null>(null)
   const uninstallingModule = ref('')
+  const uninstallConfirmVisible = ref(false)
+  const uninstallConfirmItem = ref<PluginItem | null>(null)
+  const uninstallRemoveConfig = ref(false)
+  const orphanConfigDialogVisible = ref(false)
+  const orphanConfigLoading = ref(false)
+  const orphanConfigCleaning = ref(false)
+  const orphanConfigItems = ref<OrphanPluginConfigItem[]>([])
   const authStore = useAuthStore()
   const noticeStore = useNoticeStore()
   const restartStore = useRestartStore()
@@ -706,6 +807,19 @@
       return t('plugins.disableConfirmRiskSummary', { count: 1, riskCount })
     }
     return t('plugins.disableConfirmSummary', { count: 1 })
+  })
+  const uninstallConfirmSummary = computed(() => {
+    if (!uninstallConfirmItem.value) return ''
+    const pluginName = uninstallConfirmItem.value.name || uninstallConfirmItem.value.module_name
+    if (uninstallConfirmItem.value.installed_package) {
+      return t('plugins.settingsUninstallConfirm', {
+        name: pluginName,
+        package: uninstallConfirmItem.value.installed_package,
+      })
+    }
+    return t('plugins.settingsUninstallConfirmFallback', {
+      name: pluginName,
+    })
   })
   const systemPlugins = computed(() =>
     plugins.value.filter(item => item.source === 'framework'),
@@ -858,6 +972,25 @@
     toggleConfirmItem.value = null
   }
 
+  function closeUninstallConfirm () {
+    uninstallConfirmVisible.value = false
+    uninstallConfirmItem.value = null
+    uninstallRemoveConfig.value = false
+  }
+
+  async function openOrphanConfigDialog () {
+    orphanConfigDialogVisible.value = true
+    orphanConfigLoading.value = true
+    try {
+      orphanConfigItems.value = (await getOrphanPluginConfigs()).data.items
+    } catch (error) {
+      orphanConfigDialogVisible.value = false
+      noticeStore.show(getErrorMessage(error, t('plugins.orphanConfigCleanupFailed')), 'error')
+    } finally {
+      orphanConfigLoading.value = false
+    }
+  }
+
   function shouldConfirmToggle (item: PluginItem, enabled: boolean) {
     return !enabled && item.dependent_plugins.length > 0
   }
@@ -1005,31 +1138,50 @@
   }
 
   async function uninstallPluginItem (item: PluginItem) {
-    const pluginName = item.name || item.module_name
-    const confirmMessage = item.installed_package
-      ? t('plugins.settingsUninstallConfirm', {
-        name: pluginName,
-        package: item.installed_package,
-      })
-      : t('plugins.settingsUninstallConfirmFallback', {
-        name: pluginName,
-      })
-    if (!window.confirm(confirmMessage)) {
-      return
-    }
+    uninstallConfirmItem.value = item
+    uninstallRemoveConfig.value = false
+    uninstallConfirmVisible.value = true
+  }
 
+  async function confirmUninstallPlugin () {
+    if (!uninstallConfirmItem.value) return
+    const item = uninstallConfirmItem.value
     uninstallingModule.value = item.module_name
     try {
-      await uninstallPlugin(item.module_name)
+      await uninstallPlugin(item.module_name, {
+        remove_config: uninstallRemoveConfig.value,
+      })
       noticeStore.show(t('plugins.settingsUninstallSucceeded'), 'success')
       if (settingsPlugin.value?.module_name === item.module_name) {
         settingsDialogVisible.value = false
       }
+      closeUninstallConfirm()
       await loadPluginManagement()
     } catch (error) {
       noticeStore.show(getErrorMessage(error, t('plugins.settingsUninstallFailed')), 'error')
     } finally {
       uninstallingModule.value = ''
+    }
+  }
+
+  async function confirmCleanupOrphanConfigs () {
+    orphanConfigCleaning.value = true
+    try {
+      const removed = (await cleanupOrphanPluginConfigs()).data.items
+      orphanConfigItems.value = removed
+      orphanConfigDialogVisible.value = false
+      if (removed.length > 0) {
+        noticeStore.show(
+          t('plugins.orphanConfigCleanupSucceeded', { count: removed.length }),
+          'success',
+        )
+      } else {
+        noticeStore.show(t('plugins.orphanConfigCleanupEmpty'), 'info')
+      }
+    } catch (error) {
+      noticeStore.show(getErrorMessage(error, t('plugins.orphanConfigCleanupFailed')), 'error')
+    } finally {
+      orphanConfigCleaning.value = false
     }
   }
 

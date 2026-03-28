@@ -360,6 +360,30 @@ class ProjectConfigService:
         atomic_write_text(target, tomlkit.dumps(document))
         return target
 
+    def remove_project_plugin_section(
+        self,
+        plugin_name: str,
+        config_path: Path | None = None,
+    ) -> Path:
+        """Remove one `[plugins.<section>]` block and related module mapping."""
+        target = config_path or self.default_config_path()
+        document = self._load_toml_document(target)
+
+        plugins = document.get("plugins")
+        if isinstance(plugins, tomlkit.items.Table):  # type: ignore[attr-defined]
+            for candidate in self._plugin_name_candidates(plugin_name):
+                if candidate in plugins:
+                    del plugins[candidate]
+            if len(plugins) == 0 and "plugins" in document:
+                del document["plugins"]
+
+        self._set_plugin_module_mapping(
+            document,
+            dict.fromkeys(self._plugin_name_candidates(plugin_name), None),
+        )
+        atomic_write_text(target, tomlkit.dumps(document))
+        return target
+
     def write_project_nonebot_config(
         self,
         values: dict[str, object | None],

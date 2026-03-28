@@ -279,6 +279,27 @@ class PluginManualInstallRequest(BaseModel):
     module_name: str | None = Field(default=None, max_length=256)
 
 
+class PluginUninstallRequest(BaseModel):
+    """Plugin uninstall request payload."""
+
+    remove_config: bool = False
+
+
+class OrphanPluginConfigItem(BaseModel):
+    """One orphaned plugin config item."""
+
+    section: str
+    module_name: str | None = None
+    has_section: bool
+    reason: str
+
+
+class OrphanPluginConfigResponse(BaseModel):
+    """Preview or cleanup result for orphaned plugin config items."""
+
+    items: list[OrphanPluginConfigItem]
+
+
 class PluginStoreTaskItem(BaseModel):
     """Plugin store task item returned to the Web UI."""
 

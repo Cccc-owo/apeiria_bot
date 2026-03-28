@@ -17,12 +17,18 @@ from .config_service import (
     PluginSettingsState,
     plugin_config_view_service,
 )
-from .service import PluginCatalogItem, PluginCatalogService, plugin_catalog_service
+from .service import (
+    OrphanPluginConfigItem,
+    PluginCatalogItem,
+    PluginCatalogService,
+    plugin_catalog_service,
+)
 from .settings_support import UnknownPluginSettingFieldError
 
 __all__ = [
     "AdapterConfigState",
     "DriverConfigState",
+    "OrphanPluginConfigItem",
     "PluginCatalogItem",
     "PluginCatalogService",
     "PluginConfigConflictError",
