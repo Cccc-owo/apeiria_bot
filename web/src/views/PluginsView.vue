@@ -251,181 +251,204 @@
       </v-card-text>
     </v-card>
 
-    <v-dialog v-model="settingsDialogVisible" max-width="840">
-      <v-card>
-        <v-card-title class="d-flex flex-column align-start ga-1">
-          <span>{{ t('plugins.settingsTitle', { name: settingsPlugin?.name || settingsPlugin?.module_name || '' }) }}</span>
-          <span class="text-caption text-medium-emphasis">
-            {{ settingsPlugin?.module_name }}
-          </span>
+    <v-dialog v-model="settingsDialogVisible" max-width="920">
+      <v-card class="settings-dialog-card">
+        <v-card-title class="settings-dialog-header">
+          <div class="settings-dialog-header__main">
+            <div class="settings-dialog-header__title-block">
+              <span class="settings-dialog-header__title">
+                {{ t('plugins.settingsTitle', { name: settingsPlugin?.name || settingsPlugin?.module_name || '' }) }}
+              </span>
+              <span class="settings-dialog-header__module text-caption text-medium-emphasis">
+                {{ settingsPlugin?.module_name }}
+              </span>
+            </div>
+
+            <div class="settings-dialog-header__meta">
+              <v-chip v-if="settingsState" color="primary" size="small" variant="tonal">
+                {{ settingsState.section }}
+              </v-chip>
+              <v-chip
+                v-if="settingsState"
+                :color="settingsState.legacy_flatten ? 'warning' : 'default'"
+                size="small"
+                variant="tonal"
+              >
+                {{ settingsState.legacy_flatten ? t('plugins.settingsLegacy') : settingsSourceLabel(settingsState.config_source) }}
+              </v-chip>
+              <v-chip
+                v-if="settingsPlugin?.admin_level"
+                color="secondary"
+                size="small"
+                variant="tonal"
+              >
+                Lv.{{ settingsPlugin.admin_level }}
+              </v-chip>
+              <v-chip
+                v-if="settingsPlugin?.plugin_type"
+                :color="settingsPlugin.plugin_type === 'admin' || settingsPlugin.plugin_type === 'superuser' ? 'warning' : 'default'"
+                size="small"
+                variant="tonal"
+              >
+                {{ settingsPlugin.plugin_type }}
+              </v-chip>
+              <span v-if="settingsPlugin" class="settings-dialog-header__summary text-caption text-medium-emphasis">
+                {{ pluginMetaSummary(settingsPlugin) || 'unknown' }}
+              </span>
+            </div>
+
+            <div
+              v-if="settingsPlugin && (settingsPlugin.required_plugins.length > 0 || settingsPlugin.dependent_plugins.length > 0)"
+              class="settings-dialog-header__relations"
+            >
+              <div v-if="settingsPlugin.required_plugins.length > 0" class="plugin-detail-tags">
+                <span class="text-caption text-medium-emphasis">{{ t('plugins.requiredPlugins') }}</span>
+                <v-chip
+                  v-for="dependency in settingsPlugin.required_plugins"
+                  :key="`detail-required:${dependency}`"
+                  color="info"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  {{ dependency }}
+                </v-chip>
+              </div>
+              <div v-if="settingsPlugin.dependent_plugins.length > 0" class="plugin-detail-tags">
+                <span class="text-caption text-medium-emphasis">{{ t('plugins.dependentPlugins') }}</span>
+                <v-chip
+                  v-for="dependency in settingsPlugin.dependent_plugins"
+                  :key="`detail-dependent:${dependency}`"
+                  color="warning"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  {{ dependency }}
+                </v-chip>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-dialog-header__actions">
+            <v-btn-toggle
+              v-model="settingsEditorMode"
+              class="mode-switch"
+              color="primary"
+              density="comfortable"
+              divided
+              mandatory
+              variant="outlined"
+            >
+              <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
+              <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
+            </v-btn-toggle>
+            <v-btn
+              v-if="settingsEditorMode === 'basic'"
+              color="primary"
+              :disabled="!settingsState?.has_config_model || !hasPendingPluginChanges"
+              :loading="settingsSaving"
+              @click="openPluginSettingsPreview"
+            >
+              {{ t('plugins.settingsSave') }}
+            </v-btn>
+          </div>
         </v-card-title>
-        <v-card-text class="d-flex flex-column ga-4">
-          <div v-if="settingsState" class="d-flex flex-wrap ga-2">
-            <v-chip color="primary" size="small" variant="tonal">
-              {{ settingsState.section }}
-            </v-chip>
-            <v-chip :color="settingsState.legacy_flatten ? 'warning' : 'default'" size="small" variant="tonal">
-              {{ settingsState.legacy_flatten ? t('plugins.settingsLegacy') : settingsSourceLabel(settingsState.config_source) }}
-            </v-chip>
-            <v-chip
-              v-if="settingsPlugin?.admin_level"
-              color="secondary"
-              size="small"
-              variant="tonal"
-            >
-              Lv.{{ settingsPlugin.admin_level }}
-            </v-chip>
-            <v-chip
-              v-if="settingsPlugin?.plugin_type"
-              :color="settingsPlugin.plugin_type === 'admin' || settingsPlugin.plugin_type === 'superuser' ? 'warning' : 'default'"
-              size="small"
-              variant="tonal"
-            >
-              {{ settingsPlugin.plugin_type }}
-            </v-chip>
-          </div>
-
-          <div v-if="settingsPlugin" class="plugin-detail-meta">
-            <div v-if="settingsPlugin.author || settingsPlugin.version" class="text-caption text-medium-emphasis">
-              {{ settingsPlugin.author || 'unknown' }} · {{ settingsPlugin.version || '0.0.0' }}
-            </div>
-            <div v-if="settingsPlugin.required_plugins.length > 0" class="plugin-detail-tags">
-              <span class="text-caption text-medium-emphasis">{{ t('plugins.requiredPlugins') }}</span>
-              <v-chip
-                v-for="dependency in settingsPlugin.required_plugins"
-                :key="`detail-required:${dependency}`"
-                color="info"
-                size="x-small"
-                variant="tonal"
-              >
-                {{ dependency }}
-              </v-chip>
-            </div>
-            <div v-if="settingsPlugin.dependent_plugins.length > 0" class="plugin-detail-tags">
-              <span class="text-caption text-medium-emphasis">{{ t('plugins.dependentPlugins') }}</span>
-              <v-chip
-                v-for="dependency in settingsPlugin.dependent_plugins"
-                :key="`detail-dependent:${dependency}`"
-                color="warning"
-                size="x-small"
-                variant="tonal"
-              >
-                {{ dependency }}
-              </v-chip>
-            </div>
-          </div>
-
+        <v-card-text class="settings-dialog-card__body d-flex flex-column ga-4">
           <v-alert v-if="settingsErrorMessage" density="comfortable" type="error" variant="tonal">
             {{ settingsErrorMessage }}
           </v-alert>
 
           <v-progress-linear v-if="settingsDialogLoading" color="primary" indeterminate />
 
-          <div v-if="!settingsDialogLoading" class="settings-shell">
-            <div class="settings-shell__toolbar settings-shell__toolbar--dialog">
-              <div class="settings-shell__headline" />
-              <div class="settings-shell__actions">
-                <v-btn-toggle
-                  v-model="settingsEditorMode"
-                  class="mode-switch"
-                  color="primary"
-                  density="comfortable"
-                  divided
-                  mandatory
-                  variant="outlined"
-                >
-                  <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
-                  <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
-                </v-btn-toggle>
-                <v-btn
-                  v-if="settingsEditorMode === 'basic'"
-                  color="primary"
-                  :disabled="!settingsState?.has_config_model || !hasPendingPluginChanges"
-                  :loading="settingsSaving"
-                  @click="openPluginSettingsPreview"
-                >
-                  {{ t('plugins.settingsSave') }}
-                </v-btn>
-              </div>
-            </div>
-
+          <div v-if="!settingsDialogLoading" class="settings-shell settings-shell--dialog">
             <template v-if="settingsEditorMode === 'basic'">
               <div v-if="!settingsState?.has_config_model || settingsFields.length === 0" class="text-body-2 text-medium-emphasis">
                 {{ t('plugins.settingsEmpty') }}
               </div>
 
               <div v-else class="settings-list-panel">
-                <div
+                <section
                   v-for="field in settingsFields"
                   :key="field.key"
                   class="settings-list-row"
                 >
                   <div class="settings-list-row__main">
-                    <div>
-                      <div class="font-weight-medium">{{ field.key }}</div>
-                      <div v-if="field.help" class="text-caption text-medium-emphasis">
+                    <div class="settings-list-row__info">
+                      <div class="settings-list-row__label text-subtitle-2 font-weight-medium">
+                        {{ field.key }}
+                      </div>
+                      <div v-if="field.help" class="settings-list-row__description text-caption text-medium-emphasis">
                         {{ field.help }}
                       </div>
+                      <div class="settings-list-row__status">
+                        <v-chip
+                          v-if="field.has_local_override || pluginEditor.isFieldEditing(field)"
+                          color="primary"
+                          size="x-small"
+                          variant="tonal"
+                        >
+                          {{ t('plugins.settingsLocalShort') }}
+                        </v-chip>
+                        <v-chip
+                          v-if="!field.editable"
+                          color="warning"
+                          size="x-small"
+                          variant="tonal"
+                        >
+                          {{ t('plugins.settingsReadonly') }}
+                        </v-chip>
+                      </div>
+                      <div class="settings-list-row__meta text-caption text-medium-emphasis">
+                        <span>{{ t('plugins.settingsType') }}: {{ field.type }}</span>
+                        <span>{{ t('plugins.settingsValueSource') }}: {{ settingsValueSourceLabel(field.value_source) }}</span>
+                        <span v-if="field.global_key">{{ t('plugins.settingsGlobalKey') }}: {{ field.global_key }}</span>
+                        <span v-if="field.choices.length > 0">{{ t('plugins.settingsChoices') }}: {{ formatFieldChoices(field.choices) }}</span>
+                      </div>
                     </div>
-                    <div class="settings-list-row__chips">
-                      <v-chip size="x-small" variant="tonal">{{ field.type }}</v-chip>
-                      <v-chip color="secondary" size="x-small" variant="tonal">{{ field.editor }}</v-chip>
-                      <v-chip :color="field.editable ? 'default' : 'warning'" size="x-small" variant="tonal">
-                        {{ settingsValueSourceLabel(field.value_source) }}
-                      </v-chip>
-                      <v-chip v-if="field.choices.length > 0" color="secondary" size="x-small" variant="tonal">
-                        {{ field.choices.join(', ') }}
-                      </v-chip>
+
+                    <div class="settings-list-row__control">
+                      <div class="settings-list-row__actions">
+                        <v-btn
+                          v-if="!pluginEditor.isFieldEditing(field) && field.editable"
+                          class="settings-action settings-action--primary"
+                          color="primary"
+                          size="small"
+                          variant="tonal"
+                          @click="pluginEditor.startOverride(field)"
+                        >
+                          {{ t('plugins.settingsAddOverride') }}
+                        </v-btn>
+                        <v-btn
+                          v-if="pluginEditor.isFieldEditing(field)"
+                          class="settings-action"
+                          size="small"
+                          variant="text"
+                          @click="pluginEditor.cancelField(field)"
+                        >
+                          {{ t('common.cancel') }}
+                        </v-btn>
+                        <v-btn
+                          v-if="field.has_local_override"
+                          class="settings-action"
+                          color="warning"
+                          :loading="settingsClearingKey === field.key"
+                          size="small"
+                          variant="text"
+                          @click="clearPluginField(field)"
+                        >
+                          {{ t('plugins.settingsClear') }}
+                        </v-btn>
+                      </div>
+
+                      <SettingsFieldEditor
+                        v-model="settingsForm[field.key]"
+                        :array-hint="t('plugins.settingsArrayHint')"
+                        :editing="pluginEditor.isFieldEditing(field)"
+                        :field="field"
+                        :json-hint="t('plugins.settingsJsonHint')"
+                      />
                     </div>
                   </div>
-
-                  <div class="settings-list-row__actions">
-                    <v-btn
-                      v-if="!pluginEditor.isFieldEditing(field) && field.editable"
-                      class="settings-action settings-action--primary"
-                      color="primary"
-                      size="small"
-                      variant="tonal"
-                      @click="pluginEditor.startOverride(field)"
-                    >
-                      {{ t('plugins.settingsAddOverride') }}
-                    </v-btn>
-                    <v-btn
-                      v-if="pluginEditor.isFieldEditing(field)"
-                      class="settings-action"
-                      size="small"
-                      variant="text"
-                      @click="pluginEditor.cancelField(field)"
-                    >
-                      {{ t('common.cancel') }}
-                    </v-btn>
-                    <v-btn
-                      v-if="field.has_local_override"
-                      class="settings-action"
-                      color="warning"
-                      :loading="settingsClearingKey === field.key"
-                      size="small"
-                      variant="text"
-                      @click="clearPluginField(field)"
-                    >
-                      {{ t('plugins.settingsClear') }}
-                    </v-btn>
-                  </div>
-
-                  <SettingsFieldEditor
-                    v-model="settingsForm[field.key]"
-                    :array-hint="t('plugins.settingsArrayHint')"
-                    :editing="pluginEditor.isFieldEditing(field)"
-                    :field="field"
-                    :json-hint="t('plugins.settingsJsonHint')"
-                  />
-
-                  <div class="settings-list-row__meta text-caption text-medium-emphasis">
-                    <span>{{ t('plugins.settingsCurrent') }}: {{ displayFieldValue(field.current_value) }}</span>
-                    <span v-if="field.has_local_override">{{ t('plugins.settingsLocal') }}: {{ displayFieldValue(field.local_value) }}</span>
-                    <span v-if="field.global_key">{{ field.global_key }}</span>
-                  </div>
-                </div>
+                </section>
               </div>
             </template>
 
@@ -748,6 +771,18 @@
     })
   }
 
+  function formatFieldChoices (choices: unknown[]) {
+    const normalized = choices
+      .map(choice => displayFieldValue(choice))
+      .filter(Boolean)
+
+    if (normalized.length <= 4) {
+      return normalized.join(' / ')
+    }
+
+    return `${normalized.slice(0, 4).join(' / ')} +${normalized.length - 4}`
+  }
+
   function closeToggleConfirm () {
     toggleConfirmVisible.value = false
     toggleConfirmLoading.value = false
@@ -1052,36 +1087,89 @@
 </script>
 
 <style scoped>
+.settings-dialog-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 920px);
+}
+
+.settings-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 12px;
+}
+
+.settings-dialog-header__main {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-dialog-header__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-dialog-header__title {
+  font-size: 1.2rem;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.settings-dialog-header__module {
+  line-height: 1.35;
+}
+
+.settings-dialog-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.settings-dialog-header__summary {
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.settings-dialog-header__relations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-dialog-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+.settings-dialog-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0;
+}
+
 .settings-shell {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.settings-shell__toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.settings-shell__toolbar--dialog {
-  padding-bottom: 4px;
-}
-
-.settings-shell__headline {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.settings-shell__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+.settings-shell--dialog {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .mode-switch {
@@ -1097,12 +1185,18 @@
   border-radius: 14px;
 }
 
+.settings-shell--dialog .settings-list-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .settings-list-row {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background:
+    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.98)),
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.02), rgba(var(--v-theme-secondary), 0.02));
 }
 
 .settings-list-row:last-child {
@@ -1111,9 +1205,44 @@
 
 .settings-list-row__main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
-  gap: 16px;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-list-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-list-row__label {
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.settings-list-row__description {
+  line-height: 1.45;
+}
+
+.settings-list-row__status {
+  display: flex;
   align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+
+.settings-list-row__control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(var(--v-theme-on-surface), 0.025);
+  border: 1px solid rgba(var(--v-border-color), 0.65);
 }
 
 .settings-list-row__actions {
@@ -1135,8 +1264,18 @@
 .settings-list-row__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 6px 12px;
   line-height: 1.35;
+  word-break: break-word;
+}
+
+.settings-list-row__control :deep(.settings-field-editor) {
+  width: 100%;
+}
+
+.settings-list-row__control :deep(.v-field),
+.settings-list-row__control :deep(.v-selection-control) {
+  width: 100%;
 }
 
 .section-heading {
@@ -1323,8 +1462,23 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .settings-dialog-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 10px;
+  }
+
+  .settings-dialog-header__actions {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+
   .settings-list-row__main {
     grid-template-columns: 1fr;
+  }
+
+  .settings-list-row__control {
+    padding: 12px;
   }
 
   .plugin-card__footer {
