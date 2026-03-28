@@ -19,7 +19,7 @@ from apeiria.domains.plugins import (
     plugin_catalog_service,
     plugin_config_view_service,
 )
-from apeiria.plugins.web_ui.auth import require_control_panel
+from apeiria.plugins.web_ui.auth import require_control_panel, require_owner
 from apeiria.plugins.web_ui.models import (
     AdapterConfigItem,
     AdapterConfigRequest,
@@ -27,6 +27,7 @@ from apeiria.plugins.web_ui.models import (
     DriverConfigItem,
     DriverConfigRequest,
     DriverConfigResponse,
+    OperationStatusResponse,
     PluginConfigDirItem,
     PluginConfigModuleItem,
     PluginConfigRequest,
@@ -329,6 +330,8 @@ async def list_plugins(
             version=plugin.version,
             required_plugins=plugin.required_plugins,
             dependent_plugins=plugin.dependent_plugins,
+            installed_package=plugin.installed_package,
+            installed_module_names=plugin.installed_module_names,
         )
         for plugin in plugins
     ]
@@ -354,3 +357,25 @@ async def update_plugin(
             detail=t("web_ui.plugins.protected", reason=str(exc)),
         ) from None
     return {"status": "ok"}
+
+
+@router.post("/{module_name}/uninstall", response_model=OperationStatusResponse)
+async def uninstall_plugin(
+    module_name: str,
+    _: Annotated[Any, Depends(require_owner)],
+) -> OperationStatusResponse:
+    try:
+        await plugin_catalog_service.uninstall_plugin(module_name)
+    except ResourceNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.not_found"),
+        ) from None
+    except ProtectedPluginError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=t("web_ui.plugins.protected", reason=str(exc)),
+        ) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return OperationStatusResponse(status="ok")
