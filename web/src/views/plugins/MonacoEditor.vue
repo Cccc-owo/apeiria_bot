@@ -11,7 +11,11 @@
         element: HTMLElement,
         options: Record<string, unknown>,
       ) => MonacoEditorInstance
+      setModelMarkers: (model: MonacoTextModel, owner: string, markers: MonacoMarkerData[]) => void
       setTheme: (theme: string) => void
+    }
+    MarkerSeverity: {
+      Error: number
     }
     languages: {
       register: (language: { id: string }) => void
@@ -20,8 +24,23 @@
     }
   }
 
+  interface MonacoTextModel {
+    getLineCount: () => number
+    getLineMaxColumn: (lineNumber: number) => number
+  }
+
+  interface MonacoMarkerData {
+    startLineNumber: number
+    startColumn: number
+    endLineNumber: number
+    endColumn: number
+    message: string
+    severity: number
+  }
+
   interface MonacoEditorInstance {
     dispose: () => void
+    getModel: () => MonacoTextModel | null
     getValue: () => string
     layout: () => void
     onDidChangeModelContent: (listener: () => void) => { dispose: () => void }
@@ -34,10 +53,16 @@
     language?: string
     modelValue: string
     readOnly?: boolean
+    validationColumn?: number | null
+    validationLine?: number | null
+    validationMessage?: string
   }>(), {
     height: 360,
     language: 'toml',
     readOnly: false,
+    validationColumn: null,
+    validationLine: null,
+    validationMessage: '',
   })
 
   const emit = defineEmits<{
@@ -49,9 +74,9 @@
     typeof props.height === 'number' ? `${props.height}px` : props.height,
   )
 
-  let monaco: MonacoModule | null = null
   let editor: MonacoEditorInstance | null = null
   let changeSubscription: { dispose: () => void } | null = null
+  let monacoModuleRef: MonacoModule | null = null
   let tomlRegistered = false
 
   function currentTheme () {
@@ -116,7 +141,7 @@
   onMounted(async () => {
     if (!container.value) return
     const monacoModule = (await import('monaco-editor/esm/vs/editor/editor.api.js')) as unknown as MonacoModule
-    monaco = monacoModule
+    monacoModuleRef = monacoModule
     if (props.language === 'toml') {
       ensureTomlLanguage(monacoModule)
     }
@@ -134,7 +159,34 @@
     changeSubscription = instance.onDidChangeModelContent(() => {
       emit('update:modelValue', instance.getValue())
     })
+    applyValidationMarker()
   })
+
+  function applyValidationMarker () {
+    if (!editor || !monacoModuleRef) return
+    const model = editor.getModel()
+    if (!model) return
+    if (!props.validationMessage) {
+      monacoModuleRef.editor.setModelMarkers(model, 'apeiria-raw-validation', [])
+      return
+    }
+
+    const lineCount = Math.max(1, model.getLineCount())
+    const line = Math.min(Math.max(props.validationLine || 1, 1), lineCount)
+    const maxColumn = Math.max(1, model.getLineMaxColumn(line))
+    const column = Math.min(Math.max(props.validationColumn || 1, 1), maxColumn)
+
+    monacoModuleRef.editor.setModelMarkers(model, 'apeiria-raw-validation', [
+      {
+        startLineNumber: line,
+        startColumn: column,
+        endLineNumber: line,
+        endColumn: Math.min(column + 1, maxColumn),
+        message: props.validationMessage,
+        severity: monacoModuleRef.MarkerSeverity.Error,
+      },
+    ])
+  }
 
   watch(
     () => props.modelValue,
@@ -148,6 +200,13 @@
     () => props.readOnly,
     nextValue => {
       editor?.updateOptions({ readOnly: nextValue })
+    },
+  )
+
+  watch(
+    () => [props.validationMessage, props.validationLine, props.validationColumn],
+    () => {
+      applyValidationMarker()
     },
   )
 

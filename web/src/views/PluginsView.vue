@@ -344,38 +344,6 @@
             </div>
           </div>
 
-          <div class="settings-dialog-header__actions">
-            <v-btn
-              v-if="canUninstallSettingsPlugin"
-              color="warning"
-              :loading="uninstallingModule === settingsPlugin?.module_name"
-              variant="tonal"
-              @click="uninstallCurrentPlugin"
-            >
-              {{ t('plugins.settingsUninstall') }}
-            </v-btn>
-            <v-btn-toggle
-              v-model="settingsEditorMode"
-              class="mode-switch"
-              color="primary"
-              density="comfortable"
-              divided
-              mandatory
-              variant="outlined"
-            >
-              <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
-              <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
-            </v-btn-toggle>
-            <v-btn
-              v-if="settingsEditorMode === 'basic'"
-              color="primary"
-              :disabled="!settingsState?.has_config_model || !hasPendingPluginChanges"
-              :loading="settingsSaving"
-              @click="openPluginSettingsPreview"
-            >
-              {{ t('plugins.settingsSave') }}
-            </v-btn>
-          </div>
         </v-card-title>
         <v-card-text class="settings-dialog-card__body d-flex flex-column ga-4">
           <v-alert v-if="settingsErrorMessage" density="comfortable" type="error" variant="tonal">
@@ -385,6 +353,25 @@
           <v-progress-linear v-if="settingsDialogLoading" color="primary" indeterminate />
 
           <div v-if="!settingsDialogLoading" class="settings-shell settings-shell--dialog">
+            <SettingsModeBar
+              v-model="settingsEditorMode"
+              :advanced-label="t('plugins.settingsAdvancedTab')"
+              :basic-label="t('plugins.settingsBasicTab')"
+              :tablist-label="t('plugins.settingsTitle')"
+            >
+              <template #actions>
+                <v-btn
+                  v-if="settingsEditorMode === 'basic'"
+                  color="primary"
+                  :disabled="!settingsState?.has_config_model || !hasPendingPluginChanges"
+                  :loading="settingsSaving"
+                  @click="openPluginSettingsPreview"
+                >
+                  {{ t('plugins.settingsSave') }}
+                </v-btn>
+              </template>
+            </SettingsModeBar>
+
             <template v-if="settingsEditorMode === 'basic'">
               <div v-if="!settingsState?.has_config_model || settingsFields.length === 0" class="text-body-2 text-medium-emphasis">
                 {{ t('plugins.settingsEmpty') }}
@@ -486,6 +473,10 @@
                 :reload-label="t('common.refresh')"
                 :save-label="t('plugins.settingsSave')"
                 :saving="settingsRawSaving"
+                :validation-error-column="pluginRawValidationColumn"
+                :validation-error-line="pluginRawValidationLine"
+                :validation-error-message="pluginRawValidationMessage"
+                :validation-pending="pluginRawValidationPending"
                 @reload="settingsPlugin && loadPluginRawSettings(settingsPlugin.module_name)"
                 @save="openPluginRawPreview"
               />
@@ -573,6 +564,7 @@
     updatePluginConfig,
     updatePluginSettings,
     updatePluginSettingsRaw,
+    validatePluginSettingsRaw,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useAuthStore } from '@/stores/auth'
@@ -586,8 +578,10 @@
   } from '@/views/plugins/settingsEditor'
   import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
+  import SettingsModeBar from '@/views/plugins/SettingsModeBar.vue'
   import SettingsPreviewDialog from '@/views/plugins/SettingsPreviewDialog.vue'
   import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
+  import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
 
   const plugins = ref<PluginItem[]>([])
   const loading = ref(false)
@@ -670,6 +664,23 @@
       t('plugins.settingsInvalidJson'),
     ),
   )
+  const {
+    validateNow: validatePluginRawNow,
+    validationColumn: pluginRawValidationColumn,
+    validationLine: pluginRawValidationLine,
+    validationMessage: pluginRawValidationMessage,
+    validationPending: pluginRawValidationPending,
+  } = useRawTomlValidation({
+    text: settingsRawText,
+    initialText: settingsRawInitialText,
+    fallbackMessage: t('plugins.settingsRawValidateFailed'),
+    validate: async text => {
+      if (!settingsPlugin.value) {
+        return { valid: true, message: null, line: null, column: null }
+      }
+      return (await validatePluginSettingsRaw(settingsPlugin.value.module_name, { text })).data
+    },
+  })
   const toggleConfirmTitle = computed(() => t('plugins.disableConfirmTitle'))
   const toggleConfirmSummary = computed(() => {
     if (!toggleConfirmItem.value) return ''
@@ -679,12 +690,6 @@
     }
     return t('plugins.disableConfirmSummary', { count: 1 })
   })
-  const canUninstallSettingsPlugin = computed(() =>
-    authStore.role === 'owner'
-    && Boolean(settingsPlugin.value)
-    && !settingsPlugin.value?.is_protected,
-  )
-
   const systemPlugins = computed(() =>
     plugins.value.filter(item => item.source === 'framework'),
   )
@@ -876,11 +881,6 @@
     await pluginEditor.submit()
   }
 
-  async function uninstallCurrentPlugin () {
-    if (!settingsPlugin.value) return
-    await uninstallPluginItem(settingsPlugin.value)
-  }
-
   function canUninstallPlugin (item: PluginItem) {
     return authStore.role === 'owner' && !item.is_protected
   }
@@ -961,8 +961,9 @@
     }
   }
 
-  function openPluginRawPreview () {
+  async function openPluginRawPreview () {
     if (!hasPendingPluginRawChanges.value) return
+    if (!await validatePluginRawNow()) return
     previewMode.value = 'raw'
     previewAction.value = 'plugin-raw'
     previewDialogVisible.value = true
@@ -1197,16 +1198,6 @@
   gap: 6px;
 }
 
-.settings-dialog-header__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex: 0 0 auto;
-  padding-top: 2px;
-}
-
 .settings-dialog-card__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1222,10 +1213,6 @@
 .settings-shell--dialog {
   flex: 1 1 auto;
   min-height: 0;
-}
-
-.mode-switch {
-  border-radius: 999px;
 }
 
 .settings-list-panel {
@@ -1518,11 +1505,6 @@
     flex-direction: column;
     align-items: stretch;
     padding-bottom: 10px;
-  }
-
-  .settings-dialog-header__actions {
-    justify-content: flex-start;
-    padding-top: 0;
   }
 
   .settings-list-row__main {

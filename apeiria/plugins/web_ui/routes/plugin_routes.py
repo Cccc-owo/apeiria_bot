@@ -14,6 +14,7 @@ from apeiria.domains.plugins import (
     PluginConfigConflictError,
     PluginConfigState,
     PluginRawSettingsState,
+    PluginRawValidationState,
     PluginSettingsNotConfigurableError,
     PluginSettingsState,
     plugin_catalog_service,
@@ -36,6 +37,7 @@ from apeiria.plugins.web_ui.models import (
     PluginRawSettingsResponse,
     PluginSettingFieldItem,
     PluginSettingsRawUpdateRequest,
+    PluginSettingsRawValidationResponse,
     PluginSettingsResponse,
     PluginSettingsUpdateRequest,
 )
@@ -150,6 +152,17 @@ def _raise_settings_error(exc: Exception) -> None:
     raise exc
 
 
+def _to_raw_validation_response(
+    state: PluginRawValidationState,
+) -> PluginSettingsRawValidationResponse:
+    return PluginSettingsRawValidationResponse(
+        valid=state.valid,
+        message=state.message,
+        line=state.line,
+        column=state.column,
+    )
+
+
 @router.get("/adapters/config", response_model=AdapterConfigResponse)
 async def get_adapter_config(
     _: Annotated[Any, Depends(require_control_panel)],
@@ -249,6 +262,19 @@ async def update_core_settings_raw(
     return _to_plugin_raw_settings_response(state)
 
 
+@router.post(
+    "/core/settings/raw/validate",
+    response_model=PluginSettingsRawValidationResponse,
+)
+async def validate_core_settings_raw(
+    payload: PluginSettingsRawUpdateRequest,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginSettingsRawValidationResponse:
+    return _to_raw_validation_response(
+        plugin_config_view_service.validate_core_settings_raw(payload.text)
+    )
+
+
 @router.get("/{module_name}/settings", response_model=PluginSettingsResponse)
 async def get_plugin_settings(
     module_name: str,
@@ -308,6 +334,26 @@ async def update_plugin_settings_raw(
         _raise_settings_error(exc)
         raise AssertionError("unreachable") from exc
     return _to_plugin_raw_settings_response(state)
+
+
+@router.post(
+    "/{module_name}/settings/raw/validate",
+    response_model=PluginSettingsRawValidationResponse,
+)
+async def validate_plugin_settings_raw(
+    module_name: str,
+    payload: PluginSettingsRawUpdateRequest,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginSettingsRawValidationResponse:
+    try:
+        state = plugin_config_view_service.validate_plugin_settings_raw(
+            module_name,
+            payload.text,
+        )
+    except Exception as exc:
+        _raise_settings_error(exc)
+        raise AssertionError("unreachable") from exc
+    return _to_raw_validation_response(state)
 
 
 @router.get("/", response_model=list[PluginItem])

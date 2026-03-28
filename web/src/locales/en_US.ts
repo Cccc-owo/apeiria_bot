@@ -268,6 +268,7 @@ const enUS = {
     settingsRawLoadFailed: 'Failed to load advanced settings',
     settingsSaveFailed: 'Failed to save plugin settings',
     settingsRawSaveFailed: 'Failed to save advanced settings',
+    settingsRawValidateFailed: 'Failed to validate advanced settings',
     settingsRawSaved: 'Advanced settings saved. Takes effect after restart.',
     settingsRestartHint: 'Configuration changes require a restart before plugins take effect.',
     settingsLocalShort: 'Custom',

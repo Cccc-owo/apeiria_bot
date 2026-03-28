@@ -86,6 +86,13 @@ export interface RawSettingsResponse {
   text: string
 }
 
+export interface RawSettingsValidationResponse {
+  valid: boolean
+  message: string | null
+  line: number | null
+  column: number | null
+}
+
 export interface ModuleConfigItem {
   name: string
   is_loaded: boolean
@@ -463,6 +470,9 @@ export const updateCoreSettings = (payload: {
 export const updateCoreSettingsRaw = (payload: { text: string }) =>
   client.patch<RawSettingsResponse>('/plugins/core/settings/raw', payload)
 
+export const validateCoreSettingsRaw = (payload: { text: string }) =>
+  client.post<RawSettingsValidationResponse>('/plugins/core/settings/raw/validate', payload)
+
 export const getPluginSettings = (moduleName: string) =>
   client.get<SettingsResponse>(`/plugins/${moduleName}/settings`)
 
@@ -483,6 +493,12 @@ export const updatePluginSettingsRaw = (
   payload: { text: string },
 ) =>
   client.patch<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`, payload)
+
+export const validatePluginSettingsRaw = (
+  moduleName: string,
+  payload: { text: string },
+) =>
+  client.post<RawSettingsValidationResponse>(`/plugins/${moduleName}/settings/raw/validate`, payload)
 
 export const getPluginConfig = () =>
   client.get<{
