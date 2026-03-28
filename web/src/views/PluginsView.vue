@@ -1201,6 +1201,7 @@
 .settings-dialog-card__body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
   padding-top: 0;
 }
 
@@ -1213,6 +1214,7 @@
 .settings-shell--dialog {
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .settings-list-panel {

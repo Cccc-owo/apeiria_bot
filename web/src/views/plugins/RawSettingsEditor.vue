@@ -22,15 +22,17 @@
       {{ activeErrorMessage }}
     </v-alert>
 
-    <MonacoEditor
-      v-model="model"
-      :height="380"
-      language="toml"
-      :read-only="loading || saving"
-      :validation-column="validationErrorColumn"
-      :validation-line="validationErrorLine"
-      :validation-message="validationErrorMessage"
-    />
+    <div class="raw-settings-editor__editor">
+      <MonacoEditor
+        v-model="model"
+        height="100%"
+        language="toml"
+        :read-only="loading || saving"
+        :validation-column="validationErrorColumn"
+        :validation-line="validationErrorLine"
+        :validation-message="validationErrorMessage"
+      />
+    </div>
   </div>
 </template>
 
@@ -86,5 +88,20 @@
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.raw-settings-editor :deep(.v-alert) {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.raw-settings-editor__editor {
+  position: relative;
+  z-index: 0;
+  height: clamp(280px, calc(100vh - 500px), 520px);
+  min-height: 280px;
+  max-height: 54vh;
+  overflow: hidden;
 }
 </style>
