@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from apeiria.config import (
     InvalidProjectConfigError,
@@ -24,6 +25,9 @@ from apeiria.domains.plugins.settings_view import (
     build_core_setting_fields,
     build_plugin_setting_fields,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class PluginSettingsNotConfigurableError(ValueError):
@@ -67,6 +71,14 @@ class PluginRawSettingsState:
     module_name: str
     section: str
     text: str
+
+
+@dataclass(frozen=True)
+class PluginRawValidationState:
+    valid: bool
+    message: str | None = None
+    line: int | None = None
+    column: int | None = None
 
 
 class PluginConfigViewService:
@@ -132,6 +144,11 @@ class PluginConfigViewService:
         project_config_service.write_project_nonebot_section_toml(text)
         return self.get_core_settings_raw()
 
+    def validate_core_settings_raw(self, text: str) -> PluginRawValidationState:
+        return self._validate_raw_toml(
+            lambda: project_config_service.validate_project_nonebot_section_toml(text)
+        )
+
     def get_plugin_settings(self, module_name: str) -> PluginSettingsState:
         """Return editable settings for one plugin module."""
         declared = get_plugin_declared_configs(module_name)
@@ -186,6 +203,38 @@ class PluginConfigViewService:
         )
         return self.get_plugin_settings_raw(module_name)
 
+    def validate_plugin_settings_raw(
+        self,
+        module_name: str,
+        text: str,
+    ) -> PluginRawValidationState:
+        declared = get_plugin_declared_configs(module_name)
+        return self._validate_raw_toml(
+            lambda: project_config_service.validate_project_plugin_section_toml(
+                declared.section,
+                text,
+            )
+        )
+
+    def _validate_raw_toml(
+        self,
+        validator: Callable[[], None],
+    ) -> PluginRawValidationState:
+        try:
+            validator()
+        except (TypeError, ValueError) as exc:
+            return PluginRawValidationState(
+                valid=False,
+                message=str(exc) or exc.__class__.__name__,
+                line=self._extract_error_position(exc, "line"),
+                column=self._extract_error_position(exc, "col"),
+            )
+        return PluginRawValidationState(valid=True)
+
+    def _extract_error_position(self, exc: Exception, attr: str) -> int | None:
+        value = getattr(exc, attr, None)
+        return value if isinstance(value, int) and value > 0 else None
+
 plugin_config_view_service = PluginConfigViewService()
 
 __all__ = [
@@ -196,6 +245,7 @@ __all__ = [
     "PluginConfigState",
     "PluginConfigViewService",
     "PluginRawSettingsState",
+    "PluginRawValidationState",
     "PluginSettingFieldState",
     "PluginSettingsNotConfigurableError",
     "PluginSettingsState",

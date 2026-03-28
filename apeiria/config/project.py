@@ -231,6 +231,20 @@ class ProjectConfigService:
         atomic_write_text(target, tomlkit.dumps(document))
         return target
 
+    def validate_project_nonebot_section_toml(self, text: str) -> None:
+        """Validate raw TOML for the `[nonebot]` section without writing."""
+        parsed = self._parse_toml_text(text)
+        if any(key != "nonebot" for key in parsed):
+            msg = "raw editor only accepts the [nonebot] section"
+            raise ValueError(msg)
+
+        section = parsed.get("nonebot")
+        if section is None:
+            return
+        if not isinstance(section, tomlkit.items.Table):  # type: ignore[attr-defined]
+            msg = "raw editor expects a [nonebot] table"
+            raise TypeError(msg)
+
     def read_project_plugin_section_toml(
         self,
         plugin_name: str,
@@ -286,6 +300,19 @@ class ProjectConfigService:
             self._set_plugin_module_mapping(document, {section_name: module_name})
         atomic_write_text(target, tomlkit.dumps(document))
         return target
+
+    def validate_project_plugin_section_toml(
+        self,
+        plugin_name: str,
+        text: str,
+    ) -> None:
+        """Validate raw TOML for a single `[plugins.<section>]` block."""
+        section_name = next(
+            iter(self._plugin_name_candidates(plugin_name)),
+            plugin_name,
+        )
+        parsed = self._parse_toml_text(text)
+        self._validate_plugin_section_toml(parsed, section_name)
 
     def write_project_plugin_section_config(
         self,

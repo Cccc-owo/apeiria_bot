@@ -8,7 +8,7 @@
         </v-btn>
         <v-btn
           color="primary"
-          :disabled="!dirty"
+          :disabled="!dirty || validationPending || !!validationErrorMessage"
           :loading="saving"
           size="small"
           @click="$emit('save')"
@@ -18,8 +18,8 @@
       </div>
     </div>
 
-    <v-alert v-if="errorMessage" density="comfortable" type="error" variant="tonal">
-      {{ errorMessage }}
+    <v-alert v-if="activeErrorMessage" density="comfortable" type="error" variant="tonal">
+      {{ activeErrorMessage }}
     </v-alert>
 
     <MonacoEditor
@@ -27,16 +27,25 @@
       :height="380"
       language="toml"
       :read-only="loading || saving"
+      :validation-column="validationErrorColumn"
+      :validation-line="validationErrorLine"
+      :validation-message="validationErrorMessage"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+  import { computed } from 'vue'
   import MonacoEditor from './MonacoEditor.vue'
 
   const model = defineModel<string>({ required: true })
 
-  defineProps<{
+  defineEmits<{
+    reload: []
+    save: []
+  }>()
+
+  const props = withDefaults(defineProps<{
     description: string
     dirty: boolean
     errorMessage: string
@@ -44,12 +53,18 @@
     reloadLabel: string
     saveLabel: string
     saving: boolean
-  }>()
+    validationErrorColumn?: number | null
+    validationErrorLine?: number | null
+    validationErrorMessage?: string
+    validationPending?: boolean
+  }>(), {
+    validationErrorColumn: null,
+    validationErrorLine: null,
+    validationErrorMessage: '',
+    validationPending: false,
+  })
 
-  defineEmits<{
-    reload: []
-    save: []
-  }>()
+  const activeErrorMessage = computed(() => props.validationErrorMessage || props.errorMessage)
 </script>
 
 <style scoped>

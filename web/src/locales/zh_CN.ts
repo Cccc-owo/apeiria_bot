@@ -268,6 +268,7 @@ const zhCN = {
     settingsRawLoadFailed: '加载高级配置失败',
     settingsSaveFailed: '保存插件配置失败',
     settingsRawSaveFailed: '保存高级配置失败',
+    settingsRawValidateFailed: '校验高级配置失败',
     settingsRawSaved: '高级配置已保存，重启后生效。',
     settingsRestartHint: '修改配置后需要重启，插件才会生效。',
     settingsLocalShort: '自定义',

@@ -342,6 +342,13 @@ class PluginSettingsRawUpdateRequest(BaseModel):
     text: str
 
 
+class PluginSettingsRawValidationResponse(BaseModel):
+    valid: bool
+    message: str | None = None
+    line: int | None = None
+    column: int | None = None
+
+
 class PluginConfigRequest(BaseModel):
     modules: list[str]
     dirs: list[str]

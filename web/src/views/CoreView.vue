@@ -28,19 +28,15 @@
                 <div class="settings-shell__headline">
                   <div class="text-subtitle-1 font-weight-medium">{{ t('core.coreTab') }}</div>
                 </div>
-                <div class="settings-shell__actions">
-                  <v-btn-toggle
-                    v-model="coreEditorMode"
-                    class="mode-switch"
-                    color="primary"
-                    density="comfortable"
-                    divided
-                    mandatory
-                    variant="outlined"
-                  >
-                    <v-btn value="basic">{{ t('plugins.settingsBasicTab') }}</v-btn>
-                    <v-btn value="advanced">{{ t('plugins.settingsAdvancedTab') }}</v-btn>
-                  </v-btn-toggle>
+              </div>
+
+              <SettingsModeBar
+                v-model="coreEditorMode"
+                :advanced-label="t('plugins.settingsAdvancedTab')"
+                :basic-label="t('plugins.settingsBasicTab')"
+                :tablist-label="t('core.coreTab')"
+              >
+                <template #actions>
                   <v-btn
                     v-if="coreEditorMode === 'basic'"
                     color="primary"
@@ -50,8 +46,8 @@
                   >
                     {{ t('plugins.settingsSave') }}
                   </v-btn>
-                </div>
-              </div>
+                </template>
+              </SettingsModeBar>
 
               <template v-if="coreEditorMode === 'basic'">
                 <v-alert v-if="coreErrorMessage" density="comfortable" type="error" variant="tonal">
@@ -158,6 +154,10 @@
                   :reload-label="t('common.refresh')"
                   :save-label="t('plugins.settingsSave')"
                   :saving="coreRawSaving"
+                  :validation-error-column="coreRawValidationColumn"
+                  :validation-error-line="coreRawValidationLine"
+                  :validation-error-message="coreRawValidationMessage"
+                  :validation-pending="coreRawValidationPending"
                   @reload="loadCoreRawSettings"
                   @save="openCoreRawPreview"
                 />
@@ -257,8 +257,10 @@
     type RawSettingsResponse,
     updateCoreSettings,
     updateCoreSettingsRaw,
+    validateCoreSettingsRaw,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
+  import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
   import { useNoticeStore } from '@/stores/notice'
   import { useRestartStore } from '@/stores/restart'
   import {
@@ -269,6 +271,7 @@
   } from '@/views/plugins/settingsEditor'
   import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
+  import SettingsModeBar from '@/views/plugins/SettingsModeBar.vue'
   import SettingsPreviewDialog from '@/views/plugins/SettingsPreviewDialog.vue'
   import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
 
@@ -336,6 +339,18 @@
       t('plugins.settingsInvalidJson'),
     ),
   )
+  const {
+    validateNow: validateCoreRawNow,
+    validationColumn: coreRawValidationColumn,
+    validationLine: coreRawValidationLine,
+    validationMessage: coreRawValidationMessage,
+    validationPending: coreRawValidationPending,
+  } = useRawTomlValidation({
+    text: coreRawText,
+    initialText: coreRawInitialText,
+    fallbackMessage: t('plugins.settingsRawValidateFailed'),
+    validate: async text => (await validateCoreSettingsRaw({ text })).data,
+  })
 
   function applyRouteFilters () {
     const sectionQuery = route.query.section
@@ -490,8 +505,9 @@
     }
   }
 
-  function openCoreRawPreview () {
+  async function openCoreRawPreview () {
     if (!hasPendingCoreRawChanges.value) return
+    if (!await validateCoreRawNow()) return
     previewMode.value = 'raw'
     previewAction.value = 'core-raw'
     previewDialogVisible.value = true
@@ -538,18 +554,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.settings-shell__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.mode-switch {
-  border-radius: 999px;
 }
 
 .settings-list-panel {
