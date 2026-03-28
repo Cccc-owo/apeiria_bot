@@ -10,7 +10,7 @@ from nonebot.plugin import PluginMetadata
 
 from apeiria.core.configs.models import PluginExtraData, PluginType, RegisterConfig
 
-from .config import get_render_config
+from .config import RenderConfig, get_render_config
 from .service import (
     RenderOptions,
     RenderService,
@@ -33,6 +33,9 @@ __plugin_meta__ = PluginMetadata(
         "以及 html_to_pic / template_to_pic / url_to_pic / markdown_to_pic "
         "兼容风格别名。"
     ),
+    type="library",
+    config=RenderConfig,
+    supported_adapters=None,
     extra=PluginExtraData(
         author="apeiria",
         version="0.1.0",
