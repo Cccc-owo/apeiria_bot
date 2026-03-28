@@ -55,8 +55,9 @@
     />
 
     <SettingsStructuredEditor
-      v-else-if="editing && field.editable && isNestedEditorField(field) && field.schema"
-      :model-value="modelValue"
+      v-else-if="isNestedEditorField(field) && field.schema"
+      :model-value="editing && field.editable ? modelValue : field.current_value"
+      :readonly="!editing || !field.editable"
       :schema="field.schema"
       @update:model-value="emit('update:modelValue', $event)"
     />
