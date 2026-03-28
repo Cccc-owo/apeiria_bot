@@ -304,6 +304,7 @@ def _normalize_store_item(
     )
     tags = _read_tags(item)
     extra = _read_extra(item)
+    publish_time = _read_publish_time(item)
 
     return StoreItem(
         source_id=source.source_id,
@@ -321,6 +322,7 @@ def _normalize_store_item(
         version=version,
         tags=tags,
         is_official=source.is_official,
+        publish_time=publish_time,
         extra=extra,
     )
 
@@ -348,6 +350,16 @@ def _read_tags(item: object) -> list[str]:
         if parsed:
             normalized.append(parsed)
     return normalized
+
+
+def _read_publish_time(item: object) -> str | None:
+    for attr in ("publish_time", "updated_at", "time"):
+        value = getattr(item, attr, None)
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _read_author_link(item: object) -> str | None:
