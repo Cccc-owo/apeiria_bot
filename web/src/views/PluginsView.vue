@@ -129,6 +129,16 @@
               </div>
               <div class="plugin-card__actions">
                 <v-btn
+                  v-if="canUninstallPlugin(item)"
+                  color="warning"
+                  :loading="uninstallingModule === item.module_name"
+                  size="small"
+                  variant="text"
+                  @click="uninstallPluginItem(item)"
+                >
+                  {{ t('plugins.settingsUninstall') }}
+                </v-btn>
+                <v-btn
                   color="primary"
                   :loading="settingsLoadingModule === item.module_name"
                   size="small"
@@ -295,6 +305,12 @@
               <span v-if="settingsPlugin" class="settings-dialog-header__summary text-caption text-medium-emphasis">
                 {{ pluginMetaSummary(settingsPlugin) || 'unknown' }}
               </span>
+              <span
+                v-if="settingsPlugin?.installed_package"
+                class="settings-dialog-header__summary text-caption text-medium-emphasis"
+              >
+                {{ t('plugins.settingsInstalledPackage') }}: {{ settingsPlugin.installed_package }}
+              </span>
             </div>
 
             <div
@@ -329,6 +345,15 @@
           </div>
 
           <div class="settings-dialog-header__actions">
+            <v-btn
+              v-if="canUninstallSettingsPlugin"
+              color="warning"
+              :loading="uninstallingModule === settingsPlugin?.module_name"
+              variant="tonal"
+              @click="uninstallCurrentPlugin"
+            >
+              {{ t('plugins.settingsUninstall') }}
+            </v-btn>
             <v-btn-toggle
               v-model="settingsEditorMode"
               class="mode-switch"
@@ -543,12 +568,14 @@
     type ModuleConfigItem,
     type PluginItem,
     type RawSettingsResponse,
+    uninstallPlugin,
     updatePlugin,
     updatePluginConfig,
     updatePluginSettings,
     updatePluginSettingsRaw,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
+  import { useAuthStore } from '@/stores/auth'
   import { useNoticeStore } from '@/stores/notice'
   import { useRestartStore } from '@/stores/restart'
   import {
@@ -588,6 +615,8 @@
   const toggleConfirmVisible = ref(false)
   const toggleConfirmLoading = ref(false)
   const toggleConfirmItem = ref<PluginItem | null>(null)
+  const uninstallingModule = ref('')
+  const authStore = useAuthStore()
   const noticeStore = useNoticeStore()
   const restartStore = useRestartStore()
   const { t } = useI18n()
@@ -650,6 +679,11 @@
     }
     return t('plugins.disableConfirmSummary', { count: 1 })
   })
+  const canUninstallSettingsPlugin = computed(() =>
+    authStore.role === 'owner'
+    && Boolean(settingsPlugin.value)
+    && !settingsPlugin.value?.is_protected,
+  )
 
   const systemPlugins = computed(() =>
     plugins.value.filter(item => item.source === 'framework'),
@@ -840,6 +874,44 @@
   async function saveSettings () {
     if (!settingsPlugin.value || !settingsState.value) return
     await pluginEditor.submit()
+  }
+
+  async function uninstallCurrentPlugin () {
+    if (!settingsPlugin.value) return
+    await uninstallPluginItem(settingsPlugin.value)
+  }
+
+  function canUninstallPlugin (item: PluginItem) {
+    return authStore.role === 'owner' && !item.is_protected
+  }
+
+  async function uninstallPluginItem (item: PluginItem) {
+    const pluginName = item.name || item.module_name
+    const confirmMessage = item.installed_package
+      ? t('plugins.settingsUninstallConfirm', {
+        name: pluginName,
+        package: item.installed_package,
+      })
+      : t('plugins.settingsUninstallConfirmFallback', {
+        name: pluginName,
+      })
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    uninstallingModule.value = item.module_name
+    try {
+      await uninstallPlugin(item.module_name)
+      noticeStore.show(t('plugins.settingsUninstallSucceeded'), 'success')
+      if (settingsPlugin.value?.module_name === item.module_name) {
+        settingsDialogVisible.value = false
+      }
+      await loadPluginManagement()
+    } catch (error) {
+      noticeStore.show(getErrorMessage(error, t('plugins.settingsUninstallFailed')), 'error')
+    } finally {
+      uninstallingModule.value = ''
+    }
   }
 
   function openPluginSettingsPreview () {

@@ -195,6 +195,8 @@ class PluginItem(BaseModel):
     version: str | None = None
     required_plugins: list[str] = []
     dependent_plugins: list[str] = []
+    installed_package: str | None = None
+    installed_module_names: list[str] = []
 
 
 class PluginStoreSourceItem(BaseModel):

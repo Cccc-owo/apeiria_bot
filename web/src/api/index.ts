@@ -186,6 +186,8 @@ export interface PluginItem {
   version: string | null
   required_plugins: string[]
   dependent_plugins: string[]
+  installed_package: string | null
+  installed_module_names: string[]
 }
 
 export interface PluginStoreSource {
@@ -513,6 +515,9 @@ export const updatePlugin = (moduleName: string, enabled: boolean) =>
   client.patch(`/plugins/${moduleName}`, null, {
     params: { enabled },
   })
+
+export const uninstallPlugin = (moduleName: string) =>
+  client.post<{ status: string; detail?: string | null }>(`/plugins/${encodeURIComponent(moduleName)}/uninstall`)
 
 export const getBans = () =>
   client.get<BanItem[]>('/permissions/bans')

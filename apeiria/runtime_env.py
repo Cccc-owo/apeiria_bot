@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Helpers for the managed extension runtime environment."""
 
+import json
+import logging
 import os
 import site
 import subprocess
@@ -11,11 +13,14 @@ from pathlib import Path
 from shutil import which
 from typing import Final
 
+from apeiria.core.utils.files import atomic_write_text
 from apeiria.package_ids import normalize_package_id
 
 _PLUGIN_PROJECT_RELATIVE_PATH: Final = Path(".apeiria") / "extensions"
 _PLUGIN_PROJECT_NAME: Final = "apeiria-user-plugins"
 _PYTHON_VERSION_FALLBACK: Final = ">=3.10, <4.0"
+_PENDING_PLUGIN_UNINSTALLS_FILE: Final = "pending_plugin_uninstalls.json"
+_logger = logging.getLogger("apeiria.runtime_env")
 
 
 def _project_root() -> Path:
@@ -49,6 +54,10 @@ def plugin_project_pyproject_path() -> Path:
 
 def plugin_project_lock_path() -> Path:
     return plugin_project_root() / "uv.lock"
+
+
+def plugin_pending_uninstalls_path() -> Path:
+    return plugin_project_root() / _PENDING_PLUGIN_UNINSTALLS_FILE
 
 
 def plugin_project_venv_path() -> Path:
@@ -162,6 +171,25 @@ def remove_plugin_requirement(
     _run_uv(["remove", target, *extra_args], cwd=root)
 
 
+def enqueue_plugin_requirement_removal(requirement: str) -> bool:
+    target = resolve_declared_plugin_requirement(requirement).strip()
+    if not target:
+        return False
+
+    normalized_target = normalize_package_id(target) or target
+    pending = _read_pending_plugin_uninstalls()
+    normalized_pending = {
+        normalize_package_id(item) or item
+        for item in pending
+    }
+    if normalized_target in normalized_pending:
+        return False
+
+    pending.append(target)
+    _write_pending_plugin_uninstalls(pending)
+    return True
+
+
 def declared_plugin_requirements() -> dict[str, str]:
     """Return normalized dependency names mapped to declared requirement strings."""
     pyproject_path = plugin_project_pyproject_path()
@@ -197,6 +225,36 @@ def resolve_declared_plugin_requirement(requirement: str) -> str:
     if not normalized:
         return requirement
     return declared_plugin_requirements().get(normalized, requirement)
+
+
+def process_pending_plugin_requirement_removals() -> list[str]:
+    pending = _read_pending_plugin_uninstalls()
+    if not pending:
+        return []
+
+    processed: list[str] = []
+    remaining: list[str] = []
+    for requirement in pending:
+        declared = resolve_declared_plugin_requirement(requirement).strip()
+        if not declared:
+            continue
+        normalized = normalize_package_id(declared)
+        if normalized not in declared_plugin_requirements():
+            continue
+        try:
+            remove_plugin_requirement(declared)
+        except RuntimeError as exc:
+            _logger.warning(
+                "deferred plugin uninstall failed for %s: %s",
+                declared,
+                exc,
+            )
+            remaining.append(requirement)
+            continue
+        processed.append(declared)
+
+    _write_pending_plugin_uninstalls(remaining)
+    return processed
 
 
 def plugin_site_packages_paths() -> list[Path]:
@@ -255,3 +313,39 @@ def _extend_loaded_package_path(module_name: str, package_dir: Path) -> None:
     normalized = str(package_dir)
     if normalized not in package_path:
         package_path.append(normalized)
+
+
+def _read_pending_plugin_uninstalls() -> list[str]:
+    path = plugin_pending_uninstalls_path()
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [
+        item.strip()
+        for item in payload
+        if isinstance(item, str) and item.strip()
+    ]
+
+
+def _write_pending_plugin_uninstalls(requirements: list[str]) -> None:
+    path = plugin_pending_uninstalls_path()
+    normalized = [
+        item.strip()
+        for item in requirements
+        if isinstance(item, str) and item.strip()
+    ]
+    if not normalized:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            return
+        return
+    atomic_write_text(
+        path,
+        json.dumps(normalized, ensure_ascii=True, indent=2) + "\n",
+    )

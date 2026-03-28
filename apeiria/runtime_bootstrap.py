@@ -8,7 +8,10 @@ import nonebot
 
 from apeiria.config import driver_config_service, project_config_service
 from apeiria.plugin_config_bootstrap import bootstrap_plugin_configs
-from apeiria.runtime_env import inject_plugin_site_packages
+from apeiria.runtime_env import (
+    inject_plugin_site_packages,
+    process_pending_plugin_requirement_removals,
+)
 from apeiria.runtime_framework import load_framework
 from apeiria.runtime_user import load_user_plugins, load_user_setup
 
@@ -40,11 +43,13 @@ def initialize_nonebot() -> None:
 
     The order matters:
     1. bootstrap plugin config metadata
-    2. expose extension environment site-packages
+    2. process deferred plugin package removals
+    3. expose extension environment site-packages
     3. initialize NoneBot with merged config
     4. load local user setup, framework plugins, then project plugins
     """
     bootstrap_plugin_configs()
+    process_pending_plugin_requirement_removals()
     inject_plugin_site_packages()
 
     config_kwargs = project_config_service.get_project_config_kwargs()
