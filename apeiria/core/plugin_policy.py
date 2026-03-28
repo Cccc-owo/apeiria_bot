@@ -3,14 +3,13 @@ from __future__ import annotations
 FRAMEWORK_PROTECTED_PLUGIN_MODULES = frozenset(
     {
         "apeiria.plugins.web_ui",
-        "nonebot_plugin_sentry",
+        "apeiria.plugins.render",
         "nonebot_plugin_apscheduler",
         "nonebot_plugin_localstore",
         "nonebot_plugin_orm",
         "nonebot_plugin_alconna",
         "nonebot_plugin_alconna.uniseg",
         "nonebot_plugin_waiter",
-        "nonebot_plugin_htmlkit",
     }
 )
 
