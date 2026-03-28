@@ -882,7 +882,9 @@
   }
 
   function canUninstallPlugin (item: PluginItem) {
-    return authStore.role === 'owner' && !item.is_protected
+    return authStore.role === 'owner'
+      && !item.is_protected
+      && (item.source === 'custom' || item.source === 'external')
   }
 
   async function uninstallPluginItem (item: PluginItem) {
