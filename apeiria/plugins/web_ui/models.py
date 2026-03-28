@@ -299,9 +299,11 @@ class PluginSettingFieldItem(BaseModel):
     editor: str = "readonly"
     item_type: str | None = None
     key_type: str | None = None
+    schema: object | None = None
     default: object | None
     help: str
     choices: list[object] = []
+    base_value: object | None = None
     current_value: object | None = None
     local_value: object | None = None
     value_source: str = "default"

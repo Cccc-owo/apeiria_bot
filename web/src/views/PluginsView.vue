@@ -430,7 +430,6 @@
                           v-if="field.has_local_override"
                           class="settings-action"
                           color="warning"
-                          :loading="settingsClearingKey === field.key"
                           size="small"
                           variant="text"
                           @click="clearPluginField(field)"
@@ -595,32 +594,14 @@
   const route = useRoute()
 
   const pluginEditor = useSettingsEditor({
-    save: values => updatePluginSettings(settingsPlugin.value!.module_name, { values }),
-    clear: key => updatePluginSettings(settingsPlugin.value!.module_name, { values: {}, clear: [key] }),
+    save: payload => updatePluginSettings(settingsPlugin.value!.module_name, payload),
     messages: {
-      clearSuccess: t('plugins.settingsCleared'),
       invalidJson: t('plugins.settingsInvalidJson'),
       loadFailed: t('plugins.settingsLoadFailed'),
       saveFailed: t('plugins.settingsSaveFailed'),
       saveSuccess: t('plugins.settingsSaved'),
     },
-    afterClear: field => {
-      if (!settingsPlugin.value) return
-      restartStore.markPending({
-        id: `plugin:field:${settingsPlugin.value.module_name}:${field.key}`,
-        scope: 'plugins',
-        summary: t('restart.pendingPluginField', {
-          name: settingsPlugin.value.name || settingsPlugin.value.module_name,
-          key: field.key,
-        }),
-        undo: {
-          kind: 'plugin-settings',
-          moduleName: settingsPlugin.value.module_name,
-          values: { [field.key]: field.local_value },
-        },
-      })
-    },
-    afterSave: ({ previousState, values }) => {
+    afterSave: ({ previousState, values, clear }) => {
       if (!settingsPlugin.value) return
       restartStore.markPending({
         id: `plugin:settings:${settingsPlugin.value.module_name}`,
@@ -631,7 +612,7 @@
         undo: {
           kind: 'plugin-settings',
           moduleName: settingsPlugin.value.module_name,
-          values: buildRevertValues(previousState.fields, values),
+          values: buildRevertValues(previousState.fields, values, clear),
         },
       })
     },
@@ -639,7 +620,6 @@
 
   const settingsDialogLoading = pluginEditor.loading
   const settingsSaving = pluginEditor.saving
-  const settingsClearingKey = pluginEditor.clearingKey
   const settingsErrorMessage = pluginEditor.errorMessage
   const settingsState = pluginEditor.state
   const settingsFields = pluginEditor.fields
@@ -657,6 +637,7 @@
       settingsFields.value,
       settingsForm.value,
       pluginEditor.draftOverrides.value,
+      pluginEditor.draftClears.value,
       t('plugins.settingsInvalidJson'),
     ),
   )
@@ -871,8 +852,7 @@
   }
 
   async function clearPluginField (field: PluginSettingField) {
-    if (!settingsPlugin.value) return
-    await pluginEditor.clearField(field)
+    pluginEditor.clearField(field)
   }
 
   async function savePluginRawSettings () {

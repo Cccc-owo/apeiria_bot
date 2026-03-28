@@ -19,9 +19,7 @@ class WebUIConfig(BaseModel):
 
 def _validate_config(model: type[ModelT], data: dict[str, object]) -> ModelT:
     """Validate plugin config data against a Pydantic model."""
-    if hasattr(model, "model_validate"):
-        return model.model_validate(data)
-    return model.parse_obj(data)
+    return model.model_validate(data)
 
 
 def get_web_ui_config() -> WebUIConfig:

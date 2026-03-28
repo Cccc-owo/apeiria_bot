@@ -61,77 +61,90 @@
                 <v-progress-linear v-if="coreLoading" color="primary" indeterminate />
 
                 <div v-else class="settings-list-panel">
-                  <div
+                  <section
                     v-for="field in coreFields"
                     :key="field.key"
                     class="settings-list-row"
                   >
                     <div class="settings-list-row__main">
-                      <div>
-                        <div class="font-weight-medium">{{ field.key }}</div>
-                        <div v-if="field.help" class="text-caption text-medium-emphasis">
+                      <div class="settings-list-row__info">
+                        <div class="settings-list-row__label text-subtitle-2 font-weight-medium">
+                          {{ field.key }}
+                        </div>
+                        <div v-if="field.help" class="settings-list-row__description text-caption text-medium-emphasis">
                           {{ field.help }}
                         </div>
+                        <div class="settings-list-row__status">
+                          <v-chip
+                            v-if="field.has_local_override || coreEditor.isFieldEditing(field)"
+                            color="primary"
+                            size="x-small"
+                            variant="tonal"
+                          >
+                            {{ t('plugins.settingsLocalShort') }}
+                          </v-chip>
+                          <v-chip
+                            v-if="!field.editable"
+                            color="warning"
+                            size="x-small"
+                            variant="tonal"
+                          >
+                            {{ t('plugins.settingsReadonly') }}
+                          </v-chip>
+                        </div>
+                        <div class="settings-list-row__meta text-caption text-medium-emphasis">
+                          <span>{{ t('plugins.settingsType') }}: {{ field.type }}</span>
+                          <span>{{ t('plugins.settingsValueSource') }}: {{ settingsValueSourceLabel(field.value_source) }}</span>
+                          <span v-if="field.global_key">{{ t('plugins.settingsGlobalKey') }}: {{ field.global_key }}</span>
+                          <span v-if="field.choices.length > 0">{{ t('plugins.settingsChoices') }}: {{ formatFieldChoices(field.choices) }}</span>
+                          <span>{{ t('plugins.settingsCurrent') }}: {{ displayFieldValue(field.current_value) }}</span>
+                          <span v-if="field.has_local_override">{{ t('plugins.settingsLocal') }}: {{ displayFieldValue(field.local_value) }}</span>
+                        </div>
                       </div>
-                      <div class="settings-list-row__chips">
-                        <v-chip size="x-small" variant="tonal">{{ field.type }}</v-chip>
-                        <v-chip color="secondary" size="x-small" variant="tonal">{{ field.editor }}</v-chip>
-                        <v-chip :color="field.editable ? 'default' : 'warning'" size="x-small" variant="tonal">
-                          {{ settingsValueSourceLabel(field.value_source) }}
-                        </v-chip>
-                        <v-chip v-if="field.choices.length > 0" color="secondary" size="x-small" variant="tonal">
-                          {{ field.choices.join(', ') }}
-                        </v-chip>
+
+                      <div class="settings-list-row__control">
+                        <div class="settings-list-row__actions">
+                          <v-btn
+                            v-if="!coreEditor.isFieldEditing(field) && field.editable"
+                            class="settings-action settings-action--primary"
+                            color="primary"
+                            size="small"
+                            variant="tonal"
+                            @click="coreEditor.startOverride(field)"
+                          >
+                            {{ t('plugins.settingsAddOverride') }}
+                          </v-btn>
+                          <v-btn
+                            v-if="coreEditor.isFieldEditing(field)"
+                            class="settings-action"
+                            size="small"
+                            variant="text"
+                            @click="coreEditor.cancelField(field)"
+                          >
+                            {{ t('common.cancel') }}
+                          </v-btn>
+                          <v-btn
+                            v-if="field.has_local_override"
+                            class="settings-action"
+                            color="warning"
+                            size="small"
+                            variant="text"
+                            @click="clearCoreField(field)"
+                          >
+                            {{ t('plugins.settingsClear') }}
+                          </v-btn>
+                        </div>
+
+                        <SettingsFieldEditor
+                          v-model="coreForm[field.key]"
+                          :array-hint="t('plugins.settingsArrayHint')"
+                          :editing="coreEditor.isFieldEditing(field)"
+                          :field="field"
+                          :json-hint="t('plugins.settingsJsonHint')"
+                        />
                       </div>
                     </div>
-
-                    <div class="settings-list-row__actions">
-                      <v-btn
-                        v-if="!coreEditor.isFieldEditing(field) && field.editable"
-                        class="settings-action settings-action--primary"
-                        color="primary"
-                        size="small"
-                        variant="tonal"
-                        @click="coreEditor.startOverride(field)"
-                      >
-                        {{ t('plugins.settingsAddOverride') }}
-                      </v-btn>
-                      <v-btn
-                        v-if="coreEditor.isFieldEditing(field)"
-                        class="settings-action"
-                        size="small"
-                        variant="text"
-                        @click="coreEditor.cancelField(field)"
-                      >
-                        {{ t('common.cancel') }}
-                      </v-btn>
-                      <v-btn
-                        v-if="field.has_local_override"
-                        class="settings-action"
-                        color="warning"
-                        :loading="coreClearingKey === field.key"
-                        size="small"
-                        variant="text"
-                        @click="clearCoreField(field)"
-                      >
-                        {{ t('plugins.settingsClear') }}
-                      </v-btn>
-                    </div>
-
-                    <SettingsFieldEditor
-                      v-model="coreForm[field.key]"
-                      :array-hint="t('plugins.settingsArrayHint')"
-                      :editing="coreEditor.isFieldEditing(field)"
-                      :field="field"
-                      :json-hint="t('plugins.settingsJsonHint')"
-                    />
-
-                    <div class="settings-list-row__meta text-caption text-medium-emphasis">
-                      <span>{{ t('plugins.settingsCurrent') }}: {{ displayFieldValue(field.current_value) }}</span>
-                      <span v-if="field.has_local_override">{{ t('plugins.settingsLocal') }}: {{ displayFieldValue(field.local_value) }}</span>
-                      <span v-if="field.global_key">{{ field.global_key }}</span>
-                    </div>
-                  </div>
+                  </section>
                 </div>
               </template>
 
@@ -280,34 +293,21 @@
 
   const coreEditor = useSettingsEditor({
     load: getCoreSettings,
-    save: values => updateCoreSettings({ values }),
-    clear: key => updateCoreSettings({ values: {}, clear: [key] }),
+    save: payload => updateCoreSettings(payload),
     messages: {
-      clearSuccess: t('plugins.settingsCleared'),
       invalidJson: t('plugins.settingsInvalidJson'),
       loadFailed: t('plugins.settingsLoadFailed'),
       saveFailed: t('plugins.settingsSaveFailed'),
       saveSuccess: t('plugins.settingsSaved'),
     },
-    afterClear: field => {
-      restartStore.markPending({
-        id: `core:field:${field.key}`,
-        scope: 'core',
-        summary: t('restart.pendingCoreField', { key: field.key }),
-        undo: {
-          kind: 'core-settings',
-          values: { [field.key]: field.local_value },
-        },
-      })
-    },
-    afterSave: ({ previousState, values }) => {
+    afterSave: ({ previousState, values, clear }) => {
       restartStore.markPending({
         id: 'core:settings',
         scope: 'core',
         summary: t('restart.pendingCoreSettings'),
         undo: {
           kind: 'core-settings',
-          values: buildRevertValues(previousState.fields, values),
+          values: buildRevertValues(previousState.fields, values, clear),
         },
       })
     },
@@ -315,7 +315,6 @@
 
   const coreLoading = coreEditor.loading
   const coreSaving = coreEditor.saving
-  const coreClearingKey = coreEditor.clearingKey
   const coreErrorMessage = coreEditor.errorMessage
   const coreSettings = coreEditor.state
   const coreFields = coreEditor.fields
@@ -333,6 +332,7 @@
       coreFields.value,
       coreForm.value,
       coreEditor.draftOverrides.value,
+      coreEditor.draftClears.value,
       t('plugins.settingsInvalidJson'),
     ),
   )
@@ -358,6 +358,18 @@
       env: t('plugins.settingsValueSourceEnv'),
     }
     return map[source] || source
+  }
+
+  function formatFieldChoices (choices: unknown[]) {
+    const normalized = choices
+      .map(choice => displayFieldValue(choice))
+      .filter(Boolean)
+
+    if (normalized.length <= 4) {
+      return normalized.join(' / ')
+    }
+
+    return `${normalized.slice(0, 4).join(' / ')} +${normalized.length - 4}`
   }
 
   function applyCoreRawState (nextState: RawSettingsResponse) {
@@ -432,7 +444,7 @@
   }
 
   async function clearCoreField (field: PluginSettingField) {
-    await coreEditor.clearField(field)
+    coreEditor.clearField(field)
   }
 
   async function saveCoreSettings () {
@@ -550,11 +562,11 @@
 }
 
 .settings-list-row {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background:
+    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.98)),
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.02), rgba(var(--v-theme-secondary), 0.02));
 }
 
 .settings-list-row:last-child {
@@ -563,9 +575,44 @@
 
 .settings-list-row__main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
-  gap: 16px;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-list-row__info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-list-row__label {
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.settings-list-row__description {
+  line-height: 1.45;
+}
+
+.settings-list-row__status {
+  display: flex;
   align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+
+.settings-list-row__control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(var(--v-theme-on-surface), 0.025);
+  border: 1px solid rgba(var(--v-border-color), 0.65);
 }
 
 .settings-list-row__actions {
@@ -587,8 +634,18 @@
 .settings-list-row__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 6px 12px;
   line-height: 1.35;
+  word-break: break-word;
+}
+
+.settings-list-row__control :deep(.settings-field-editor) {
+  width: 100%;
+}
+
+.settings-list-row__control :deep(.v-field),
+.settings-list-row__control :deep(.v-selection-control) {
+  width: 100%;
 }
 
 .config-chip-row {

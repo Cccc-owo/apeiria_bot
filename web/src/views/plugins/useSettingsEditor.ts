@@ -4,17 +4,17 @@ import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
 
 import {
-  buildChangedValues,
+  buildClearedFieldValue,
   buildFieldFormValue,
   buildOverrideInitialValue,
   buildSettingsForm,
+  buildSettingsUpdate,
   hasPendingChanges,
   type PluginSettingField,
   type PluginSettingsState,
 } from './settingsEditor'
 
 interface SettingsEditorMessages {
-  clearSuccess: string
   invalidJson: string
   loadFailed: string
   saveFailed: string
@@ -26,32 +26,35 @@ interface SettingsEditorResponse {
 }
 
 interface UseSettingsEditorOptions {
-  afterClear?: (field: PluginSettingField) => void
   afterSave?: (context: {
     previousState: PluginSettingsState
     values: Record<string, unknown>
+    clear: string[]
   }) => void
-  clear: (key: string) => Promise<SettingsEditorResponse>
   load?: () => Promise<SettingsEditorResponse>
   messages: SettingsEditorMessages
-  save: (values: Record<string, unknown>) => Promise<SettingsEditorResponse>
+  save: (payload: {
+    values: Record<string, unknown>
+    clear: string[]
+  }) => Promise<SettingsEditorResponse>
 }
 
 export function useSettingsEditor (options: UseSettingsEditorOptions) {
   const noticeStore = useNoticeStore()
   const loading = ref(false)
   const saving = ref(false)
-  const clearingKey = ref('')
   const errorMessage = ref('')
   const state = ref<PluginSettingsState | null>(null)
   const form = ref<Record<string, unknown>>({})
   const draftOverrides = ref<Record<string, boolean>>({})
+  const draftClears = ref<Record<string, boolean>>({})
 
   const fields = computed(() => state.value?.fields ?? [])
   const hasPendingChangesState = computed(() =>
     hasPendingChanges(
       fields.value.filter(field => isFieldEditing(field)),
       form.value,
+      draftClears.value,
       options.messages.invalidJson,
     ),
   )
@@ -60,6 +63,7 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     state.value = nextState
     form.value = buildSettingsForm(nextState.fields)
     draftOverrides.value = {}
+    draftClears.value = {}
   }
 
   function reset () {
@@ -67,13 +71,21 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     state.value = null
     form.value = {}
     draftOverrides.value = {}
+    draftClears.value = {}
   }
 
   function isFieldEditing (field: PluginSettingField) {
-    return field.has_local_override || Boolean(draftOverrides.value[field.key])
+    return (
+      field.has_local_override
+      || Boolean(draftOverrides.value[field.key])
+      || Boolean(draftClears.value[field.key])
+    )
   }
 
   function startOverride (field: PluginSettingField) {
+    const nextDraftClears = { ...draftClears.value }
+    delete nextDraftClears[field.key]
+    draftClears.value = nextDraftClears
     draftOverrides.value = {
       ...draftOverrides.value,
       [field.key]: true,
@@ -97,9 +109,14 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
 
   async function submit () {
     const editingFields = fields.value.filter(field => isFieldEditing(field))
-    let values: Record<string, unknown> = {}
+    let payload = { values: {} as Record<string, unknown>, clear: [] as string[] }
     try {
-      values = buildChangedValues(editingFields, form.value, options.messages.invalidJson)
+      payload = buildSettingsUpdate(
+        editingFields,
+        form.value,
+        draftClears.value,
+        options.messages.invalidJson,
+      )
     } catch (error) {
       const message = getErrorMessage(error, options.messages.invalidJson)
       errorMessage.value = message
@@ -107,16 +124,20 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
       return
     }
 
-    if (Object.keys(values).length === 0) return
+    if (Object.keys(payload.values).length === 0 && payload.clear.length === 0) return
 
     saving.value = true
     errorMessage.value = ''
     try {
-      const response = await options.save(values)
+      const response = await options.save(payload)
       const previousState = state.value
       applyState(response.data)
       if (previousState) {
-        options.afterSave?.({ previousState, values })
+        options.afterSave?.({
+          previousState,
+          values: payload.values,
+          clear: payload.clear,
+        })
       }
       noticeStore.show(options.messages.saveSuccess, 'success')
       return true
@@ -130,29 +151,25 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     }
   }
 
-  async function clearField (field: PluginSettingField) {
-    clearingKey.value = field.key
-    errorMessage.value = ''
-    try {
-      const response = await options.clear(field.key)
-      applyState(response.data)
-      options.afterClear?.(field)
-      noticeStore.show(options.messages.clearSuccess, 'success')
-      return true
-    } catch (error) {
-      const message = getErrorMessage(error, options.messages.saveFailed)
-      errorMessage.value = message
-      noticeStore.show(message, 'error')
-      return false
-    } finally {
-      clearingKey.value = ''
+  function clearField (field: PluginSettingField) {
+    const nextDraftOverrides = { ...draftOverrides.value }
+    delete nextDraftOverrides[field.key]
+    draftOverrides.value = nextDraftOverrides
+    draftClears.value = {
+      ...draftClears.value,
+      [field.key]: true,
     }
+    form.value[field.key] = buildClearedFieldValue(field)
+    errorMessage.value = ''
   }
 
   function cancelField (field: PluginSettingField) {
     const nextDraftOverrides = { ...draftOverrides.value }
     delete nextDraftOverrides[field.key]
     draftOverrides.value = nextDraftOverrides
+    const nextDraftClears = { ...draftClears.value }
+    delete nextDraftClears[field.key]
+    draftClears.value = nextDraftClears
     form.value[field.key] = buildFieldFormValue(field)
     errorMessage.value = ''
   }
@@ -161,7 +178,7 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
     applyState,
     cancelField,
     clearField,
-    clearingKey,
+    draftClears,
     draftOverrides,
     errorMessage,
     fields,

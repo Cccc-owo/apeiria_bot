@@ -54,6 +54,13 @@
       @update:model-value="emit('update:modelValue', $event)"
     />
 
+    <SettingsStructuredEditor
+      v-else-if="editing && field.editable && isNestedEditorField(field) && field.schema"
+      :model-value="modelValue"
+      :schema="field.schema"
+      @update:model-value="emit('update:modelValue', $event)"
+    />
+
     <v-textarea
       v-else-if="editing && field.editable && field.editor === 'json_array'"
       auto-grow
@@ -103,12 +110,14 @@
 <script setup lang="ts">
   import {
     displayFieldValue,
+    isNestedEditorField,
     isNullableBoolField,
     isSequenceChipField,
     isTextInputField,
     type PluginSettingField,
     textInputType,
   } from './settingsEditor'
+  import SettingsStructuredEditor from './SettingsStructuredEditor.vue'
 
   withDefaults(defineProps<{
     arrayHint: string

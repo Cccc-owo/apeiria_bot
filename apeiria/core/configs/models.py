@@ -29,6 +29,10 @@ class RegisterConfig:
     item_type: object | None = None
     key_type: object | None = None
     allows_null: bool = False
+    fields: list["RegisterConfig"] = field(default_factory=list)
+    item_schema: "RegisterConfig | None" = None
+    key_schema: "RegisterConfig | None" = None
+    value_schema: "RegisterConfig | None" = None
 
 
 @dataclass
@@ -69,7 +73,8 @@ class PluginExtraData:
 
             configs_raw = extra.get("configs", [])
             configs = [
-                RegisterConfig(**c) if isinstance(c, dict) else c for c in configs_raw
+                _coerce_register_config(c) if isinstance(c, dict) else c
+                for c in configs_raw
             ]
 
             return cls(
@@ -83,3 +88,40 @@ class PluginExtraData:
             )
         except (ValueError, TypeError, KeyError):
             return None
+
+
+def _coerce_register_config(raw: dict[str, Any]) -> RegisterConfig:
+    fields = [
+        _coerce_register_config(item)
+        for item in raw.get("fields", [])
+        if isinstance(item, dict)
+    ]
+    item_schema = raw.get("item_schema")
+    key_schema = raw.get("key_schema")
+    value_schema = raw.get("value_schema")
+    return RegisterConfig(
+        key=str(raw.get("key", "")),
+        default=raw.get("default"),
+        help=str(raw.get("help", "")),
+        type=raw.get("type", str),
+        choices=list(raw.get("choices", [])),
+        item_type=raw.get("item_type"),
+        key_type=raw.get("key_type"),
+        allows_null=bool(raw.get("allows_null", False)),
+        fields=fields,
+        item_schema=(
+            _coerce_register_config(item_schema)
+            if isinstance(item_schema, dict)
+            else None
+        ),
+        key_schema=(
+            _coerce_register_config(key_schema)
+            if isinstance(key_schema, dict)
+            else None
+        ),
+        value_schema=(
+            _coerce_register_config(value_schema)
+            if isinstance(value_schema, dict)
+            else None
+        ),
+    )

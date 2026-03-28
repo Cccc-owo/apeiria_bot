@@ -47,9 +47,7 @@ class HelpConfig(BaseModel):
 
 
 def _validate_config(model: type[ModelT], data: dict[str, object]) -> ModelT:
-    if hasattr(model, "model_validate"):
-        return model.model_validate(data)
-    return model.parse_obj(data)
+    return model.model_validate(data)
 
 
 def get_help_config() -> HelpConfig:

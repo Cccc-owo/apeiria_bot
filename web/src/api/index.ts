@@ -37,9 +37,11 @@ export interface SettingsFieldItem {
   editor: string
   item_type: string | null
   key_type: string | null
+  schema: SettingsFieldSchemaItem | null
   default: unknown
   help: string
   choices: unknown[]
+  base_value: unknown
   current_value: unknown
   local_value: unknown
   value_source: string
@@ -48,6 +50,25 @@ export interface SettingsFieldItem {
   allows_null: boolean
   editable: boolean
   type_category: string
+}
+
+export interface SettingsFieldSchemaFieldItem {
+  key: string
+  help: string
+  default: unknown
+  schema: SettingsFieldSchemaItem
+}
+
+export interface SettingsFieldSchemaItem {
+  type: string
+  item_type: string | null
+  key_type: string | null
+  choices: unknown[]
+  allows_null: boolean
+  fields: SettingsFieldSchemaFieldItem[]
+  item_schema: SettingsFieldSchemaFieldItem | null
+  key_schema: SettingsFieldSchemaFieldItem | null
+  value_schema: SettingsFieldSchemaFieldItem | null
 }
 
 export interface SettingsResponse {
