@@ -24,6 +24,7 @@ from apeiria.cli_support import (
     uninstall_resource_requirement,
     update_resource_requirement,
 )
+from apeiria.runtime_bootstrap import initialize_nonebot
 from apeiria.runtime_env import ensure_plugin_project
 
 
@@ -329,6 +330,59 @@ def plugin_remove(
     module_name: str | None,
 ) -> None:
     plugin_uninstall.callback(package_name, pip_args, module_name)
+
+
+@plugin.command(
+    "diagnose",
+    help=_("Show plugin registration diagnostics."),
+)
+def plugin_diagnose() -> None:
+    try:
+        initialize_nonebot()
+    except Exception as exc:
+        raise click.ClickException(
+            _("plugin diagnose failed: {error}").format(error=str(exc))
+        ) from exc
+
+    from apeiria.domains.plugins.registration_service import (
+        plugin_registration_config_service,
+    )
+
+    state = plugin_registration_config_service.get_plugin_config()
+    module_items = state.modules
+    dir_items = state.dirs
+
+    click.echo(_("registered plugin diagnostics:"))
+    if not module_items:
+        click.echo(_("no registered plugin modules"))
+    else:
+        for item in module_items:
+            loaded = _("loaded") if item.is_loaded else _("not loaded")
+            importable = _("importable") if item.is_importable else _("not importable")
+            click.echo(f"  - {item.name} ({loaded}, {importable})")
+
+    if dir_items:
+        click.echo(_("registered plugin dirs:"))
+        for item in dir_items:
+            exists = _("exists") if item.exists else _("missing")
+            loaded = _("loaded") if item.is_loaded else _("not loaded")
+            click.echo(f"  - {item.path} ({exists}, {loaded})")
+
+    not_importable_modules = [item for item in module_items if not item.is_importable]
+    not_loaded_modules = [item for item in module_items if not item.is_loaded]
+    missing_dirs = [item for item in dir_items if not item.exists]
+    not_loaded_dirs = [item for item in dir_items if item.exists and not item.is_loaded]
+
+    click.echo()
+    click.echo(_("plugin diagnose summary:"))
+    click.echo(_("module total: {count}").format(count=len(module_items)))
+    click.echo(
+        _("module not importable: {count}").format(count=len(not_importable_modules))
+    )
+    click.echo(_("module not loaded: {count}").format(count=len(not_loaded_modules)))
+    click.echo(_("dir total: {count}").format(count=len(dir_items)))
+    click.echo(_("dir missing: {count}").format(count=len(missing_dirs)))
+    click.echo(_("dir not loaded: {count}").format(count=len(not_loaded_dirs)))
 
 
 @plugin.command(
