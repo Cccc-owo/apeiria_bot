@@ -140,7 +140,12 @@
 
   onMounted(async () => {
     if (!container.value) return
-    const monacoModule = (await import('monaco-editor/esm/vs/editor/editor.api.js')) as unknown as MonacoModule
+    const [monacoApiModule] = await Promise.all([
+      import('monaco-editor/esm/vs/editor/editor.api.js'),
+      import('monaco-editor/esm/vs/editor/contrib/contextmenu/browser/contextmenu.js'),
+      import('monaco-editor/esm/vs/editor/contrib/clipboard/browser/clipboard.js'),
+    ])
+    const monacoModule = monacoApiModule as unknown as MonacoModule
     monacoModuleRef = monacoModule
     if (props.language === 'toml') {
       ensureTomlLanguage(monacoModule)
@@ -148,10 +153,16 @@
     monacoModule.editor.setTheme(currentTheme())
     const instance = monacoModule.editor.create(container.value, {
       automaticLayout: true,
+      contextmenu: true,
       language: props.language,
       minimap: { enabled: false },
       readOnly: props.readOnly,
       scrollBeyondLastLine: false,
+      scrollbar: {
+        alwaysConsumeMouseWheel: false,
+        horizontal: 'auto',
+        vertical: 'auto',
+      },
       value: props.modelValue,
       wordWrap: 'on',
     })
@@ -222,6 +233,7 @@
 
 <style scoped>
 .monaco-editor-host {
+  height: 100%;
   min-height: 240px;
   border-radius: 14px;
   overflow: hidden;
