@@ -37,6 +37,7 @@ class PluginCatalogItem:
     module_name: str
     name: str
     description: str | None
+    homepage: str | None
     source: str
     is_global_enabled: bool
     is_protected: bool
@@ -76,6 +77,7 @@ class PluginCatalogService:
                     module_name=plugin.module_name,
                     name=get_plugin_name(plugin),
                     description=meta.description if meta else None,
+                    homepage=meta.homepage if meta else None,
                     source=get_plugin_source(plugin),
                     is_global_enabled=enabled_map.get(plugin.module_name, True),
                     is_protected=protected_reason is not None,

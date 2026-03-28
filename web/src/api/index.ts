@@ -183,6 +183,7 @@ export interface PluginItem {
   module_name: string
   name: string | null
   description: string | null
+  homepage: string | null
   source: string
   is_global_enabled: boolean
   is_protected: boolean

@@ -185,6 +185,7 @@ class PluginItem(BaseModel):
     module_name: str
     name: str | None
     description: str | None
+    homepage: str | None = None
     source: str
     is_global_enabled: bool
     is_protected: bool = False
