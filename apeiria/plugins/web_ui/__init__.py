@@ -1,10 +1,16 @@
 """Web UI plugin — management dashboard API + static file serving."""
 from pathlib import Path
 
+from nonebot import require
 from nonebot.plugin import PluginMetadata
 
 from apeiria.core.configs.models import PluginExtraData, PluginType, RegisterConfig
 from apeiria.core.i18n import load_locales, t
+
+from .config import WebUIConfig
+
+require("nonebot_plugin_localstore")
+require("nonebot_plugin_orm")
 
 load_locales(Path(__file__).parent / "locales")
 
@@ -12,6 +18,9 @@ __plugin_meta__ = PluginMetadata(
     name="Web管理面板",
     description="Web UI 管理面板 API",
     usage="访问 http://host:port/ 打开管理面板",
+    type="application",
+    config=WebUIConfig,
+    supported_adapters=None,
     extra=PluginExtraData(
         author="apeiria",
         version="0.1.0",

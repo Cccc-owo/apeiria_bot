@@ -2,10 +2,14 @@
 
 from pathlib import Path
 
-from nonebot.plugin import PluginMetadata
+from nonebot import require
+from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
 from apeiria.core.configs.models import PluginExtraData, PluginType
 from apeiria.core.i18n import load_locales
+
+require("nonebot_plugin_alconna")
+require("nonebot_plugin_orm")
 
 # Register plugin locales
 load_locales(Path(__file__).parent / "locales")
@@ -27,6 +31,8 @@ __plugin_meta__ = PluginMetadata(
         "/banlist - 查看封禁列表\n"
         "/pluginlist - 查看插件状态"
     ),
+    type="application",
+    supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
     extra=PluginExtraData(
         author="apeiria",
         version="0.1.0",
