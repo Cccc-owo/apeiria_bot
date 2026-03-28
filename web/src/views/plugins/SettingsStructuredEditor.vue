@@ -3,6 +3,7 @@
     <v-select
       v-if="schema.choices.length > 0"
       density="comfortable"
+      :disabled="readonly"
       hide-details
       item-title="title"
       item-value="value"
@@ -15,6 +16,7 @@
     <v-select
       v-else-if="isNullableBoolSchema(schema)"
       density="comfortable"
+      :disabled="readonly"
       hide-details
       item-title="title"
       item-value="value"
@@ -27,6 +29,7 @@
     <v-switch
       v-else-if="schema.type === 'bool'"
       color="primary"
+      :disabled="readonly"
       hide-details
       inset
       :model-value="Boolean(modelValue)"
@@ -38,6 +41,7 @@
       density="comfortable"
       hide-details
       :model-value="modelValue"
+      :readonly="readonly"
       :type="schema.type === 'int' || schema.type === 'float' ? 'number' : 'text'"
       variant="outlined"
       @update:model-value="emit('update:modelValue', $event)"
@@ -57,6 +61,7 @@
         </div>
         <SettingsStructuredEditor
           :model-value="objectValue[field.key]"
+          :readonly="readonly"
           :schema="field.schema"
           @update:model-value="updateObjectField(field.key, $event)"
         />
@@ -72,6 +77,7 @@
         <div class="structured-list__item-toolbar">
           <span class="text-caption text-medium-emphasis">#{{ index + 1 }}</span>
           <v-btn
+            v-if="!readonly"
             color="warning"
             icon="mdi-delete-outline"
             size="x-small"
@@ -82,11 +88,13 @@
         <SettingsStructuredEditor
           v-if="itemSchema"
           :model-value="item"
+          :readonly="readonly"
           :schema="itemSchema.schema"
           @update:model-value="updateSequenceItem(index, $event)"
         />
       </div>
       <v-btn
+        v-if="!readonly"
         block
         color="primary"
         prepend-icon="mdi-plus"
@@ -108,6 +116,7 @@
           density="comfortable"
           hide-details
           :model-value="entry.key"
+          :readonly="readonly"
           variant="outlined"
           @update:model-value="updateMappingKey(index, String($event ?? ''))"
         />
@@ -115,10 +124,12 @@
           v-if="valueSchema"
           class="structured-map__value"
           :model-value="entry.value"
+          :readonly="readonly"
           :schema="valueSchema.schema"
           @update:model-value="updateMappingValue(index, $event)"
         />
         <v-btn
+          v-if="!readonly"
           color="warning"
           icon="mdi-delete-outline"
           size="small"
@@ -127,6 +138,7 @@
         />
       </div>
       <v-btn
+        v-if="!readonly"
         block
         color="primary"
         prepend-icon="mdi-plus"
@@ -165,10 +177,13 @@
     name: 'SettingsStructuredEditor',
   })
 
-  const props = defineProps<{
+  const props = withDefaults(defineProps<{
     modelValue: unknown
+    readonly?: boolean
     schema: PluginSettingSchema
-  }>()
+  }>(), {
+    readonly: false,
+  })
   const { t } = useI18n()
 
   const emit = defineEmits<{
