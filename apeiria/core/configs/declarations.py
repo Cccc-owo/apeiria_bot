@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
+
+from pydantic import BaseModel
 
 from .models import RegisterConfig
 
@@ -31,6 +33,18 @@ class FieldDeclaration:
     item_type: object | None = None
     key_type: object | None = None
     allows_null: bool = False
+    fields: list["NestedFieldDeclaration"] = field(default_factory=list)
+    item_declaration: "FieldDeclaration | None" = None
+    key_declaration: "FieldDeclaration | None" = None
+    value_declaration: "FieldDeclaration | None" = None
+
+
+@dataclass(frozen=True)
+class NestedFieldDeclaration:
+    key: str
+    default: Any
+    help: str
+    declaration: FieldDeclaration
 
 
 def register_config_from_runtime_annotation(
@@ -41,55 +55,62 @@ def register_config_from_runtime_annotation(
     help_text: str,
 ) -> RegisterConfig:
     declaration = declaration_from_runtime_annotation(annotation, default)
-    return RegisterConfig(
+    return _register_config_from_declaration(
         key=key,
         default=default,
-        help=help_text,
-        type=declaration.type,
-        choices=list(declaration.choices),
-        item_type=declaration.item_type,
-        key_type=declaration.key_type,
-        allows_null=declaration.allows_null,
+        help_text=help_text,
+        declaration=declaration,
     )
 
 
 def declaration_from_runtime_annotation(
     annotation: object,
     default: Any,
+    _seen_models: set[type[BaseModel]] | None = None,
 ) -> FieldDeclaration:
+    seen_models = _seen_models or set()
     normalized_annotation, allows_null = _unwrap_runtime_optional(annotation)
     origin = get_origin(normalized_annotation)
     args = get_args(normalized_annotation)
 
     if origin in {list, set}:
-        item_type = (
-            _normalize_runtime_scalar_annotation(args[0], None)
+        item_declaration = (
+            declaration_from_runtime_annotation(args[0], None, seen_models)
             if args
-            else _default_collection_item_type(default) or str
+            else _declaration_from_default(_default_collection_default_value(default))
         )
         return FieldDeclaration(
             type=origin,
             choices=[],
-            item_type=item_type or str,
+            item_type=item_declaration.type or str,
             allows_null=allows_null,
+            item_declaration=item_declaration,
         )
 
     if origin is dict:
-        key_type = str
-        value_type = str
+        key_declaration = _declaration_from_default("")
+        value_declaration = _declaration_from_default(
+            _default_mapping_value(default),
+        )
         if args:
-            key_type = _normalize_runtime_scalar_annotation(args[0], None)
-            value_type = _normalize_runtime_scalar_annotation(args[1], None)
-        else:
-            default_key_type, default_value_type = _default_mapping_types(default)
-            key_type = default_key_type or str
-            value_type = default_value_type or str
+            key_declaration = declaration_from_runtime_annotation(
+                args[0],
+                None,
+                seen_models,
+            )
+            value_declaration = declaration_from_runtime_annotation(
+                args[1],
+                None,
+                seen_models,
+            )
         return FieldDeclaration(
             type=dict,
             choices=[],
-            item_type=value_type,
-            key_type=key_type,
+            item_type=value_declaration.type,
+            key_type=key_declaration.type,
             allows_null=allows_null,
+            key_declaration=key_declaration,
+            value_declaration=value_declaration,
         )
 
     if origin is not None and str(origin).endswith("Literal"):
@@ -104,6 +125,23 @@ def declaration_from_runtime_annotation(
         normalized_annotation,
         default,
     )
+    if (
+        isinstance(normalized_annotation, type)
+        and issubclass(normalized_annotation, BaseModel)
+    ):
+        if normalized_annotation in seen_models:
+            return FieldDeclaration(
+                type=normalized_annotation,
+                choices=[],
+                allows_null=allows_null,
+            )
+        next_seen = {*seen_models, normalized_annotation}
+        return FieldDeclaration(
+            type=normalized_annotation,
+            choices=[],
+            allows_null=allows_null,
+            fields=_runtime_model_field_declarations(normalized_annotation, next_seen),
+        )
     choices: list[Any] = []
     if isinstance(normalized_annotation, type) and issubclass(
         normalized_annotation,
@@ -148,15 +186,11 @@ def register_config_from_declaration(
     default: Any,
     help_text: str,
 ) -> RegisterConfig:
-    return RegisterConfig(
+    return _register_config_from_declaration(
         key=key,
         default=default,
-        help=help_text,
-        type=declaration.type,
-        choices=list(declaration.choices),
-        item_type=declaration.item_type,
-        key_type=declaration.key_type,
-        allows_null=declaration.allows_null,
+        help_text=help_text,
+        declaration=declaration,
     )
 
 
@@ -190,11 +224,25 @@ def _default_collection_item_type(default: Any) -> object | None:
     return None
 
 
+def _default_collection_default_value(default: Any) -> Any:
+    if isinstance(default, list | tuple) and default:
+        return default[0]
+    if isinstance(default, set) and default:
+        return next(iter(default))
+    return None
+
+
 def _default_mapping_types(default: Any) -> tuple[object | None, object | None]:
     if isinstance(default, dict) and default:
         key, value = next(iter(default.items()))
         return type(key), type(value)
     return None, None
+
+
+def _default_mapping_value(default: Any) -> Any:
+    if isinstance(default, dict) and default:
+        return next(iter(default.values()))
+    return None
 
 
 def _ast_value_name(node: ast.AST) -> str | None:
@@ -334,6 +382,7 @@ def _sequence_declaration(
         type=collection_type,
         choices=[],
         item_type=declaration.type,
+        item_declaration=declaration,
     )
 
 
@@ -350,6 +399,8 @@ def _mapping_declaration(annotation: ast.AST) -> FieldDeclaration:
         choices=[],
         item_type=value_decl.type,
         key_type=key_decl.type,
+        key_declaration=key_decl,
+        value_declaration=value_decl,
     )
 
 
@@ -390,4 +441,92 @@ def _clone_declaration(
         item_type=declaration.item_type,
         key_type=declaration.key_type,
         allows_null=allows_null,
+        fields=list(declaration.fields),
+        item_declaration=declaration.item_declaration,
+        key_declaration=declaration.key_declaration,
+        value_declaration=declaration.value_declaration,
     )
+
+
+def _register_config_from_declaration(
+    *,
+    key: str,
+    default: Any,
+    help_text: str,
+    declaration: FieldDeclaration,
+) -> RegisterConfig:
+    return RegisterConfig(
+        key=key,
+        default=default,
+        help=help_text,
+        type=declaration.type,
+        choices=list(declaration.choices),
+        item_type=declaration.item_type,
+        key_type=declaration.key_type,
+        allows_null=declaration.allows_null,
+        fields=[
+            _register_config_from_declaration(
+                key=item.key,
+                default=item.default,
+                help_text=item.help,
+                declaration=item.declaration,
+            )
+            for item in declaration.fields
+        ],
+        item_schema=(
+            _register_config_from_declaration(
+                key="item",
+                default=None,
+                help_text="",
+                declaration=declaration.item_declaration,
+            )
+            if declaration.item_declaration is not None
+            else None
+        ),
+        key_schema=(
+            _register_config_from_declaration(
+                key="key",
+                default=None,
+                help_text="",
+                declaration=declaration.key_declaration,
+            )
+            if declaration.key_declaration is not None
+            else None
+        ),
+        value_schema=(
+            _register_config_from_declaration(
+                key="value",
+                default=None,
+                help_text="",
+                declaration=declaration.value_declaration,
+            )
+            if declaration.value_declaration is not None
+            else None
+        ),
+    )
+
+
+def _runtime_model_field_declarations(
+    model: type[BaseModel],
+    seen_models: set[type[BaseModel]],
+) -> list[NestedFieldDeclaration]:
+    result: list[NestedFieldDeclaration] = []
+    for key, field_info in model.model_fields.items():
+        default = (
+            None
+            if field_info.is_required()
+            else field_info.get_default(call_default_factory=True)
+        )
+        result.append(
+            NestedFieldDeclaration(
+                key=key,
+                default=default,
+                help=field_info.description or "",
+                declaration=declaration_from_runtime_annotation(
+                    field_info.annotation,
+                    default,
+                    seen_models,
+                ),
+            )
+        )
+    return result

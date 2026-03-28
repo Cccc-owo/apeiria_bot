@@ -37,9 +37,11 @@ class PluginSettingFieldState:
     editor: str
     item_type: str | None
     key_type: str | None
+    schema: object | None
     default: object | None
     help: str
     choices: list[object]
+    base_value: object | None
     current_value: object | None
     local_value: object | None
     value_source: str

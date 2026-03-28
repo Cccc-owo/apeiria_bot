@@ -1,6 +1,7 @@
 const enUS = {
   common: {
     refresh: 'Refresh',
+    add: 'Add',
     save: 'Save',
     cancel: 'Cancel',
     close: 'Close',

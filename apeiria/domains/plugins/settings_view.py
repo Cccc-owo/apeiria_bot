@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class FieldValueState:
+    base_value: object | None
     current_value: object | None
     local_value: object | None
     value_source: str
@@ -92,19 +93,23 @@ def build_plugin_field_state(
 ) -> FieldValueState:
     """Build field state for one plugin config item."""
     current_value: object | None = config.default
+    base_value: object | None = config.default
     local_value: object | None = None
     value_source = "default"
     global_key = ctx.key_map.get(config.key, config.key) if ctx.legacy_flatten else None
 
     if ctx.legacy_flatten and global_key:
         if global_key in ctx.nonebot_section:
-            current_value = ctx.nonebot_section[global_key]
+            base_value = ctx.nonebot_section[global_key]
+            current_value = base_value
             value_source = "legacy_global"
         elif global_key in ctx.env_config:
-            current_value = ctx.env_config[global_key]
+            base_value = ctx.env_config[global_key]
+            current_value = base_value
             value_source = "env"
         elif global_key in ctx.effective_global_config:
-            current_value = ctx.effective_global_config[global_key]
+            base_value = ctx.effective_global_config[global_key]
+            current_value = base_value
             value_source = "legacy_global"
     if config.key in ctx.plugin_config:
         local_value = ctx.plugin_config[config.key]
@@ -112,6 +117,7 @@ def build_plugin_field_state(
         value_source = "plugin_section"
 
     return FieldValueState(
+        base_value=base_value,
         current_value=current_value,
         local_value=local_value,
         value_source=value_source,
@@ -128,11 +134,13 @@ def build_core_field_state(
 ) -> FieldValueState:
     """Build field state for one core config item."""
     current_value: object | None = config.default
+    base_value: object | None = config.default
     local_value: object | None = None
     value_source = "default"
 
     if config.key in env_config and env_config[config.key] != config.default:
-        current_value = env_config[config.key]
+        base_value = env_config[config.key]
+        current_value = base_value
         value_source = "env"
     if config.key in section_config:
         local_value = section_config[config.key]
@@ -142,10 +150,12 @@ def build_core_field_state(
         config.key in effective_config
         and effective_config[config.key] != config.default
     ):
-        current_value = effective_config[config.key]
+        base_value = effective_config[config.key]
+        current_value = base_value
         value_source = "env"
 
     return FieldValueState(
+        base_value=base_value,
         current_value=current_value,
         local_value=local_value,
         value_source=value_source,
@@ -167,9 +177,11 @@ def build_setting_field_item(
         editor=capability.editor,
         item_type=format_type_name(config.item_type),
         key_type=format_type_name(config.key_type),
+        schema=build_setting_schema(config),
         default=normalize_value_for_response(config, config.default),
         help=config.help,
         choices=normalize_choices_for_response(list(config.choices)),
+        base_value=normalize_value_for_response(config, state.base_value),
         current_value=normalize_value_for_response(config, state.current_value),
         local_value=normalize_value_for_response(config, state.local_value),
         value_source=state.value_source,
@@ -179,6 +191,64 @@ def build_setting_field_item(
         editable=capability.editable,
         type_category=capability.category,
     )
+
+
+def build_setting_schema(config: "RegisterConfig") -> dict[str, object]:
+    return {
+        "type": format_type_name(config.type) or "unknown",
+        "item_type": format_type_name(config.item_type),
+        "key_type": format_type_name(config.key_type),
+        "choices": normalize_choices_for_response(list(config.choices)),
+        "allows_null": config.allows_null,
+        "fields": [
+            {
+                "key": field.key,
+                "help": field.help,
+                "default": normalize_value_for_response(field, field.default),
+                "schema": build_setting_schema(field),
+            }
+            for field in config.fields
+        ],
+        "item_schema": (
+            {
+                "key": config.item_schema.key,
+                "help": config.item_schema.help,
+                "default": normalize_value_for_response(
+                    config.item_schema,
+                    config.item_schema.default,
+                ),
+                "schema": build_setting_schema(config.item_schema),
+            }
+            if config.item_schema is not None
+            else None
+        ),
+        "key_schema": (
+            {
+                "key": config.key_schema.key,
+                "help": config.key_schema.help,
+                "default": normalize_value_for_response(
+                    config.key_schema,
+                    config.key_schema.default,
+                ),
+                "schema": build_setting_schema(config.key_schema),
+            }
+            if config.key_schema is not None
+            else None
+        ),
+        "value_schema": (
+            {
+                "key": config.value_schema.key,
+                "help": config.value_schema.help,
+                "default": normalize_value_for_response(
+                    config.value_schema,
+                    config.value_schema.default,
+                ),
+                "schema": build_setting_schema(config.value_schema),
+            }
+            if config.value_schema is not None
+            else None
+        ),
+    }
 
 
 __all__ = [

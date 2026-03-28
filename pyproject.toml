@@ -15,6 +15,7 @@ dependencies = [
     "nonebot-plugin-alconna>=0.61.0",
     "nonebot-plugin-orm[default]>=0.8.3",
     "playwright>=1.54.0",
+    "pydantic>=2.0,<3.0",
     "PyJWT>=2.10.1",
     "tomlkit>=0.13.2",
 ]

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import nonebot
+from pydantic import BaseModel
 
 from apeiria.config import plugin_config_service, project_config_service
 from apeiria.runtime_framework import (
@@ -16,6 +17,7 @@ from .models import PluginExtraData, RegisterConfig
 from .registry import (
     PluginConfigRegistration,
     RegisterPluginConfigOptions,
+    configs_from_model,
     get_registered_plugin_config,
     register_plugin_config,
 )
@@ -179,6 +181,17 @@ def resolve_plugin_declared_config(module_name: str) -> ResolvedPluginConfig:
         ),
         None,
     )
+    if plugin and plugin.metadata:
+        config_model = getattr(plugin.metadata, "config", None)
+        if isinstance(config_model, type) and issubclass(config_model, BaseModel):
+            return ResolvedPluginConfig(
+                section=module_name.rsplit(".", maxsplit=1)[-1],
+                legacy_flatten=False,
+                source="plugin_metadata",
+                has_config_model=True,
+                configs=configs_from_model(config_model),
+            )
+
     if plugin and plugin.metadata and plugin.metadata.extra:
         extra = PluginExtraData.from_extra(plugin.metadata.extra)
         if extra is not None:

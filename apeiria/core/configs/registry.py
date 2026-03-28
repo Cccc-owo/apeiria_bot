@@ -56,29 +56,19 @@ def _name_candidates(name: str) -> tuple[str, ...]:
 
 
 def _model_to_configs(model: type[ModelT]) -> list[RegisterConfig]:
-    if hasattr(model, "model_fields"):
-        result: list[RegisterConfig] = []
-        for key, field_info in model.model_fields.items():
-            default = None if field_info.is_required() else field_info.default
-            result.append(
-                register_config_from_runtime_annotation(
-                    key=key,
-                    annotation=field_info.annotation,
-                    default=default,
-                    help_text=field_info.description or "",
-                )
-            )
-        return result
-
-    result = []
-    for key, field_info in model.__fields__.items():  # pyright: ignore[reportDeprecated]
-        default = None if field_info.required else field_info.default  # pyright: ignore[reportAttributeAccessIssue]
+    result: list[RegisterConfig] = []
+    for key, field_info in model.model_fields.items():
+        default = (
+            None
+            if field_info.is_required()
+            else field_info.get_default(call_default_factory=True)
+        )
         result.append(
             register_config_from_runtime_annotation(
                 key=key,
-                annotation=field_info.outer_type_,  # pyright: ignore[reportAttributeAccessIssue]
+                annotation=field_info.annotation,
                 default=default,
-                help_text=field_info.field_info.description or "",  # pyright: ignore[reportAttributeAccessIssue]
+                help_text=field_info.description or "",
             )
         )
     return result
