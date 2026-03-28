@@ -366,6 +366,7 @@ async def list_plugins(
             module_name=plugin.module_name,
             name=plugin.name,
             description=plugin.description,
+            homepage=plugin.homepage,
             source=plugin.source,
             is_global_enabled=plugin.is_global_enabled,
             is_protected=plugin.is_protected,

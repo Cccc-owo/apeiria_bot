@@ -80,6 +80,9 @@
                     variant="tonal"
                   >
                     {{ t('plugins.protected') }}
+                    <v-tooltip v-if="pluginToggleHint(item)" activator="parent" location="top">
+                      {{ pluginToggleHint(item) }}
+                    </v-tooltip>
                   </v-chip>
                 </div>
                 <div class="plugin-card__subline text-caption text-medium-emphasis">
@@ -124,38 +127,54 @@
             </div>
 
             <div class="plugin-card__footer">
-              <div v-if="pluginRiskLabel(item)" class="plugin-card__hint text-caption text-medium-emphasis">
-                {{ pluginRiskLabel(item) }}
-              </div>
-              <div class="plugin-card__actions">
-                <v-btn
-                  v-if="canUninstallPlugin(item)"
-                  color="warning"
-                  :loading="uninstallingModule === item.module_name"
-                  size="small"
-                  variant="text"
-                  @click="uninstallPluginItem(item)"
-                >
-                  {{ t('plugins.settingsUninstall') }}
-                </v-btn>
-                <v-btn
-                  color="primary"
-                  :loading="settingsLoadingModule === item.module_name"
-                  size="small"
-                  variant="text"
-                  @click="openSettings(item)"
-                >
-                  {{ t('plugins.settings') }}
-                </v-btn>
-                <v-switch
-                  color="success"
-                  :disabled="item.is_protected"
-                  hide-details
-                  inset
-                  :loading="pendingModule === item.module_name"
-                  :model-value="item.is_global_enabled"
-                  @update:model-value="togglePlugin(item, $event)"
-                />
+              <div class="plugin-card__footer-bar">
+                <div class="plugin-card__actions">
+                  <v-btn
+                    v-if="canUninstallPlugin(item)"
+                    color="warning"
+                    :loading="uninstallingModule === item.module_name"
+                    size="small"
+                    variant="text"
+                    @click="uninstallPluginItem(item)"
+                  >
+                    {{ t('plugins.settingsUninstall') }}
+                  </v-btn>
+                  <v-btn
+                    v-if="pluginProjectUrl(item)"
+                    color="primary"
+                    :href="pluginProjectUrl(item)"
+                    rel="noopener noreferrer"
+                    size="small"
+                    target="_blank"
+                    variant="text"
+                  >
+                    {{ t('plugins.projectPage') }}
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    :loading="settingsLoadingModule === item.module_name"
+                    size="small"
+                    variant="text"
+                    @click="openSettings(item)"
+                  >
+                    {{ t('plugins.settings') }}
+                  </v-btn>
+                </div>
+                <div class="plugin-card__switch-wrap">
+                  <v-switch
+                    class="plugin-card__switch"
+                    color="success"
+                    :disabled="item.is_protected"
+                    hide-details
+                    inset
+                    :loading="pendingModule === item.module_name"
+                    :model-value="item.is_global_enabled"
+                    @update:model-value="togglePlugin(item, $event)"
+                  />
+                  <v-tooltip v-if="pluginToggleHint(item)" activator="parent" location="top">
+                    {{ pluginToggleHint(item) }}
+                  </v-tooltip>
+                </div>
               </div>
             </div>
           </article>
@@ -761,13 +780,15 @@
     return ''
   }
 
-  function pluginRiskLabel (item: PluginItem) {
+  function pluginToggleHint (item: PluginItem) {
     if (item.is_protected && item.protected_reason) return item.protected_reason
-    if (item.dependent_plugins.length > 0) {
-      return t('plugins.dependentCountHint', { count: item.dependent_plugins.length })
-    }
-    if (item.required_plugins.length > 0) {
-      return t('plugins.requiredCountHint', { count: item.required_plugins.length })
+    return ''
+  }
+
+  function pluginProjectUrl (item: PluginItem) {
+    const candidate = item.homepage || ''
+    if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
+      return candidate
     }
     return ''
   }
@@ -1422,25 +1443,23 @@
 }
 
 .plugin-card__footer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 12px;
   margin-top: auto;
 }
 
-.plugin-card__hint {
-  min-width: 0;
-  line-height: 1.35;
+.plugin-card__footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .plugin-card__actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  justify-self: end;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .plugin-card__actions :deep(.v-btn) {
@@ -1448,9 +1467,16 @@
   padding-inline: 4px;
 }
 
-.plugin-card__actions :deep(.v-switch) {
+.plugin-card__switch :deep(.v-switch) {
   width: 54px;
   margin-inline: 0;
+}
+
+.plugin-card__switch-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .plugin-config-section__header {
@@ -1520,12 +1546,20 @@
   }
 
   .plugin-card__footer {
-    grid-template-columns: 1fr;
     align-items: flex-start;
   }
 
+  .plugin-card__footer-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .plugin-card__actions {
-    justify-self: stretch;
+    width: 100%;
+  }
+
+  .plugin-card__switch {
+    align-self: flex-end;
   }
 }
 

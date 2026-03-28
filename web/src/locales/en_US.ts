@@ -255,6 +255,7 @@ const enUS = {
     settingsLegacy: 'Compat',
     settingsSave: 'Save',
     settingsUninstall: 'Uninstall',
+    projectPage: 'Project',
     settingsInstalledPackage: 'Package',
     settingsUninstallConfirm: 'Uninstall plugin {name}? It will be removed from project config now, and package {package} will be cleaned before the next startup. The current process may still use already loaded code, so restart as soon as possible.',
     settingsUninstallConfirmFallback: 'Remove plugin {name}? It will be removed from project config now. Because the package can no longer be identified, no automatic package cleanup will run before next startup. The current process may still use already loaded code, so restart as soon as possible.',
