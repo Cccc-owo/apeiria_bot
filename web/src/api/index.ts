@@ -198,6 +198,17 @@ export interface PluginItem {
   installed_module_names: string[]
 }
 
+export interface OrphanPluginConfigItem {
+  section: string
+  module_name: string | null
+  has_section: boolean
+  reason: string
+}
+
+export interface OrphanPluginConfigResponse {
+  items: OrphanPluginConfigItem[]
+}
+
 export interface PluginStoreSource {
   source_id: string
   name: string
@@ -416,6 +427,12 @@ export const getLogSources = (signal?: AbortSignal) =>
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')
 
+export const getOrphanPluginConfigs = () =>
+  client.get<OrphanPluginConfigResponse>('/plugins/orphan-configs')
+
+export const cleanupOrphanPluginConfigs = () =>
+  client.post<OrphanPluginConfigResponse>('/plugins/orphan-configs/cleanup')
+
 export const installManualPlugin = (payload: {
   requirement: string
   module_name?: string
@@ -542,8 +559,14 @@ export const updatePlugin = (moduleName: string, enabled: boolean) =>
     params: { enabled },
   })
 
-export const uninstallPlugin = (moduleName: string) =>
-  client.post<{ status: string; detail?: string | null }>(`/plugins/${encodeURIComponent(moduleName)}/uninstall`)
+export const uninstallPlugin = (
+  moduleName: string,
+  payload?: { remove_config?: boolean },
+) =>
+  client.post<{ status: string; detail?: string | null }>(
+    `/plugins/${encodeURIComponent(moduleName)}/uninstall`,
+    payload || {},
+  )
 
 export const getBans = () =>
   client.get<BanItem[]>('/permissions/bans')
