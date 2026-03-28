@@ -121,6 +121,56 @@ class ProjectConfigService:
             and module_name.strip()
         }
 
+    def _parse_int(self, value: object, default: int) -> int:
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                return default
+            try:
+                return int(normalized)
+            except ValueError:
+                return default
+        return default
+
+    def read_plugin_store_sources_config(
+        self,
+        config_path: Path | None = None,
+    ) -> list[dict[str, object]]:
+        """Read configured plugin store sources from project config."""
+        target = config_path or self.default_config_path()
+        data = self._load_config(target)
+        plugin_store = data.get("plugin_store")
+        if not isinstance(plugin_store, dict):
+            return []
+        raw_sources = plugin_store.get("sources")
+        if not isinstance(raw_sources, dict):
+            return []
+
+        sources: list[dict[str, object]] = []
+        for source_id, raw_source in raw_sources.items():
+            if not isinstance(source_id, str) or not source_id.strip():
+                continue
+            if not isinstance(raw_source, dict):
+                continue
+            sources.append(
+                {
+                    "source_id": source_id.strip(),
+                    "kind": raw_source.get("kind", ""),
+                    "label": raw_source.get("label", source_id.strip()),
+                    "base_url": raw_source.get("base_url", ""),
+                    "enabled": raw_source.get("enabled", True),
+                    "priority": self._parse_int(
+                        raw_source.get("priority", 100),
+                        100,
+                    ),
+                }
+            )
+        return sources
+
     def write_project_plugin_module_map(
         self,
         updates: dict[str, str | None],

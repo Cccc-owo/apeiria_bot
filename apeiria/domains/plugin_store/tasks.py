@@ -31,6 +31,7 @@ class PluginStoreTaskService:
         item = await plugin_store_service.get_item(
             source_id=request.source_id,
             plugin_id=request.plugin_id,
+            item_type=request.type,
         )
         if item is None:
             msg = "store plugin not found"

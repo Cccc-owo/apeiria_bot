@@ -1,1 +1,8 @@
 [nonebot]
+
+[plugin_store.sources.example_json]
+kind = "json-http"
+label = "Example Store"
+base_url = "https://example.com/apeiria-store.json"
+enabled = false
+priority = 100

@@ -236,10 +236,18 @@ class PluginStoreItem(BaseModel):
     installed_module_names: list[str] = []
 
 
+class PluginStoreCategoryItem(BaseModel):
+    """Plugin store category aggregate returned to the Web UI."""
+
+    value: str
+    count: int
+
+
 class PluginStoreItemsResponse(BaseModel):
     """Paginated plugin store items response."""
 
     items: list[PluginStoreItem]
+    categories: list[PluginStoreCategoryItem] = []
     total: int
     page: int
     per_page: int
