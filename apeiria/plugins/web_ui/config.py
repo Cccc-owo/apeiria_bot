@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Configuration model for the Web UI plugin."""
+
 from typing import TypeVar
 
 from pydantic import BaseModel
@@ -10,16 +12,20 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class WebUIConfig(BaseModel):
+    """Runtime configuration for the Web UI plugin."""
+
     token_expire_days: int = 7
 
 
 def _validate_config(model: type[ModelT], data: dict[str, object]) -> ModelT:
+    """Validate plugin config data against a Pydantic model."""
     if hasattr(model, "model_validate"):
         return model.model_validate(data)
     return model.parse_obj(data)
 
 
 def get_web_ui_config() -> WebUIConfig:
+    """Read Web UI config with a fallback for the legacy project key."""
     config = project_config_service.read_project_plugin_config("web_ui")
     if "token_expire_days" not in config:
         legacy = project_config_service.read_project_config()
