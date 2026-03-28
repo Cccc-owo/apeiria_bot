@@ -81,7 +81,8 @@ class PluginStoreService:
         )
         categories = _collect_categories(enriched_items)
         items = _apply_category_filter(enriched_items, effective_query.category)
-        items.sort(key=_item_sort_key(effective_query.sort))
+        if effective_query.sort != "default":
+            items.sort(key=_item_sort_key(effective_query.sort))
 
         total = len(items)
         page_size = max(1, min(effective_query.page_size, 100))
@@ -267,12 +268,7 @@ def _item_sort_key(sort_mode: str):
             item.name.lower(),
             item.module_name.lower(),
         )
-    return lambda item: (
-        not item.is_installed,
-        not item.is_official,
-        item.name.lower(),
-        item.module_name.lower(),
-    )
+    return lambda item: (item.name.lower(), item.module_name.lower())
 
 
 def _timestamp_value(value: str | None) -> int:
