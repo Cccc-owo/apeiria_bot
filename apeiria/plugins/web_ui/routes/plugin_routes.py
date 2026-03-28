@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from apeiria.core.i18n import t
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
+from apeiria.domains.plugin_store import plugin_store_task_service
 from apeiria.domains.plugins import (
     AdapterConfigState,
     DriverConfigState,
@@ -34,12 +35,14 @@ from apeiria.plugins.web_ui.models import (
     PluginConfigRequest,
     PluginConfigResponse,
     PluginItem,
+    PluginManualInstallRequest,
     PluginRawSettingsResponse,
     PluginSettingFieldItem,
     PluginSettingsRawUpdateRequest,
     PluginSettingsRawValidationResponse,
     PluginSettingsResponse,
     PluginSettingsUpdateRequest,
+    PluginStoreTaskItem,
 )
 
 router = APIRouter()
@@ -426,3 +429,50 @@ async def uninstall_plugin(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return OperationStatusResponse(status="ok")
+
+
+@router.post("/install/manual", response_model=PluginStoreTaskItem)
+async def install_plugin_manual(
+    payload: PluginManualInstallRequest,
+    _: Annotated[Any, Depends(require_owner)],
+) -> PluginStoreTaskItem:
+    try:
+        task = await plugin_store_task_service.create_manual_plugin_install_task(
+            payload.requirement,
+            payload.module_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return PluginStoreTaskItem(
+        task_id=task.task_id,
+        title=task.title,
+        status=task.status,
+        logs=task.logs,
+        error=task.error,
+        result=task.result,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+    )
+
+
+@router.get("/install/tasks/{task_id}", response_model=PluginStoreTaskItem)
+async def get_plugin_install_task(
+    task_id: str,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginStoreTaskItem:
+    task = plugin_store_task_service.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    return PluginStoreTaskItem(
+        task_id=task.task_id,
+        title=task.title,
+        status=task.status,
+        logs=task.logs,
+        error=task.error,
+        result=task.result,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+    )

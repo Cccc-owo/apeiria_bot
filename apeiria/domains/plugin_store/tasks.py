@@ -7,10 +7,19 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from apeiria.cli_store import install_plugin_package
+from apeiria.cli_store import (
+    install_plugin_package,
+    install_plugin_requirement_with_auto_module,
+)
 
 from .models import PluginStoreInstallRequest, PluginStoreTask, StorePluginItem
 from .service import plugin_store_service
+
+
+def _format_task_error(exc: Exception) -> str:
+    """Return a trimmed multi-line error string for task logs and API payloads."""
+    message = str(exc).strip()
+    return message or exc.__class__.__name__
 
 
 class PluginStoreTaskService:
@@ -19,7 +28,7 @@ class PluginStoreTaskService:
     def __init__(self) -> None:
         self._tasks: dict[str, PluginStoreTask] = {}
         self._background_tasks: set[asyncio.Task[None]] = set()
-        self._active_install_keys: set[tuple[str, str, str, str]] = set()
+        self._active_install_keys: set[tuple[str, ...]] = set()
 
     def get_task(self, task_id: str) -> PluginStoreTask | None:
         return self._tasks.get(task_id)
@@ -54,6 +63,44 @@ class PluginStoreTaskService:
         self._active_install_keys.add(install_key)
         background_task = asyncio.create_task(
             self._run_plugin_install_task(task_id, item, request, install_key)
+        )
+        self._background_tasks.add(background_task)
+        background_task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    async def create_manual_plugin_install_task(
+        self,
+        requirement: str,
+        module_name: str | None = None,
+    ) -> PluginStoreTask:
+        target = requirement.strip()
+        resolved_module = (module_name or "").strip()
+        if not target:
+            msg = "package name is required"
+            raise ValueError(msg)
+
+        install_key = ("manual", target, resolved_module or "auto")
+        if install_key in self._active_install_keys:
+            msg = "install task already running for this target"
+            raise ValueError(msg)
+
+        task_id = uuid4().hex
+        task = PluginStoreTask(
+            task_id=task_id,
+            title=f"Install {target}",
+            status="pending",
+            logs="",
+            created_at=_now(),
+        )
+        self._tasks[task_id] = task
+        self._active_install_keys.add(install_key)
+        background_task = asyncio.create_task(
+            self._run_manual_plugin_install_task(
+                task_id,
+                target,
+                resolved_module,
+                install_key,
+            )
         )
         self._background_tasks.add(background_task)
         background_task.add_done_callback(self._background_tasks.discard)
@@ -98,14 +145,75 @@ class PluginStoreTaskService:
                 ),
             )
         except Exception as exc:  # noqa: BLE001
+            error = _format_task_error(exc)
             self._update_task(
                 task_id,
                 status="failed",
                 finished_at=_now(),
-                error=str(exc),
+                error=error,
                 logs=(
                     f"{self._tasks[task_id].logs}"
-                    f"install failed: {exc}\n"
+                    "install failed\n"
+                    f"{error}\n"
+                ),
+            )
+        finally:
+            self._active_install_keys.discard(install_key)
+
+    async def _run_manual_plugin_install_task(
+        self,
+        task_id: str,
+        requirement: str,
+        module_name: str,
+        install_key: tuple[str, ...],
+    ) -> None:
+        self._update_task(
+            task_id,
+            status="running",
+            started_at=_now(),
+            logs=(
+                "source: manual\n"
+                f"requirement: {requirement}\n"
+                f"module: {module_name or 'auto'}\n"
+            ),
+        )
+        try:
+            if module_name:
+                result = await asyncio.to_thread(
+                    install_plugin_package,
+                    requirement,
+                    module_name,
+                )
+            else:
+                result = await asyncio.to_thread(
+                    install_plugin_requirement_with_auto_module,
+                    requirement,
+                )
+            self._update_task(
+                task_id,
+                status="succeeded",
+                finished_at=_now(),
+                result={
+                    "requirement": result.requirement,
+                    "module_name": result.module_name,
+                    "restart_required": True,
+                },
+                logs=(
+                    f"{self._tasks[task_id].logs}"
+                    "install succeeded\n"
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001
+            error = _format_task_error(exc)
+            self._update_task(
+                task_id,
+                status="failed",
+                finished_at=_now(),
+                error=error,
+                logs=(
+                    f"{self._tasks[task_id].logs}"
+                    "install failed\n"
+                    f"{error}\n"
                 ),
             )
         finally:

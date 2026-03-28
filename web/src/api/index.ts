@@ -416,6 +416,15 @@ export const getLogSources = (signal?: AbortSignal) =>
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')
 
+export const installManualPlugin = (payload: {
+  requirement: string
+  module_name?: string
+}) =>
+  client.post<PluginStoreTask>('/plugins/install/manual', payload)
+
+export const getPluginInstallTask = (taskId: string) =>
+  client.get<PluginStoreTask>(`/plugins/install/tasks/${taskId}`)
+
 export const getPluginStoreSources = () =>
   client.get<PluginStoreSource[]>('/plugins/store/sources')
 
