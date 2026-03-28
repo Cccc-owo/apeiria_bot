@@ -3,6 +3,7 @@
 from .models import (
     PluginStoreInstallRequest,
     PluginStoreTask,
+    StoreInstallCandidate,
     StoreItemsQuery,
     StorePluginItem,
     StoreSourceInfo,
@@ -15,6 +16,7 @@ __all__ = [
     "PluginStoreService",
     "PluginStoreTask",
     "PluginStoreTaskService",
+    "StoreInstallCandidate",
     "StoreItemsQuery",
     "StorePluginItem",
     "StoreSourceInfo",

@@ -1,5 +1,6 @@
 """Web UI plugin — management dashboard API + static file serving."""
 
+from contextlib import suppress
 from pathlib import Path
 
 from nonebot.plugin import PluginMetadata
@@ -105,6 +106,28 @@ def _mount_routes() -> None:
         logger.debug("Web UI frontend assets not found in {}", _DIST_DIR)
 
 
+async def _cleanup_htmlkit_session() -> None:
+    """Close htmlkit's cached HTTP session to avoid shutdown leaks."""
+    try:
+        import nonebot_plugin_htmlkit as htmlkit
+    except ImportError:
+        return
+
+    session = getattr(htmlkit, "session", None)
+    if session is None:
+        return
+
+    close = getattr(session, "close", None)
+    if close is None:
+        return
+
+    with suppress(RuntimeError):
+        await close()
+    if getattr(htmlkit, "session", None) is session:
+        htmlkit.session = None
+
+
 from nonebot import get_driver
 
 get_driver().on_startup(_mount_routes)
+get_driver().on_shutdown(_cleanup_htmlkit_session)

@@ -55,6 +55,18 @@
 
       <div class="store-toolbar__filters">
         <v-select
+          v-model="selectedSource"
+          class="store-select"
+          density="comfortable"
+          hide-details
+          item-title="label"
+          item-value="value"
+          :items="sourceOptions"
+          :label="t('pluginStore.allSources')"
+          rounded="xl"
+          variant="outlined"
+        />
+        <v-select
           v-model="selectedCategory"
           class="store-select"
           density="comfortable"
@@ -265,10 +277,12 @@
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import {
+    getPluginStoreItem,
     getPluginStoreItems,
     getPluginStoreSources,
     getPluginStoreTask,
     installPluginStoreItem,
+    type PluginStoreCategoryItem,
     type PluginStoreItem,
     type PluginStoreSource,
     type PluginStoreTask,
@@ -284,6 +298,7 @@
   const errorMessage = ref('')
   const sources = ref<PluginStoreSource[]>([])
   const items = ref<PluginStoreItem[]>([])
+  const categories = ref<PluginStoreCategoryItem[]>([])
   const totalItems = ref(0)
   const selectedSource = ref('')
   const selectedCategory = ref('')
@@ -304,6 +319,13 @@
     const matched = sources.value.find(item => item.source_id === selectedSource.value)
     return matched?.name || t('pluginStore.allSources')
   })
+  const sourceOptions = computed(() => [
+    { value: '', label: t('pluginStore.allSources') },
+    ...sources.value.map(source => ({
+      value: source.source_id,
+      label: source.name,
+    })),
+  ])
   const taskStatusLabel = computed(() => {
     const status = activeTask.value?.status || ''
     if (status === 'pending') return t('pluginStore.installPending')
@@ -320,7 +342,10 @@
   const categoryOptions = computed(() => {
     return [
       { value: '', label: t('pluginStore.allCategories') },
-      ...collectCategoryOptions(items.value),
+      ...categories.value.map(item => ({
+        value: item.value,
+        label: `${item.value} (${item.count})`,
+      })),
     ]
   })
   const sortOptions = computed(() => [
@@ -373,10 +398,16 @@
     }).format(date)
   }
 
-  function openInstallDialog (item: PluginStoreItem) {
+  async function openInstallDialog (item: PluginStoreItem) {
     if (actionLocked.value) return
     selectedItem.value = item
     installDialogVisible.value = true
+    try {
+      const response = await getPluginStoreItem(item.source_id, item.plugin_id)
+      selectedItem.value = response.data
+    } catch {
+      // Keep the existing item snapshot when detail loading fails.
+    }
   }
 
   async function startInstall () {
@@ -461,7 +492,14 @@
       ])
       sources.value = sourcesResponse.data
       items.value = itemsResponse.data.items
+      categories.value = itemsResponse.data.categories
       totalItems.value = itemsResponse.data.total
+      if (
+        selectedCategory.value
+        && !itemsResponse.data.categories.some(item => item.value === selectedCategory.value)
+      ) {
+        selectedCategory.value = ''
+      }
     } catch (error) {
       errorMessage.value = getErrorMessage(error, t('pluginStore.loadFailed'))
     } finally {
@@ -499,21 +537,6 @@
       searchTimer = null
     }
   })
-
-  function collectCategoryOptions (items: PluginStoreItem[]) {
-    const counts = new Map<string, number>()
-    for (const item of items) {
-      for (const tag of item.tags) {
-        counts.set(tag, (counts.get(tag) || 0) + 1)
-      }
-    }
-    return [...counts.entries()]
-      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-      .map(([tag, count]) => ({
-        value: tag,
-        label: `${tag} (${count})`,
-      }))
-  }
 </script>
 
 <style scoped>

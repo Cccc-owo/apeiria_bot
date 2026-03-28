@@ -202,8 +202,14 @@ export interface PluginStoreItem {
   installed_module_names: string[]
 }
 
+export interface PluginStoreCategoryItem {
+  value: string
+  count: number
+}
+
 export interface PluginStoreItemsResponse {
   items: PluginStoreItem[]
+  categories: PluginStoreCategoryItem[]
   total: number
   page: number
   per_page: number
@@ -393,6 +399,14 @@ export const getPluginStoreItems = (params?: {
   per_page?: number
 }) =>
   client.get<PluginStoreItemsResponse>('/plugins/store/items', { params })
+
+export const getPluginStoreItem = (sourceId: string, pluginId: string) =>
+  client.get<PluginStoreItem>(`/plugins/store/items/${encodeURIComponent(sourceId)}/${encodeURIComponent(pluginId)}`)
+
+export const refreshPluginStoreSources = (payload?: {
+  source_id?: string
+}) =>
+  client.post<PluginStoreSource[]>('/plugins/store/refresh', payload || {})
 
 export const installPluginStoreItem = (payload: {
   source_id: string

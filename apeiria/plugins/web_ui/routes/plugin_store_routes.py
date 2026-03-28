@@ -16,8 +16,13 @@ from apeiria.domains.plugin_store import (
     plugin_store_service,
     plugin_store_task_service,
 )
+from apeiria.domains.plugin_store import (
+    StorePluginItem as DomainStorePluginItem,
+)
 from apeiria.plugins.web_ui.auth import require_control_panel, require_owner
 from apeiria.plugins.web_ui.models import (
+    OperationStatusResponse,
+    PluginStoreCategoryItem,
     PluginStoreInstallRequest,
     PluginStoreItem,
     PluginStoreItemsResponse,
@@ -40,6 +45,37 @@ class PluginStoreItemsQueryParams(BaseModel):
     uninstalled_only: bool = False
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=16, ge=1, le=100)
+
+
+class PluginStoreRefreshRequest(BaseModel):
+    """Plugin store refresh payload."""
+
+    source_id: str = ""
+
+
+def _build_plugin_store_item(item: DomainStorePluginItem) -> PluginStoreItem:
+    return PluginStoreItem(
+        source_id=item.source_id,
+        source_name=item.source_name,
+        plugin_id=item.plugin_id,
+        name=item.name,
+        module_name=item.module_name,
+        package_name=item.package_name,
+        description=item.description,
+        project_link=item.project_link,
+        homepage=item.homepage,
+        author=item.author,
+        author_link=item.author_link,
+        version=item.version,
+        tags=item.tags,
+        is_official=item.is_official,
+        publish_time=item.publish_time,
+        extra=item.extra,
+        is_installed=item.is_installed,
+        is_registered=item.is_registered,
+        installed_package=item.installed_package,
+        installed_module_names=item.installed_module_names,
+    )
 
 
 @router.get("/sources", response_model=list[PluginStoreSourceItem])
@@ -69,46 +105,67 @@ async def list_plugin_store_items(
 ) -> PluginStoreItemsResponse:
     result = await plugin_store_service.list_items(
         StoreItemsQuery(
+            type="plugin",
             source_id=params.source,
-            search=params.search,
+            keyword=params.search,
             category=params.category,
             sort=params.sort,
             installed_only=params.installed_only,
             uninstalled_only=params.uninstalled_only,
             page=params.page,
-            per_page=params.per_page,
+            page_size=params.per_page,
         )
     )
     return PluginStoreItemsResponse(
-        items=[
-            PluginStoreItem(
-                source_id=item.source_id,
-                source_name=item.source_name,
-                plugin_id=item.plugin_id,
-                name=item.name,
-                module_name=item.module_name,
-                package_name=item.package_name,
-                description=item.description,
-                project_link=item.project_link,
-                homepage=item.homepage,
-                author=item.author,
-                author_link=item.author_link,
-                version=item.version,
-                tags=item.tags,
-                is_official=item.is_official,
-                publish_time=item.publish_time,
-                extra=item.extra,
-                is_installed=item.is_installed,
-                is_registered=item.is_registered,
-                installed_package=item.installed_package,
-                installed_module_names=item.installed_module_names,
-            )
-            for item in result.items
+        items=[_build_plugin_store_item(item) for item in result.items],
+        categories=[
+            PluginStoreCategoryItem(value=item.value, count=item.count)
+            for item in result.categories
         ],
         total=result.total,
         page=result.page,
         per_page=result.per_page,
     )
+
+
+@router.get("/items/{source_id}/{plugin_id}", response_model=PluginStoreItem)
+async def get_plugin_store_item(
+    source_id: str,
+    plugin_id: str,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginStoreItem:
+    item = await plugin_store_service.get_item(
+        source_id=source_id,
+        plugin_id=plugin_id,
+        item_type="plugin",
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="store plugin not found")
+    return _build_plugin_store_item(item)
+
+
+@router.post("/refresh", response_model=list[PluginStoreSourceItem])
+async def refresh_plugin_store_sources(
+    payload: PluginStoreRefreshRequest,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[PluginStoreSourceItem]:
+    return [
+        PluginStoreSourceItem(
+            source_id=item.source_id,
+            name=item.name,
+            kind=item.kind,
+            enabled=item.enabled,
+            is_builtin=item.is_builtin,
+            is_official=item.is_official,
+            base_url=item.base_url,
+            last_synced_at=item.last_synced_at,
+            last_error=item.last_error,
+        )
+        for item in await plugin_store_service.refresh_sources(
+            item_type="plugin",
+            source_id=payload.source_id,
+        )
+    ]
 
 
 @router.post("/install", response_model=PluginStoreTaskItem)
@@ -120,9 +177,10 @@ async def install_plugin_store_item(
         task = await plugin_store_task_service.create_plugin_install_task(
             PluginStoreInstallCommand(
                 source_id=payload.source_id,
-                plugin_id=payload.plugin_id,
-                package_name=payload.package_name,
-                module_name=payload.module_name,
+                item_id=payload.plugin_id,
+                type="plugin",
+                package_requirement=payload.package_name,
+                binding_value=payload.module_name,
             )
         )
     except ValueError as exc:
@@ -166,7 +224,7 @@ async def get_plugin_store_task(
 async def revert_plugin_store_install(
     payload: PluginStoreRevertInstallRequest,
     _: Annotated[Any, Depends(require_owner)],
-) -> dict[str, str]:
+) -> OperationStatusResponse:
     try:
         uninstall_plugin_package(
             payload.package_name,
@@ -174,4 +232,4 @@ async def revert_plugin_store_install(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"status": "ok"}
+    return OperationStatusResponse(status="ok")

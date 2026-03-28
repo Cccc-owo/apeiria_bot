@@ -2,51 +2,115 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 from abc import ABC, abstractmethod
-from dataclasses import replace
 from datetime import UTC, datetime
+from urllib.request import urlopen
 
 from apeiria.cli_nb import search_store_packages_async
+from apeiria.config import project_config_service
 
-from .models import StorePluginItem, StoreSourceInfo
+from .models import (
+    StoreInstallCandidate,
+    StoreItem,
+    StorePage,
+    StoreQuery,
+    StoreSource,
+)
 
 
-class StoreSource(ABC):
-    """Abstract store source."""
+class StoreSourceAdapter(ABC):
+    """Abstract source adapter."""
 
     @abstractmethod
-    def source_info(self) -> StoreSourceInfo:
+    def source_info(self) -> StoreSource:
         """Return source metadata."""
 
     @abstractmethod
-    async def list_items(self) -> list[StorePluginItem]:
-        """Return normalized store items."""
+    async def list_page(self, query: StoreQuery) -> StorePage:
+        """Return one normalized page of items."""
+
+    @abstractmethod
+    async def find_exact(self, item_type: str, value: str) -> StoreItem | None:
+        """Find one exact store item."""
+
+    @abstractmethod
+    def resolve_install_candidate(self, item: StoreItem) -> StoreInstallCandidate:
+        """Convert one store item into an install-ready candidate."""
 
 
-class OfficialNoneBotStoreSource(StoreSource):
-    """Official NoneBot plugin source."""
+class OfficialNoneBotStoreSource(StoreSourceAdapter):
+    """Official NoneBot source adapter."""
 
     def __init__(self) -> None:
         self._last_synced_at = ""
         self._last_error = ""
 
-    def source_info(self) -> StoreSourceInfo:
-        return StoreSourceInfo(
+    def source_info(self) -> StoreSource:
+        return StoreSource(
             source_id="official-nonebot",
-            name="NoneBot2源",
+            label="NoneBot2源",
             kind="official-nonebot",
             enabled=True,
+            priority=0,
             is_builtin=True,
             is_official=True,
             base_url="https://nonebot.dev/store/plugins",
+            supports_search=True,
+            supports_exact_lookup=True,
+            supports_pagination=False,
             last_synced_at=self._last_synced_at or None,
             last_error=self._last_error or None,
         )
 
-    async def list_items(self) -> list[StorePluginItem]:
+    async def list_page(self, query: StoreQuery) -> StorePage:
+        items = await self._load_items(query.type, query.keyword)
+        total = len(items)
+        return StorePage(
+            items=items,
+            total=total,
+            page=1,
+            page_size=total or 1,
+            has_next=False,
+        )
+
+    async def find_exact(self, item_type: str, value: str) -> StoreItem | None:
+        needle = value.strip().lower()
+        if not needle:
+            return None
+        for item in await self._load_items(item_type, value):
+            if any(
+                candidate.lower() == needle
+                for candidate in (
+                    item.item_id,
+                    item.module_name,
+                    item.package_requirement,
+                    item.name,
+                )
+                if candidate
+            ):
+                return item
+        return None
+
+    def resolve_install_candidate(self, item: StoreItem) -> StoreInstallCandidate:
+        return StoreInstallCandidate(
+            source_id=item.source_id,
+            type=item.type,
+            display_name=item.name,
+            resolved_requirement=item.package_requirement,
+            binding_hint=item.module_name,
+            item_id=item.item_id,
+        )
+
+    async def _load_items(
+        self,
+        item_type: str,
+        query: str | None = None,
+    ) -> list[StoreItem]:
         try:
-            items = await search_store_packages_async("plugin")
+            items = await search_store_packages_async(item_type, query)
         except Exception as exc:
             self._last_error = str(exc)
             raise
@@ -54,47 +118,175 @@ class OfficialNoneBotStoreSource(StoreSource):
         now = datetime.now(UTC).isoformat()
         self._last_synced_at = now
         self._last_error = ""
-        source = replace(self.source_info(), last_synced_at=now, last_error=None)
-        normalized: list[StorePluginItem] = []
+        source = self.source_info()
+        normalized: list[StoreItem] = []
         for item in items:
-            normalized_item = _normalize_store_item(item, source)
+            normalized_item = _normalize_store_item(item, source, item_type)
             if normalized_item is not None:
                 normalized.append(normalized_item)
         return normalized
 
 
-class JsonHttpStoreSource(StoreSource):
+class JsonHttpStoreSource(StoreSourceAdapter):
     """Reserved adapter for future custom HTTP JSON sources."""
 
-    def __init__(self, source_id: str, name: str, base_url: str) -> None:
-        self._source = StoreSourceInfo(
+    def __init__(
+        self,
+        source_id: str,
+        label: str,
+        base_url: str,
+        *,
+        priority: int = 100,
+    ) -> None:
+        self._source = StoreSource(
             source_id=source_id,
-            name=name,
+            label=label,
             kind="json-http",
             enabled=True,
+            priority=priority,
             is_builtin=False,
             is_official=False,
             base_url=base_url,
+            supports_search=True,
+            supports_exact_lookup=True,
+            supports_pagination=False,
+        )
+        self._last_synced_at = ""
+        self._last_error = ""
+
+    def source_info(self) -> StoreSource:
+        return StoreSource(
+            **{
+                **self._source.__dict__,
+                "last_synced_at": self._last_synced_at or None,
+                "last_error": self._last_error or None,
+            }
         )
 
-    def source_info(self) -> StoreSourceInfo:
-        return self._source
+    async def list_page(self, query: StoreQuery) -> StorePage:
+        items = await self._load_items(query.type, query.keyword)
+        return StorePage(
+            items=items,
+            total=len(items),
+            page=1,
+            page_size=len(items) or 1,
+            has_next=False,
+        )
 
-    async def list_items(self) -> list[StorePluginItem]:
-        raise NotImplementedError("json-http custom sources are not implemented yet")
+    async def find_exact(self, item_type: str, value: str) -> StoreItem | None:
+        needle = value.strip().lower()
+        if not needle:
+            return None
+        for item in await self._load_items(item_type):
+            if any(
+                candidate.lower() == needle
+                for candidate in (
+                    item.item_id,
+                    item.module_name,
+                    item.package_requirement,
+                    item.name,
+                )
+                if candidate
+            ):
+                return item
+        return None
+
+    def resolve_install_candidate(self, item: StoreItem) -> StoreInstallCandidate:
+        return StoreInstallCandidate(
+            source_id=item.source_id,
+            type=item.type,
+            display_name=item.name,
+            resolved_requirement=item.package_requirement,
+            binding_hint=item.module_name,
+            item_id=item.item_id,
+        )
+
+    async def _load_items(
+        self,
+        item_type: str,
+        query: str | None = None,
+    ) -> list[StoreItem]:
+        try:
+            payload = await asyncio.to_thread(
+                _load_json_http_payload,
+                self._source.base_url,
+            )
+        except Exception as exc:
+            self._last_error = str(exc)
+            raise
+
+        now = datetime.now(UTC).isoformat()
+        self._last_synced_at = now
+        self._last_error = ""
+        items = payload.get("items", [])
+        if not isinstance(items, list):
+            return []
+
+        normalized: list[StoreItem] = []
+        keyword = (query or "").strip().lower()
+        for item in items:
+            normalized_item = _normalize_json_http_item(
+                item,
+                self.source_info(),
+                item_type,
+            )
+            if normalized_item is None:
+                continue
+            if keyword and keyword not in " ".join(
+                [
+                    normalized_item.name,
+                    normalized_item.module_name,
+                    normalized_item.package_requirement,
+                    normalized_item.desc or "",
+                    normalized_item.author or "",
+                    " ".join(normalized_item.tags),
+                ]
+            ).lower():
+                continue
+            normalized.append(normalized_item)
+        return normalized
+
+
+def configured_store_sources() -> list[StoreSourceAdapter]:
+    sources: list[StoreSourceAdapter] = [OfficialNoneBotStoreSource()]
+    for item in project_config_service.read_plugin_store_sources_config():
+        source_id = str(item.get("source_id", "")).strip()
+        if not source_id:
+            continue
+        enabled = bool(item.get("enabled", True))
+        if not enabled:
+            continue
+        kind = str(item.get("kind", "")).strip()
+        label = str(item.get("label", source_id)).strip() or source_id
+        base_url = str(item.get("base_url", "")).strip()
+        if kind == "json-http" and base_url:
+            sources.append(
+                JsonHttpStoreSource(
+                    source_id=source_id,
+                    label=label,
+                    base_url=base_url,
+                    priority=(
+                        item.get("priority", 100)
+                        if isinstance(item.get("priority", 100), int)
+                        else 100
+                    ),
+                )
+            )
+    return sources
 
 
 def _normalize_store_item(
     item: object,
-    source: StoreSourceInfo,
-) -> StorePluginItem | None:
+    source: StoreSource,
+    item_type: str,
+) -> StoreItem | None:
     module_name = _read_str_attr(item, "module_name")
-    package_name = _read_package_name(item)
-    name = _read_str_attr(item, "name") or module_name or package_name
-    if not module_name or not package_name or not name:
+    package_requirement = _read_package_requirement(item)
+    name = _read_str_attr(item, "name") or module_name or package_requirement
+    if not module_name or not package_requirement or not name:
         return None
 
-    description = (
+    desc = (
         _read_str_attr(item, "desc")
         or _read_str_attr(item, "description")
         or _read_str_attr(item, "summary")
@@ -113,14 +305,15 @@ def _normalize_store_item(
     tags = _read_tags(item)
     extra = _read_extra(item)
 
-    return StorePluginItem(
+    return StoreItem(
         source_id=source.source_id,
-        source_name=source.name,
-        plugin_id=module_name,
+        source_label=source.label,
+        item_id=module_name,
+        type=item_type,
         name=name,
         module_name=module_name,
-        package_name=package_name,
-        description=description,
+        package_requirement=package_requirement,
+        desc=desc,
         project_link=project_link,
         homepage=homepage,
         author=author,
@@ -132,7 +325,7 @@ def _normalize_store_item(
     )
 
 
-def _read_package_name(item: object) -> str:
+def _read_package_requirement(item: object) -> str:
     project_link = _read_str_attr(item, "project_link")
     if project_link:
         return project_link
@@ -207,13 +400,94 @@ def _normalize_tag(value: str) -> str:
     normalized = value.strip()
     if not normalized:
         return ""
-
     label_match = re.search(r"label=(['\"])(.*?)\1", normalized)
     if label_match:
         return label_match.group(2).strip()
-
     if " color=" in normalized:
         normalized = normalized.split(" color=", 1)[0].strip()
     if normalized.startswith("label="):
         normalized = normalized[6:].strip().strip("'\"")
     return normalized
+
+
+def _normalize_json_http_item(
+    item: object,
+    source: StoreSource,
+    item_type: str,
+) -> StoreItem | None:
+    if not isinstance(item, dict):
+        return None
+    normalized_type = str(item.get("type", "plugin")).strip() or "plugin"
+    if normalized_type != item_type:
+        return None
+
+    module_name = _read_mapping_str(item, "module_name")
+    package_requirement = _read_mapping_str(item, "package_requirement")
+    name = _read_mapping_str(item, "name") or module_name or package_requirement
+    if not module_name or not package_requirement or not name:
+        return None
+
+    raw_tags = item.get("tags", [])
+    tags = (
+        [str(tag).strip() for tag in raw_tags if str(tag).strip()]
+        if isinstance(raw_tags, list)
+        else []
+    )
+
+    extra = {
+        key: value
+        for key, value in item.items()
+        if key
+        not in {
+            "type",
+            "item_id",
+            "name",
+            "module_name",
+            "package_requirement",
+            "desc",
+            "project_link",
+            "homepage",
+            "author",
+            "author_link",
+            "version",
+            "tags",
+            "publish_time",
+        }
+    }
+
+    return StoreItem(
+        source_id=source.source_id,
+        source_label=source.label,
+        item_id=_read_mapping_str(item, "item_id") or module_name,
+        type=normalized_type,
+        name=name,
+        module_name=module_name,
+        package_requirement=package_requirement,
+        desc=_read_mapping_str(item, "desc") or None,
+        project_link=_normalize_external_url(_read_mapping_str(item, "project_link")),
+        homepage=_normalize_external_url(_read_mapping_str(item, "homepage")),
+        author=_read_mapping_str(item, "author") or None,
+        author_link=_normalize_external_url(_read_mapping_str(item, "author_link")),
+        version=_read_mapping_str(item, "version") or None,
+        tags=tags,
+        is_official=source.is_official,
+        publish_time=_read_mapping_str(item, "publish_time") or None,
+        extra=extra,
+    )
+
+
+def _read_mapping_str(item: dict[str, object], key: str) -> str:
+    value = item.get(key, "")
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _load_json_http_payload(base_url: str | None) -> dict[str, object]:
+    if not base_url:
+        msg = "json-http source base_url is required"
+        raise ValueError(msg)
+    with urlopen(base_url, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        msg = "json-http source response must be an object"
+        raise TypeError(msg)
+    return payload
