@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from nonebot.log import logger
-from nonebot_plugin_localstore import get_data_file
+from nonebot_plugin_localstore import get_data_file, get_plugin_data_file
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.files import atomic_write_text
@@ -24,7 +24,6 @@ from .roles import (
     normalize_supported_role,
 )
 
-_PLUGIN_DATA_ID = "apeiria.plugins.web_ui"
 _PASSWORD_HASH_N = 2**14
 _PASSWORD_HASH_R = 8
 _PASSWORD_HASH_P = 1
@@ -81,6 +80,25 @@ class WebUISecurityAuditEvent:
 def _apply_secret_permissions(secret_file: "Path") -> None:
     with contextlib.suppress(OSError):
         secret_file.chmod(0o600)
+
+
+def _legacy_secret_file() -> "Path":
+    return get_data_file("apeiria.plugins.web_ui", "secret.json")
+
+
+def _get_secret_file() -> "Path":
+    try:
+        secret_file = get_plugin_data_file("secret.json")
+    except RuntimeError:
+        return _legacy_secret_file()
+    legacy_file = _legacy_secret_file()
+    if (
+        secret_file != legacy_file
+        and legacy_file.is_file()
+        and not secret_file.exists()
+    ):
+        return legacy_file
+    return secret_file
 
 
 def _hash_password(password: str, *, salt: str | None = None) -> str:
@@ -203,7 +221,7 @@ def _normalize_registration_code_item(item: object) -> dict[str, str] | None:
 
 def _load_or_create_raw() -> dict[str, Any]:
     """Load raw auth storage from disk, creating a default document when missing."""
-    secret_file = get_data_file(_PLUGIN_DATA_ID, "secret.json")
+    secret_file = _get_secret_file()
     if secret_file.is_file():
         try:
             data = json.loads(secret_file.read_text(encoding="utf-8"))
@@ -305,7 +323,7 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
 
 def _persist_raw(data: dict[str, Any]) -> None:
     """Persist auth storage to disk."""
-    secret_file = get_data_file(_PLUGIN_DATA_ID, "secret.json")
+    secret_file = _get_secret_file()
     atomic_write_text(
         secret_file,
         json.dumps(data, ensure_ascii=True, indent=2),
@@ -323,7 +341,7 @@ def get_token_secret() -> str:
 
 def get_secret_file_path() -> "Path":
     """Return the auth storage file path."""
-    return get_data_file(_PLUGIN_DATA_ID, "secret.json")
+    return _get_secret_file()
 
 
 def list_accounts() -> list[WebUIAccount]:
