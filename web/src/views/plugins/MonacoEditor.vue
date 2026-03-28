@@ -13,6 +13,11 @@
       ) => MonacoEditorInstance
       setTheme: (theme: string) => void
     }
+    languages: {
+      register: (language: { id: string }) => void
+      setLanguageConfiguration: (languageId: string, configuration: Record<string, unknown>) => void
+      setMonarchTokensProvider: (languageId: string, provider: Record<string, unknown>) => void
+    }
   }
 
   interface MonacoEditorInstance {
@@ -47,16 +52,76 @@
   let monaco: MonacoModule | null = null
   let editor: MonacoEditorInstance | null = null
   let changeSubscription: { dispose: () => void } | null = null
+  let tomlRegistered = false
 
   function currentTheme () {
     return localStorage.getItem('apeiria-theme') === 'light' ? 'vs' : 'vs-dark'
   }
 
+  function ensureTomlLanguage (monacoModule: MonacoModule) {
+    if (tomlRegistered) return
+    tomlRegistered = true
+    monacoModule.languages.register({ id: 'toml' })
+    monacoModule.languages.setLanguageConfiguration('toml', {
+      autoClosingPairs: [
+        { open: '{', close: '}' },
+        { open: '[', close: ']' },
+        { open: '"', close: '"' },
+      ],
+      brackets: [
+        ['{', '}'],
+        ['[', ']'],
+      ],
+      comments: {
+        lineComment: '#',
+      },
+      surroundingPairs: [
+        { open: '{', close: '}' },
+        { open: '[', close: ']' },
+        { open: '"', close: '"' },
+      ],
+    })
+    monacoModule.languages.setMonarchTokensProvider('toml', {
+      brackets: [
+        { open: '{', close: '}', token: 'delimiter.curly' },
+        { open: '[', close: ']', token: 'delimiter.square' },
+      ],
+      defaultToken: '',
+      ignoreCase: false,
+      keywords: ['true', 'false'],
+      escapes: /\\(?:[btnfr"\\]|u[0-9A-Fa-f]{4})/,
+      tokenizer: {
+        root: [
+          [/^\s*\[[^[\]]+\]\s*$/, 'type.identifier'],
+          [/[A-Za-z0-9_-]+(?=\s*=)/, 'key'],
+          [/#.*$/, 'comment'],
+          [/"([^"\\]|\\.)*$/, 'string.invalid'],
+          [/"/, { token: 'string.quote', next: '@string' }],
+          [/-?\d+\.\d+([eE][+-]?\d+)?/, 'number.float'],
+          [/-?\d+/, 'number'],
+          [/\b(?:true|false)\b/, 'keyword'],
+          [/[{}[\]]/, '@brackets'],
+          [/[=,]/, 'delimiter'],
+        ],
+        string: [
+          [/[^\\"]+/, 'string'],
+          [/@escapes/, 'string.escape'],
+          [/\\./, 'string.escape.invalid'],
+          [/"/, { token: 'string.quote', next: '@pop' }],
+        ],
+      },
+    })
+  }
+
   onMounted(async () => {
     if (!container.value) return
-    monaco = await import('monaco-editor')
-    monaco.editor.setTheme(currentTheme())
-    editor = monaco.editor.create(container.value, {
+    const monacoModule = (await import('monaco-editor/esm/vs/editor/editor.api.js')) as unknown as MonacoModule
+    monaco = monacoModule
+    if (props.language === 'toml') {
+      ensureTomlLanguage(monacoModule)
+    }
+    monacoModule.editor.setTheme(currentTheme())
+    const instance = monacoModule.editor.create(container.value, {
       automaticLayout: true,
       language: props.language,
       minimap: { enabled: false },
@@ -65,9 +130,9 @@
       value: props.modelValue,
       wordWrap: 'on',
     })
-    changeSubscription = editor.onDidChangeModelContent(() => {
-      if (!editor) return
-      emit('update:modelValue', editor.getValue())
+    editor = instance
+    changeSubscription = instance.onDidChangeModelContent(() => {
+      emit('update:modelValue', instance.getValue())
     })
   })
 
