@@ -272,6 +272,13 @@ class PluginStoreRevertInstallRequest(BaseModel):
     module_name: str = Field(min_length=1, max_length=256)
 
 
+class PluginManualInstallRequest(BaseModel):
+    """Manual plugin install request payload."""
+
+    requirement: str = Field(min_length=1, max_length=512)
+    module_name: str | None = Field(default=None, max_length=256)
+
+
 class PluginStoreTaskItem(BaseModel):
     """Plugin store task item returned to the Web UI."""
 

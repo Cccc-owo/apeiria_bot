@@ -132,9 +132,24 @@ def _run_uv(args: list[str], *, cwd: Path) -> None:
     env["UV_CACHE_DIR"] = str(cache_dir)
     env["UV_PROJECT_ENVIRONMENT"] = str(cwd / ".venv")
     env.pop("VIRTUAL_ENV", None)
-    result = subprocess.run([executable, *args], cwd=cwd, check=False, env=env)
+    result = subprocess.run(
+        [executable, *args],
+        cwd=cwd,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
     if result.returncode != 0:
+        output_parts = [
+            part.strip()
+            for part in (result.stdout, result.stderr)
+            if part and part.strip()
+        ]
+        output = "\n".join(output_parts)
         msg = f"uv command failed: {' '.join(args)}"
+        if output:
+            msg = f"{msg}\n{output}"
         raise RuntimeError(msg)
 
 

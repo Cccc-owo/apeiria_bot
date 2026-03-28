@@ -36,6 +36,14 @@
               :label="t('plugins.search')"
               prepend-inner-icon="mdi-magnify"
             />
+            <v-btn
+              v-if="authStore.role === 'owner'"
+              color="primary"
+              variant="tonal"
+              @click="openManualInstallDialog"
+            >
+              {{ t('plugins.manualInstall') }}
+            </v-btn>
           </div>
           <div class="section-heading__actions">
             <v-switch
@@ -182,100 +190,6 @@
 
         <div v-else class="py-6 text-body-2 text-medium-emphasis text-center">
           {{ t('plugins.noVisiblePlugins') }}
-        </div>
-
-        <div class="settings-shell">
-          <div class="settings-shell__toolbar">
-            <div class="settings-shell__headline">
-              <div class="text-subtitle-1 font-weight-medium">{{ t('plugins.advancedConfigTitle') }}</div>
-            </div>
-          </div>
-
-          <div class="settings-list-panel">
-            <section class="settings-list-row">
-              <div class="plugin-config-section__header">
-                <div class="plugin-config-section__title">{{ t('plugins.moduleSectionTitle') }}</div>
-              </div>
-              <div class="plugin-config-section__toolbar">
-                <v-text-field
-                  v-model.trim="newModule"
-                  class="config-input"
-                  density="comfortable"
-                  hide-details
-                  :label="t('plugins.moduleInput')"
-                  @keydown.enter.prevent="addModule"
-                />
-                <v-btn
-                  color="primary"
-                  :loading="configSaving"
-                  variant="tonal"
-                  @click="addModule"
-                >
-                  {{ t('plugins.addModule') }}
-                </v-btn>
-              </div>
-              <div class="config-chip-row">
-                <v-chip
-                  v-for="moduleItem in pluginModules"
-                  :key="moduleItem.name"
-                  closable
-                  :color="moduleChipColor(moduleItem)"
-                  variant="tonal"
-                  @click:close="removeModule(moduleItem.name)"
-                >
-                  {{ moduleItem.name }}
-                  <v-tooltip activator="parent" location="top">
-                    {{ moduleStatusText(moduleItem) }}
-                  </v-tooltip>
-                </v-chip>
-                <span v-if="pluginModules.length === 0" class="text-body-2 text-medium-emphasis">
-                  {{ t('plugins.emptyModules') }}
-                </span>
-              </div>
-            </section>
-
-            <section class="settings-list-row">
-              <div class="plugin-config-section__header">
-                <div class="plugin-config-section__title">{{ t('plugins.dirSectionTitle') }}</div>
-              </div>
-              <div class="plugin-config-section__toolbar">
-                <v-text-field
-                  v-model.trim="newDir"
-                  class="config-input"
-                  density="comfortable"
-                  hide-details
-                  :label="t('plugins.dirInput')"
-                  @keydown.enter.prevent="addDir"
-                />
-                <v-btn
-                  color="secondary"
-                  :loading="configSaving"
-                  variant="tonal"
-                  @click="addDir"
-                >
-                  {{ t('plugins.addDir') }}
-                </v-btn>
-              </div>
-              <div class="config-chip-row">
-                <v-chip
-                  v-for="dirItem in pluginDirs"
-                  :key="dirItem.path"
-                  closable
-                  :color="dirChipColor(dirItem)"
-                  variant="tonal"
-                  @click:close="removeDir(dirItem.path)"
-                >
-                  {{ dirItem.path }}
-                  <v-tooltip activator="parent" location="top">
-                    {{ dirStatusText(dirItem) }}
-                  </v-tooltip>
-                </v-chip>
-                <span v-if="pluginDirs.length === 0" class="text-body-2 text-medium-emphasis">
-                  {{ t('plugins.emptyDirs') }}
-                </span>
-              </div>
-            </section>
-          </div>
         </div>
       </v-card-text>
     </v-card>
@@ -562,25 +476,105 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="manualInstallDialogVisible" max-width="640">
+      <v-card rounded="xl">
+        <v-card-title>{{ t('plugins.manualInstall') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <v-alert density="comfortable" type="info" variant="tonal">
+            {{ t('plugins.manualInstallHint') }}
+          </v-alert>
+          <v-select
+            v-model="manualInstallSourceType"
+            density="comfortable"
+            hide-details
+            item-title="label"
+            item-value="value"
+            :items="manualInstallSourceOptions"
+            :label="t('plugins.manualInstallSourceType')"
+          />
+          <v-text-field
+            v-model.trim="manualInstallRequirement"
+            density="comfortable"
+            :hint="manualInstallRequirementHint"
+            :label="manualInstallRequirementLabel"
+            persistent-hint
+          />
+          <v-text-field
+            v-model.trim="manualInstallModuleName"
+            density="comfortable"
+            :hint="t('plugins.manualInstallModuleHint')"
+            :label="t('plugins.manualInstallModule')"
+            persistent-hint
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-btn rounded="xl" variant="text" @click="manualInstallDialogVisible = false">
+            {{ t('common.cancel') }}
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            color="primary"
+            :disabled="!canSubmitManualInstall"
+            :loading="manualInstallSubmitting"
+            rounded="xl"
+            @click="submitManualInstall"
+          >
+            {{ t('plugins.manualInstallSubmit') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="manualInstallTaskDialogVisible" max-width="840">
+      <v-card rounded="xl">
+        <v-card-title>{{ manualInstallTask?.title || t('plugins.manualInstallTaskTitle') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <div class="text-body-2 text-medium-emphasis">
+            {{ manualInstallTaskStatusLabel }}
+          </div>
+          <v-alert
+            v-if="manualInstallTaskErrorSummary"
+            density="comfortable"
+            type="error"
+            variant="tonal"
+          >
+            {{ manualInstallTaskErrorSummary }}
+          </v-alert>
+          <v-progress-linear
+            v-if="manualInstallTask?.status === 'pending' || manualInstallTask?.status === 'running'"
+            color="primary"
+            indeterminate
+          />
+          <v-sheet class="task-log-card" rounded="lg">
+            <pre class="task-log-card__content">{{ manualInstallTask?.logs || t('plugins.manualInstallWaiting') }}</pre>
+          </v-sheet>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn rounded="xl" variant="text" @click="manualInstallTaskDialogVisible = false">
+            {{ t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue'
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
   import {
-    type DirConfigItem,
-    getPluginConfig,
+    getPluginInstallTask,
     getPlugins,
     getPluginSettings,
     getPluginSettingsRaw,
-    type ModuleConfigItem,
+    installManualPlugin,
     type PluginItem,
+    type PluginStoreTask,
     type RawSettingsResponse,
     uninstallPlugin,
     updatePlugin,
-    updatePluginConfig,
     updatePluginSettings,
     updatePluginSettingsRaw,
     validatePluginSettingsRaw,
@@ -608,11 +602,15 @@
   const errorMessage = ref('')
   const hideSystemPlugins = ref(true)
   const pluginSearch = ref('')
-  const configSaving = ref(false)
-  const pluginModules = ref<ModuleConfigItem[]>([])
-  const pluginDirs = ref<DirConfigItem[]>([])
-  const newModule = ref('')
-  const newDir = ref('')
+  const manualInstallDialogVisible = ref(false)
+  const manualInstallTaskDialogVisible = ref(false)
+  const manualInstallSubmitting = ref(false)
+  const manualInstallSourceType = ref<'pypi' | 'git' | 'local'>('pypi')
+  const manualInstallRequirement = ref('')
+  const manualInstallModuleName = ref('')
+  const manualInstallTask = ref<PluginStoreTask | null>(null)
+  const activeManualInstallRequirement = ref('')
+  let manualInstallTaskPollTimer: number | null = null
   const settingsDialogVisible = ref(false)
   const settingsLoadingModule = ref('')
   const settingsPlugin = ref<PluginItem | null>(null)
@@ -737,16 +735,46 @@
     external: 'warning',
   }
 
-  function normalizeConfigEntry (value: string) {
-    const normalized = value.trim()
-    if (!normalized) return ''
-    if (['none', 'null'].includes(normalized.toLowerCase())) return ''
-    return normalized
-  }
+  const manualInstallSourceOptions = computed(() => [
+    { value: 'pypi', label: t('plugins.manualInstallSourcePypi') },
+    { value: 'git', label: t('plugins.manualInstallSourceGit') },
+    { value: 'local', label: t('plugins.manualInstallSourceLocal') },
+  ])
 
-  function normalizeConfigEntries (values: string[]) {
-    return Array.from(new Set(values.map(normalizeConfigEntry).filter(Boolean))).sort()
-  }
+  const manualInstallRequirementLabel = computed(() => {
+    if (manualInstallSourceType.value === 'git') {
+      return t('plugins.manualInstallGitLabel')
+    }
+    if (manualInstallSourceType.value === 'local') {
+      return t('plugins.manualInstallLocalLabel')
+    }
+    return t('plugins.manualInstallPackageLabel')
+  })
+
+  const manualInstallRequirementHint = computed(() => {
+    if (manualInstallSourceType.value === 'git') {
+      return t('plugins.manualInstallGitHint')
+    }
+    if (manualInstallSourceType.value === 'local') {
+      return t('plugins.manualInstallLocalHint')
+    }
+    return t('plugins.manualInstallPackageHint')
+  })
+
+  const canSubmitManualInstall = computed(() => manualInstallRequirement.value.trim().length > 0)
+  const manualInstallTaskErrorSummary = computed(() => {
+    const error = manualInstallTask.value?.error?.trim()
+    if (!error) return ''
+    return error.split('\n')[0]?.trim() || error
+  })
+  const manualInstallTaskStatusLabel = computed(() => {
+    const status = manualInstallTask.value?.status || ''
+    if (status === 'pending') return t('plugins.manualInstallPending')
+    if (status === 'running') return t('plugins.manualInstallRunning')
+    if (status === 'succeeded') return t('plugins.manualInstallSucceeded')
+    if (status === 'failed') return manualInstallTaskErrorSummary.value || t('plugins.manualInstallFailed')
+    return ''
+  })
 
   function applyRouteFilters () {
     const searchQuery = route.query.search
@@ -861,18 +889,86 @@
     loading.value = true
     errorMessage.value = ''
     try {
-      const [pluginsResponse, pluginConfigResponse] = await Promise.all([
-        getPlugins(),
-        getPluginConfig(),
-      ])
-      plugins.value = pluginsResponse.data
-      pluginModules.value = pluginConfigResponse.data.modules
-      pluginDirs.value = pluginConfigResponse.data.dirs
+      plugins.value = (await getPlugins()).data
     } catch (error) {
       errorMessage.value = getErrorMessage(error, t('plugins.loadFailed'))
     } finally {
       loading.value = false
     }
+  }
+
+  function openManualInstallDialog () {
+    manualInstallSourceType.value = 'pypi'
+    manualInstallRequirement.value = ''
+    manualInstallModuleName.value = ''
+    manualInstallDialogVisible.value = true
+  }
+
+  async function submitManualInstall () {
+    const requirement = manualInstallRequirement.value.trim()
+    if (!requirement) return
+
+    manualInstallSubmitting.value = true
+    try {
+      const response = await installManualPlugin({
+        requirement,
+        module_name: manualInstallModuleName.value.trim() || undefined,
+      })
+      activeManualInstallRequirement.value = requirement
+      manualInstallTask.value = response.data
+      manualInstallDialogVisible.value = false
+      manualInstallTaskDialogVisible.value = true
+      startManualInstallTaskPolling(response.data.task_id)
+    } catch (error) {
+      noticeStore.show(getErrorMessage(error, t('plugins.manualInstallFailed')), 'error')
+    } finally {
+      manualInstallSubmitting.value = false
+    }
+  }
+
+  function stopManualInstallTaskPolling () {
+    if (manualInstallTaskPollTimer !== null) {
+      window.clearInterval(manualInstallTaskPollTimer)
+      manualInstallTaskPollTimer = null
+    }
+  }
+
+  function startManualInstallTaskPolling (taskId: string) {
+    stopManualInstallTaskPolling()
+    manualInstallTaskPollTimer = window.setInterval(async () => {
+      try {
+        const response = await getPluginInstallTask(taskId)
+        manualInstallTask.value = response.data
+        if (response.data.status === 'succeeded' || response.data.status === 'failed') {
+          stopManualInstallTaskPolling()
+          if (response.data.status === 'succeeded') {
+            const moduleName = typeof response.data.result.module_name === 'string'
+              ? response.data.result.module_name
+              : ''
+            const requirement = typeof response.data.result.requirement === 'string'
+              ? response.data.result.requirement
+              : activeManualInstallRequirement.value
+            restartStore.markPending({
+              id: `plugin-manual-install:${moduleName || requirement}`,
+              scope: 'plugins',
+              summary: t('plugins.manualInstallRestartPending', { name: moduleName || requirement }),
+              undo: {
+                kind: 'plugin-install',
+                packageName: requirement,
+                moduleName,
+              },
+            })
+            noticeStore.show(t('plugins.manualInstallSucceeded'), 'success')
+            void loadPluginManagement()
+          } else {
+            noticeStore.show(summarizeTaskError(response.data.error) || t('plugins.manualInstallFailed'), 'error')
+          }
+        }
+      } catch (error) {
+        stopManualInstallTaskPolling()
+        noticeStore.show(getErrorMessage(error, t('plugins.manualInstallFailed')), 'error')
+      }
+    }, 1500)
   }
 
   async function openSettings (item: PluginItem) {
@@ -950,6 +1046,12 @@
     pluginEditor.clearField(field)
   }
 
+  function summarizeTaskError (message: string | null | undefined) {
+    const normalized = message?.trim()
+    if (!normalized) return ''
+    return normalized.split('\n')[0]?.trim() || normalized
+  }
+
   async function savePluginRawSettings () {
     if (!settingsPlugin.value || !hasPendingPluginRawChanges.value) return
     settingsRawSaving.value = true
@@ -1002,94 +1104,6 @@
     if (!settingsErrorMessage.value && !settingsRawErrorMessage.value) {
       previewDialogVisible.value = false
     }
-  }
-
-  async function savePluginConfig (modules: string[], dirs: string[]) {
-    configSaving.value = true
-    errorMessage.value = ''
-    const previousModules = pluginModules.value.map(item => item.name)
-    const previousDirs = pluginDirs.value.map(item => item.path)
-    try {
-      const response = await updatePluginConfig({ modules, dirs })
-      pluginModules.value = response.data.modules
-      pluginDirs.value = response.data.dirs
-      restartStore.markPending({
-        id: 'plugin:loading-rules',
-        scope: 'plugins',
-        summary: t('restart.pendingPluginLoadingRules'),
-        undo: {
-          kind: 'plugin-config',
-          modules: previousModules,
-          dirs: previousDirs,
-        },
-      })
-      noticeStore.show(t('plugins.configSaved'), 'success')
-    } catch (error) {
-      errorMessage.value = getErrorMessage(error, t('plugins.configSaveFailed'))
-      noticeStore.show(errorMessage.value, 'error')
-    } finally {
-      configSaving.value = false
-    }
-  }
-
-  async function addModule () {
-    if (!newModule.value) return
-    const nextModules = normalizeConfigEntries([
-      ...pluginModules.value.map(item => item.name),
-      newModule.value,
-    ])
-    newModule.value = ''
-    await savePluginConfig(nextModules, normalizeConfigEntries(pluginDirs.value.map(item => item.path)))
-  }
-
-  async function removeModule (moduleName: string) {
-    await savePluginConfig(
-      pluginModules.value.filter(item => item.name !== moduleName).map(item => item.name),
-      normalizeConfigEntries(pluginDirs.value.map(item => item.path)),
-    )
-  }
-
-  async function addDir () {
-    if (!newDir.value) return
-    const nextDirs = normalizeConfigEntries([
-      ...pluginDirs.value.map(item => item.path),
-      newDir.value,
-    ])
-    newDir.value = ''
-    await savePluginConfig(pluginModules.value.map(item => item.name), nextDirs)
-  }
-
-  async function removeDir (dirName: string) {
-    await savePluginConfig(
-      pluginModules.value.map(item => item.name),
-      normalizeConfigEntries(
-        pluginDirs.value.filter(item => item.path !== dirName).map(item => item.path),
-      ),
-    )
-  }
-
-  function moduleChipColor (item: ModuleConfigItem) {
-    if (item.is_loaded) return 'success'
-    if (item.is_importable) return 'warning'
-    return 'error'
-  }
-
-  function dirChipColor (item: DirConfigItem) {
-    if (!item.exists) return 'error'
-    if (item.is_loaded) return 'success'
-    return 'warning'
-  }
-
-  function moduleStatusText (item: ModuleConfigItem) {
-    if (item.is_loaded) return t('plugins.moduleLoaded')
-    if (item.is_importable) return t('plugins.moduleRegisteredOnly')
-    return t('plugins.moduleMissing')
-  }
-
-  function dirStatusText (item: DirConfigItem) {
-    if (!item.exists) return t('plugins.dirMissing')
-    if (item.is_loaded) return t('plugins.dirLoaded')
-    return t('plugins.dirRegisteredOnly')
   }
 
   async function togglePlugin (item: PluginItem, nextValue: boolean | null) {
@@ -1159,6 +1173,10 @@
 
   watch(() => route.query, () => {
     applyRouteFilters()
+  })
+
+  onBeforeUnmount(() => {
+    stopManualInstallTaskPolling()
   })
 </script>
 
@@ -1362,19 +1380,6 @@
   width: 240px;
 }
 
-.config-input {
-  flex: 1 1 300px;
-  min-width: 220px;
-}
-
-.config-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-}
-
 .plugins-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1479,23 +1484,21 @@
   flex: 0 0 auto;
 }
 
-.plugin-config-section__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+.task-log-card {
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-.plugin-config-section__title {
-  font-weight: 600;
-}
-
-.plugin-config-section__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+.task-log-card__content {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .plugin-detail-meta {
