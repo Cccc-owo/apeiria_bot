@@ -119,6 +119,9 @@ class PluginCatalogService:
         reason = get_plugin_protection_reason(module_name)
         if reason:
             raise ProtectedPluginError(reason)
+        if not self._is_plugin_uninstallable(plugin):
+            msg = "only custom or external plugins can be uninstalled"
+            raise ValueError(msg)
 
         current_config = plugin_config_service.read_project_plugin_config()
         package_name = self._resolve_installed_package(module_name, plugin)
@@ -215,6 +218,9 @@ class PluginCatalogService:
         if len(bound_modules) == 1 and module_name in bound_modules:
             return declared
         return None
+
+    def _is_plugin_uninstallable(self, plugin: object) -> bool:
+        return get_plugin_source(plugin) in {"custom", "external"}
 
 
 plugin_catalog_service = PluginCatalogService()
