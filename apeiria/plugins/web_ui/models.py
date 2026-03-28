@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginRequest(BaseModel):
@@ -296,12 +296,14 @@ class PluginConfigResponse(BaseModel):
 
 
 class PluginSettingFieldItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     key: str
     type: str
     editor: str = "readonly"
     item_type: str | None = None
     key_type: str | None = None
-    schema: object | None = None
+    schema_: object | None = Field(default=None, alias="schema")
     default: object | None
     help: str
     choices: list[object] = []

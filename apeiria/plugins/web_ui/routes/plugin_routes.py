@@ -108,7 +108,7 @@ def _to_plugin_settings_response(state: PluginSettingsState) -> PluginSettingsRe
                 editor=item.editor,
                 item_type=item.item_type,
                 key_type=item.key_type,
-                schema=item.schema,
+                schema_=item.schema,
                 default=item.default,
                 help=item.help,
                 choices=item.choices,
