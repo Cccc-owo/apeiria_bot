@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 _OFFICIAL_COMMAND_DESCRIPTIONS = {
     "help": "查看帮助菜单或指定插件详情",
     "status": "查看当前 bot 运行状态摘要",
+    "sid": "查看当前会话的 SID 与 UID 信息",
     "adapters": "查看当前适配器加载状态",
     "drivers": "查看当前驱动器运行信息",
     "plugins": "查看系统插件总览",

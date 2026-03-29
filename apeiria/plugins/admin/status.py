@@ -7,7 +7,6 @@ from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import format_duration
-from apeiria.core.utils.rules import owner_check
 from apeiria.domains.dashboard import dashboard_service
 
 from .presenter import render_block
@@ -16,7 +15,6 @@ from .utils import ensure_owner_message
 _status = on_alconna(
     Alconna("status"),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )

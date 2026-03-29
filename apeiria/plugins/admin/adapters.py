@@ -7,7 +7,6 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.rules import owner_check
 from apeiria.domains.plugins import plugin_config_view_service
 
 from .presenter import render_list_block
@@ -16,7 +15,6 @@ from .utils import ensure_owner_message
 _adapters = on_alconna(
     Alconna("adapters"),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )

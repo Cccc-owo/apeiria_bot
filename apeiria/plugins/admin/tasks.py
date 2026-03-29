@@ -9,7 +9,6 @@ from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
 from apeiria.core.services.scheduler import scheduler_service
-from apeiria.core.utils.rules import owner_check
 
 from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
@@ -17,7 +16,6 @@ from .utils import ensure_owner_message
 _tasks = on_alconna(
     Alconna("tasks"),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )
@@ -25,7 +23,6 @@ _tasks = on_alconna(
 _task = on_alconna(
     Alconna("task", Args["action", str], Args["task_id", str]),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )

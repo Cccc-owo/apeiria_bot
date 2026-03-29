@@ -21,6 +21,17 @@ admin:
     field_disabled_groups: "已关闭群"
     field_bans: "封禁记录"
     field_adapters: "适配器"
+  session:
+    title: "主人管理 · 会话信息"
+    summary: "以下字段可直接用于当前会话排障或授权"
+    field_adapter: "适配器"
+    field_bot: "Bot ID"
+    field_user: "用户 ID"
+    field_group: "群组 ID"
+    field_session: "会话 ID"
+    field_type: "会话类型"
+    group_footer: "给当前群加管理员时，使用 user_id={user_id} 与 group_id={group_id}"
+    private_footer: "当前不在群上下文；若要加群管理员，请先在目标群内执行本命令。当前 user_id={user_id}"
   adapters:
     title: "主人管理 · 适配器"
     summary: "已配置 {configured} 个适配器，运行中加载 {loaded} 个"
