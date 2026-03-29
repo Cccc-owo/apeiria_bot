@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from arclet.alconna import Args
+from arclet.alconna import Args, CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
@@ -16,14 +16,19 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message, resolve_plugin_query
 
 _plugins = on_alconna(
-    Alconna("plugins"),
+    Alconna("plugins", meta=CommandMeta(description="查看系统插件总览")),
     use_cmd_start=True,
     priority=5,
     block=True,
 )
 
 _plugin = on_alconna(
-    Alconna("plugin", Args["action", str], Args["plugin_name?", str]),
+    Alconna(
+        "plugin",
+        Args["action", str],
+        Args["plugin_name?", str],
+        meta=CommandMeta(description="管理插件状态、详情或配置摘要"),
+    ),
     use_cmd_start=True,
     priority=5,
     block=True,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from arclet.alconna import CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
@@ -11,7 +12,7 @@ from apeiria.domains.dashboard import dashboard_service
 from .utils import ensure_owner_message
 
 _restart = on_alconna(
-    Alconna("restart"),
+    Alconna("restart", meta=CommandMeta(description="安排 bot 进程重启")),
     use_cmd_start=True,
     priority=5,
     block=True,

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import nonebot
 from nonebot.matcher import matchers
 
-from apeiria.core.configs.models import PluginType
+from apeiria.core.configs.models import CommandDeclaration, PluginType
 from apeiria.core.utils.helpers import (
     get_plugin_extra,
     get_plugin_name,
@@ -20,20 +20,6 @@ from apeiria.plugins.help.utils import find_plugin_icon
 
 if TYPE_CHECKING:
     from apeiria.plugins.help.config import CustomCategory, HelpConfig, PluginOverride
-
-_OFFICIAL_COMMAND_DESCRIPTIONS = {
-    "help": "查看帮助菜单或指定插件详情",
-    "status": "查看当前 bot 运行状态摘要",
-    "sid": "查看当前会话的 SID 与 UID 信息",
-    "adapters": "查看当前适配器加载状态",
-    "drivers": "查看当前驱动器运行信息",
-    "plugins": "查看系统插件总览",
-    "plugin": "管理插件状态、详情或配置摘要",
-    "config": "查看核心或插件配置摘要",
-    "restart": "安排 bot 进程重启",
-    "tasks": "查看当前调度任务列表",
-    "task": "查看、暂停或恢复调度任务",
-}
 
 _ARG_DISPLAY_NAMES = {
     "plugin_name": "插件名",
@@ -281,9 +267,6 @@ def _extract_matcher_command(
     description = getattr(alconna_command.meta, "description", "") or ""
     if description == "Unknown":
         description = ""
-    if not description:
-        description = _OFFICIAL_COMMAND_DESCRIPTIONS.get(display_name, "")
-
     usage = _build_usage_text(alconna_command, display_name)
     if not usage:
         get_help = getattr(alconna_command, "get_help", None)
@@ -307,15 +290,55 @@ def _extract_matcher_command(
 
 def _merge_declared_commands(
     existing: list[CommandHelpInfo],
-    declared: list[str],
+    declared: list[str | CommandDeclaration],
 ) -> list[CommandHelpInfo]:
     """Merge declared metadata commands into collected commands."""
     merged = {command.name: command for command in existing}
-    for name in declared:
-        if not isinstance(name, str) or not name or name in merged:
+    for item in declared:
+        command = _command_from_declaration(item)
+        if command is None:
             continue
-        merged[name] = CommandHelpInfo(name=name)
+        existing_command = merged.get(command.name)
+        if existing_command is None:
+            merged[command.name] = command
+            continue
+        merged[command.name] = CommandHelpInfo(
+            name=existing_command.name,
+            description=existing_command.description or command.description,
+            aliases=sorted(set(existing_command.aliases) | set(command.aliases)),
+            usage=existing_command.usage or command.usage,
+            admin_only=existing_command.admin_only or command.admin_only,
+            custom_prefix=(
+                existing_command.custom_prefix
+                if existing_command.custom_prefix is not None
+                else command.custom_prefix
+            ),
+        )
     return list(merged.values())
+
+
+def _command_from_declaration(
+    value: str | CommandDeclaration,
+) -> CommandHelpInfo | None:
+    if isinstance(value, str):
+        name = value.strip()
+        return CommandHelpInfo(name=name) if name else None
+    if not isinstance(value, CommandDeclaration):
+        return None
+    name = value.name.strip()
+    if not name:
+        return None
+    return CommandHelpInfo(
+        name=name,
+        description=value.description.strip(),
+        aliases=sorted(
+            alias.strip()
+            for alias in value.aliases
+            if isinstance(alias, str) and alias.strip() and alias.strip() != name
+        ),
+        usage=value.usage.strip(),
+        custom_prefix=value.custom_prefix,
+    )
 
 
 def _apply_overrides(

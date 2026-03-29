@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from arclet.alconna import CommandMeta
 from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 _session = on_alconna(
-    Alconna("sid"),
+    Alconna("sid", meta=CommandMeta(description="查看当前会话的 SID 与 UID 信息")),
     use_cmd_start=True,
     priority=5,
     block=True,
