@@ -1,4 +1,4 @@
-"""Alconna / UniSeg compatibility for WebChat."""
+"""Alconna / UniSeg / Uninfo compatibility for WebChat."""
 
 import base64
 from collections.abc import Sequence
@@ -151,3 +151,129 @@ def register_webchat_uniseg() -> None:
 
     EXPORTER_MAPPING["WebChat"] = WebChatMessageExporter()
     BUILDER_MAPPING["WebChat"] = WebChatMessageBuilder()
+
+
+def _build_webchat_uninfo_fetcher() -> Any | None:  # noqa: C901
+    try:
+        from nonebot_plugin_uninfo.constraint import SupportScope
+        from nonebot_plugin_uninfo.fetch import InfoFetcher as BaseInfoFetcher
+        from nonebot_plugin_uninfo.model import Scene, SceneType, User
+    except ModuleNotFoundError:
+        return None
+
+    class WebChatInfoFetcher(BaseInfoFetcher):
+        def extract_user(self, data: dict[str, Any]) -> User:
+            user_id = str(data["user_id"])
+            name = data.get("name")
+            return User(
+                id=user_id,
+                name=str(name) if name else user_id,
+                nick=str(data.get("nickname") or name or user_id),
+                avatar=str(data.get("avatar")) if data.get("avatar") else None,
+            )
+
+        def extract_scene(self, data: dict[str, Any]) -> Scene:
+            scene_id = str(data.get("scene_id") or data["user_id"])
+            scene_name = data.get("scene_name") or data.get("name") or scene_id
+            return Scene(
+                id=scene_id,
+                type=SceneType.PRIVATE,
+                name=str(scene_name),
+                avatar=str(data.get("avatar")) if data.get("avatar") else None,
+            )
+
+        def extract_member(
+            self,
+            data: dict[str, Any],  # noqa: ARG002
+            user: User | None,  # noqa: ARG002
+        ) -> None:
+            return None
+
+        def supply_self(self, bot: Bot) -> dict[str, Any]:
+            return {
+                "self_id": str(bot.self_id),
+                "adapter": "WebChat",
+                "scope": SupportScope.unknown,
+            }
+
+        async def query_user(self, bot: Bot, user_id: str) -> User | None:  # noqa: ARG002
+            return User(id=user_id, name=user_id, nick=user_id)
+
+        async def query_scene(
+            self,
+            bot: Bot,  # noqa: ARG002
+            scene_type: Any,
+            scene_id: str,
+            *,
+            parent_scene_id: str | None = None,  # noqa: ARG002
+        ) -> Scene | None:
+            if scene_type != SceneType.PRIVATE:
+                return None
+            return Scene(id=scene_id, type=SceneType.PRIVATE, name=scene_id)
+
+        async def query_member(
+            self,
+            bot: Bot,  # noqa: ARG002
+            scene_type: Any,  # noqa: ARG002
+            parent_scene_id: str,  # noqa: ARG002
+            user_id: str,  # noqa: ARG002
+        ) -> None:
+            return None
+
+        async def query_users(self, bot: Bot):  # noqa: ARG002
+            if False:
+                yield User(id="")
+
+        async def query_scenes(
+            self,
+            bot: Bot,  # noqa: ARG002
+            scene_type: Any = None,  # noqa: ARG002
+            *,
+            parent_scene_id: str | None = None,  # noqa: ARG002
+        ):
+            if False:
+                yield Scene(id="", type=SceneType.PRIVATE)
+
+        async def query_members(
+            self,
+            bot: Bot,  # noqa: ARG002
+            scene_type: Any,  # noqa: ARG002
+            parent_scene_id: str,  # noqa: ARG002
+        ):
+            if False:
+                yield None
+
+    fetcher = WebChatInfoFetcher("WebChat")
+
+    @fetcher.supply_wildcard
+    async def _fetch_webchat_session(bot: Bot, event: Event) -> dict[str, Any]:  # noqa: ARG001
+        assert isinstance(event, WebChatMessageEvent)
+        user_id = event.get_user_id()
+        display_name = event.session.created_by.username or user_id
+        return {
+            "user_id": user_id,
+            "name": display_name,
+            "nickname": display_name,
+            "scene_id": user_id,
+            "scene_name": display_name,
+        }
+
+    return fetcher
+
+
+def register_webchat_uninfo() -> None:
+    """Register a minimal Uninfo fetcher for the in-process WebChat adapter.
+
+    WebChat is an internal adapter, so upstream `nonebot_plugin_uninfo` does not
+    know how to resolve it. A lightweight private-session fetcher is enough to
+    stop warning spam and satisfy libraries that probe session metadata.
+    """
+
+    try:
+        from nonebot_plugin_uninfo.adapters import INFO_FETCHER_MAPPING
+    except ModuleNotFoundError:
+        return
+
+    fetcher = _build_webchat_uninfo_fetcher()
+    if fetcher is not None:
+        INFO_FETCHER_MAPPING["WebChat"] = fetcher
