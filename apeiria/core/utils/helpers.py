@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,15 +35,91 @@ def get_plugin_name(plugin: Plugin) -> str:
 
 
 def get_plugin_required_plugins(plugin: Plugin) -> list[str]:
-    """Get declared plugin dependencies from metadata."""
+    """Get declared plugin dependencies from metadata or source `require()` calls."""
     extra = get_plugin_extra(plugin)
-    if not extra:
+    if extra:
+        return [
+            module
+            for module in extra.required_plugins
+            if isinstance(module, str) and module
+        ]
+
+    module = getattr(plugin, "module", None)
+    module_file = getattr(module, "__file__", None)
+    if not isinstance(module_file, str) or not module_file:
         return []
-    return [
-        module
-        for module in extra.required_plugins
-        if isinstance(module, str) and module
-    ]
+
+    return _scan_required_plugins_from_source(_plugin_source_paths(Path(module_file)))
+
+
+def _plugin_source_paths(origin: Path) -> tuple[str, ...]:
+    try:
+        resolved = origin.resolve()
+    except OSError:
+        return ()
+
+    if resolved.name == "__init__.py":
+        try:
+            return tuple(
+                str(path)
+                for path in sorted(resolved.parent.rglob("*.py"))
+                if path.is_file()
+            )
+        except OSError:
+            return ()
+    return (str(resolved),)
+
+
+@lru_cache(maxsize=256)
+def _scan_required_plugins_from_source(source_paths: tuple[str, ...]) -> list[str]:
+    required: list[str] = []
+    seen: set[str] = set()
+
+    for raw_path in source_paths:
+        path = Path(raw_path)
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+
+        for dependency in _iter_required_plugins_in_tree(tree):
+            if not dependency or dependency in seen:
+                continue
+            seen.add(dependency)
+            required.append(dependency)
+
+    return required
+
+
+def _require_aliases(tree: ast.AST) -> set[str]:
+    aliases = {"require"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.module != "nonebot":
+            continue
+        for alias in node.names:
+            if alias.name == "require":
+                aliases.add(alias.asname or alias.name)
+    return aliases
+
+
+def _iter_required_plugins_in_tree(tree: ast.AST) -> list[str]:
+    aliases = _require_aliases(tree)
+    dependencies: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id not in aliases:
+            continue
+        if not node.args:
+            continue
+        first_arg = node.args[0]
+        if not isinstance(first_arg, ast.Constant) or not isinstance(
+            first_arg.value,
+            str,
+        ):
+            continue
+        dependencies.append(first_arg.value.strip())
+    return dependencies
 
 
 def find_loaded_plugin(name: str) -> Plugin | None:
