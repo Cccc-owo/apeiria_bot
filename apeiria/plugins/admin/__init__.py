@@ -20,6 +20,7 @@ __plugin_meta__ = PluginMetadata(
     description="主人专用的系统管理命令：状态、插件、配置、任务、重启",
     usage=(
         "/status - 查看运行状态\n"
+        "/sid - 查看当前会话 ID 信息\n"
         "/adapters - 查看适配器状态\n"
         "/drivers - 查看 driver 状态\n"
         "/plugins - 查看插件总览\n"
@@ -44,6 +45,7 @@ __plugin_meta__ = PluginMetadata(
         admin_level=6,
         commands=[
             "status",
+            "sid",
             "adapters",
             "drivers",
             "plugins",
@@ -66,5 +68,6 @@ from . import config_view as config_view
 from . import drivers as drivers
 from . import plugin_admin as plugin_admin
 from . import restart as restart
+from . import session_info as session_info
 from . import status as status
 from . import tasks as tasks

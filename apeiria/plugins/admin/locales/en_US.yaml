@@ -21,6 +21,17 @@ admin:
     field_disabled_groups: "Disabled groups"
     field_bans: "Ban records"
     field_adapters: "Adapters"
+  session:
+    title: "Owner Admin · Session Info"
+    summary: "These fields can be used directly for session debugging or permission setup"
+    field_adapter: "Adapter"
+    field_bot: "Bot ID"
+    field_user: "User ID"
+    field_group: "Group ID"
+    field_session: "Session ID"
+    field_type: "Conversation type"
+    group_footer: "To grant admin in this group, use user_id={user_id} with group_id={group_id}"
+    private_footer: "This is not a group context. Run this command inside the target group first. Current user_id={user_id}"
   adapters:
     title: "Owner Admin · Adapters"
     summary: "{configured} configured adapters, {loaded} loaded at runtime"

@@ -8,7 +8,6 @@ from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import get_plugin_name
-from apeiria.core.utils.rules import owner_check
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
 from apeiria.domains.plugins import plugin_catalog_service, plugin_config_view_service
 
@@ -19,7 +18,6 @@ from .utils import ensure_owner_message, resolve_plugin_query
 _plugins = on_alconna(
     Alconna("plugins"),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )
@@ -27,7 +25,6 @@ _plugins = on_alconna(
 _plugin = on_alconna(
     Alconna("plugin", Args["action", str], Args["plugin_name?", str]),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )

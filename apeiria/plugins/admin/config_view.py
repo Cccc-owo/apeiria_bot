@@ -8,7 +8,6 @@ from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import get_plugin_name
-from apeiria.core.utils.rules import owner_check
 from apeiria.domains.plugins import plugin_config_view_service
 
 from .presenter import render_list_block, summarize_value
@@ -17,7 +16,6 @@ from .utils import ensure_owner_message, resolve_plugin_query
 _config = on_alconna(
     Alconna("config", Args["scope", str], Args["target?", str]),
     use_cmd_start=True,
-    rule=owner_check(),
     priority=5,
     block=True,
 )
