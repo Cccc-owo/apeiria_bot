@@ -23,26 +23,23 @@ if TYPE_CHECKING:
 
 _OFFICIAL_COMMAND_DESCRIPTIONS = {
     "help": "查看帮助菜单或指定插件详情",
-    "ban": "封禁指定用户，可附带时长与原因",
-    "unban": "解除指定用户的封禁状态",
-    "banlist": "查看当前封禁名单",
-    "boton": "开启当前群内的 Bot 响应",
-    "botoff": "关闭当前群内的 Bot 响应",
-    "enable": "启用当前群的某个插件",
-    "disable": "禁用当前群的某个插件",
-    "kick": "将指定成员移出当前群",
-    "mute": "禁言指定成员一段时间",
-    "unmute": "解除指定成员禁言",
-    "pluginlist": "查看当前群插件启用状态",
-    "setlevel": "设置用户权限等级",
+    "status": "查看当前 bot 运行状态摘要",
+    "adapters": "查看当前适配器加载状态",
+    "drivers": "查看当前驱动器运行信息",
+    "plugins": "查看系统插件总览",
+    "plugin": "管理插件状态、详情或配置摘要",
+    "config": "查看核心或插件配置摘要",
+    "restart": "安排 bot 进程重启",
+    "tasks": "查看当前调度任务列表",
+    "task": "查看、暂停或恢复调度任务",
 }
 
 _ARG_DISPLAY_NAMES = {
     "plugin_name": "插件名",
-    "user": "用户",
-    "duration": "时长",
-    "reason": "原因",
-    "level": "等级",
+    "action": "动作",
+    "scope": "范围",
+    "target": "目标",
+    "task_id": "任务ID",
 }
 
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 FRAMEWORK_PROTECTED_PLUGIN_MODULES = frozenset(
     {
+        "apeiria.plugins.admin",
+        "apeiria.plugins.help",
         "apeiria.plugins.web_ui",
         "apeiria.plugins.render",
         "nonebot_plugin_apscheduler",

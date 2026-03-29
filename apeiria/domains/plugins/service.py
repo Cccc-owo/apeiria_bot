@@ -113,18 +113,30 @@ class PluginCatalogService:
             )
         return items
 
-    async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> None:
+    async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> bool:
+        plugin = find_loaded_plugin(module_name)
+        if plugin is None:
+            raise ResourceNotFoundError(module_name)
+
         if not enabled:
             reason = get_plugin_protection_reason(module_name)
             if reason:
                 raise ProtectedPluginError(reason)
 
-        await plugin_catalog_repository.set_plugin_enabled(
-            module_name,
-            enabled=enabled,
-        )
+        try:
+            changed = await plugin_catalog_repository.set_plugin_enabled(
+                module_name,
+                enabled=enabled,
+            )
+        except ResourceNotFoundError:
+            await plugin_catalog_repository.ensure_plugin_record(plugin)
+            changed = await plugin_catalog_repository.set_plugin_enabled(
+                module_name,
+                enabled=enabled,
+            )
 
         await permission_service.invalidate_plugin_global_cache(module_name)
+        return changed
 
     async def uninstall_plugin(
         self,
