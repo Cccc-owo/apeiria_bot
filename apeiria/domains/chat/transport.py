@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fastapi import WebSocket, WebSocketDisconnect
+from nonebot.log import logger
 from pydantic import ValidationError
 
 from apeiria.core.i18n import t
@@ -44,6 +45,7 @@ async def serve_chat_websocket(
         if active_session_id:
             web_chat_service.close_session(active_session_id)
     except Exception as exc:  # noqa: BLE001
+        logger.opt(exception=exc).error("Web UI chat websocket loop crashed")
         await web_chat_service.emit_error(
             connection,
             code="INTERNAL_ERROR",

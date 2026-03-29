@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from nonebot.adapters import Event
 
-if TYPE_CHECKING:
-    from .message import WebChatMessage
-    from .session import ChatSession
+from .message import WebChatMessage  # noqa: TC001
+from .session import ChatSession  # noqa: TC001
 
 
 class WebChatMessageEvent(Event):
@@ -31,15 +30,17 @@ class WebChatMessageEvent(Event):
         self_id: str = "webchat",
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
-        object.__setattr__(self, "session", session)
-        object.__setattr__(self, "message", message)
-        object.__setattr__(self, "message_id", message_id)
-        object.__setattr__(self, "time", timestamp)
-        object.__setattr__(self, "self_id", self_id)
-        object.__setattr__(self, "post_type", "message")
-        object.__setattr__(self, "message_type", "private")
-        object.__setattr__(self, "user_id", session.target_user_id)
+        super().__init__(
+            session=session,
+            message=message,
+            message_id=message_id,
+            time=timestamp,
+            self_id=self_id,
+            post_type="message",
+            message_type="private",
+            user_id=session.target_user_id,
+            **kwargs,
+        )
 
     def get_type(self) -> str:
         return "message"
@@ -64,3 +65,6 @@ class WebChatMessageEvent(Event):
 
     def is_tome(self) -> bool:
         return True
+
+
+WebChatMessageEvent.model_rebuild()
