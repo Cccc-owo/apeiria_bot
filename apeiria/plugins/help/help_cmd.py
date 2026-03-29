@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 
 import nonebot
-from arclet.alconna import Args, CommandMeta, Option
+from arclet.alconna import Args, CommandMeta, MultiVar, Option
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
@@ -21,7 +21,7 @@ from apeiria.plugins.help.generator import (
 _help = on_alconna(
     Alconna(
         "help",
-        Args["plugin_name?", str],
+        Args["plugin_name?", MultiVar(str, "*")],
         Option("--all"),
         meta=CommandMeta(description="查看帮助菜单或指定插件详情"),
     ),
@@ -117,7 +117,7 @@ def _format_plugin_detail_text(
 async def handle_help(
     bot: Bot,
     event: Event,
-    plugin_name: Match[str],
+    plugin_name: Match[tuple[str, ...]],
     show_all_flag: Match[object],
 ) -> None:
     config = get_help_config()
@@ -125,11 +125,12 @@ async def handle_help(
     show_all = _is_superuser(event) and (
         config.admin_show_all or show_all_flag.available
     )
+    target_name = _merge_plugin_name(plugin_name)
 
-    if plugin_name.available:
+    if target_name:
         await _show_plugin_detail(
             bot,
-            plugin_name.result,
+            target_name,
             prefix=prefix,
             config=config,
             show_all=show_all,
@@ -215,3 +216,14 @@ async def _show_plugin_detail(
 def _display_name(prefix: str, name: str, custom_prefix: str | None) -> str:
     effective_prefix = prefix if custom_prefix is None else custom_prefix
     return f"{effective_prefix}{name}"
+
+
+def _merge_plugin_name(plugin_name: Match[tuple[str, ...]]) -> str | None:
+    parts = [
+        item.strip()
+        for item in plugin_name.result
+        if isinstance(item, str) and item.strip()
+    ] if plugin_name.available else []
+    if not parts:
+        return None
+    return " ".join(parts)

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import nonebot
 from nonebot.matcher import matchers
+from nonebot.rule import CommandRule
 
 from apeiria.core.configs.models import CommandDeclaration, PluginType
 from apeiria.core.utils.helpers import (
@@ -218,7 +219,7 @@ def _discover_plugins(
 def _collect_matcher_commands(
     plugins: dict[str, PluginHelpInfo],
 ) -> dict[str, list[CommandHelpInfo]]:
-    """Collect command information from registered Alconna matchers."""
+    """Collect command information from registered matchers."""
     commands_by_plugin: dict[str, dict[str, CommandHelpInfo]] = {}
 
     for matcher_group in matchers.values():
@@ -237,9 +238,18 @@ def _collect_matcher_commands(
         plugin_id: sorted(command_map.values(), key=lambda item: item.name)
         for plugin_id, command_map in commands_by_plugin.items()
     }
-
-
 def _extract_matcher_command(
+    matcher: type[object],
+    plugin: PluginHelpInfo,
+) -> CommandHelpInfo | None:
+    """Extract one command from an Alconna or standard command matcher."""
+    command = _extract_alconna_matcher_command(matcher, plugin)
+    if command is not None:
+        return command
+    return _extract_standard_matcher_command(matcher, plugin)
+
+
+def _extract_alconna_matcher_command(
     matcher: type[object],
     plugin: PluginHelpInfo,
 ) -> CommandHelpInfo | None:
@@ -286,6 +296,55 @@ def _extract_matcher_command(
         usage=usage,
         admin_only=plugin.admin_level > 0,
     )
+
+
+def _extract_standard_matcher_command(
+    matcher: type[object],
+    plugin: PluginHelpInfo,
+) -> CommandHelpInfo | None:
+    """Extract one command from a standard NoneBot command rule."""
+    commands = _extract_rule_commands(getattr(matcher, "rule", None))
+    if not commands:
+        return None
+
+    display_name = commands[0]
+    aliases = sorted({command for command in commands[1:] if command != display_name})
+    prefix = get_command_prefix()
+
+    return CommandHelpInfo(
+        name=display_name,
+        aliases=aliases,
+        usage=prefix + display_name,
+        admin_only=plugin.admin_level > 0,
+    )
+
+
+def _extract_rule_commands(rule: Any) -> list[str]:
+    if rule is None:
+        return []
+
+    raw_commands: list[str] = []
+    for checker in getattr(rule, "checkers", ()):
+        dependent_call = getattr(checker, "call", None)
+        if not isinstance(dependent_call, CommandRule):
+            continue
+        for command_tokens in dependent_call.cmds:
+            command = " ".join(
+                token.strip()
+                for token in command_tokens
+                if isinstance(token, str) and token.strip()
+            ).strip()
+            if command:
+                raw_commands.append(command)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for command in raw_commands:
+        if command in seen:
+            continue
+        seen.add(command)
+        deduped.append(command)
+    return deduped
 
 
 def _merge_declared_commands(
