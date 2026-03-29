@@ -96,8 +96,8 @@ class WebChatMessageHandler:
             self._codec,
             self._emitter,
         )
-        event = self._build_event(session, payload.message_id, payload.segments)
         try:
+            event = self._build_event(session, payload.message_id, payload.segments)
             await handle_event(bot, event)
         except Exception as exc:  # noqa: BLE001
             await bot.emit_error(str(exc))
