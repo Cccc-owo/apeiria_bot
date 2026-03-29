@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from arclet.alconna import Args
+from arclet.alconna import Args, CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
@@ -14,7 +14,12 @@ from .presenter import render_list_block, summarize_value
 from .utils import ensure_owner_message, resolve_plugin_query
 
 _config = on_alconna(
-    Alconna("config", Args["scope", str], Args["target?", str]),
+    Alconna(
+        "config",
+        Args["scope", str],
+        Args["target?", str],
+        meta=CommandMeta(description="查看核心或插件配置摘要"),
+    ),
     use_cmd_start=True,
     priority=5,
     block=True,

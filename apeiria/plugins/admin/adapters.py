@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import nonebot
+from arclet.alconna import CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
@@ -13,7 +14,7 @@ from .presenter import render_list_block
 from .utils import ensure_owner_message
 
 _adapters = on_alconna(
-    Alconna("adapters"),
+    Alconna("adapters", meta=CommandMeta(description="查看当前适配器加载状态")),
     use_cmd_start=True,
     priority=5,
     block=True,

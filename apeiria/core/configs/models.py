@@ -36,6 +36,17 @@ class RegisterConfig:
 
 
 @dataclass
+class CommandDeclaration:
+    """Declares one command help entry for plugin metadata."""
+
+    name: str
+    description: str = ""
+    usage: str = ""
+    aliases: list[str] = field(default_factory=list)
+    custom_prefix: str | None = None
+
+
+@dataclass
 class PluginExtraData:
     """Extended metadata for apeiria plugins.
 
@@ -47,7 +58,7 @@ class PluginExtraData:
     version: str = "0.1.0"
     plugin_type: PluginType = PluginType.NORMAL
     admin_level: int = 0
-    commands: list[str] = field(default_factory=list)
+    commands: list[str | CommandDeclaration] = field(default_factory=list)
     configs: list[RegisterConfig] = field(default_factory=list)
     required_plugins: list[str] = field(default_factory=list)
 
@@ -76,13 +87,18 @@ class PluginExtraData:
                 _coerce_register_config(c) if isinstance(c, dict) else c
                 for c in configs_raw
             ]
+            commands_raw = extra.get("commands", [])
+            commands = [
+                _coerce_command_declaration(item) if isinstance(item, dict) else item
+                for item in commands_raw
+            ]
 
             return cls(
                 author=extra.get("author", "unknown"),
                 version=extra.get("version", "0.0.0"),
                 plugin_type=plugin_type,
                 admin_level=extra.get("admin_level", 0),
-                commands=extra.get("commands", []),
+                commands=commands,
                 configs=configs,
                 required_plugins=extra.get("required_plugins", []),
             )
@@ -122,6 +138,24 @@ def _coerce_register_config(raw: dict[str, Any]) -> RegisterConfig:
         value_schema=(
             _coerce_register_config(value_schema)
             if isinstance(value_schema, dict)
+            else None
+        ),
+    )
+
+
+def _coerce_command_declaration(raw: dict[str, Any]) -> CommandDeclaration:
+    return CommandDeclaration(
+        name=str(raw.get("name", "")),
+        description=str(raw.get("description", "")),
+        usage=str(raw.get("usage", "")),
+        aliases=[
+            str(item)
+            for item in raw.get("aliases", [])
+            if isinstance(item, str) and item.strip()
+        ],
+        custom_prefix=(
+            str(raw.get("custom_prefix"))
+            if isinstance(raw.get("custom_prefix"), str) and raw.get("custom_prefix")
             else None
         ),
     )

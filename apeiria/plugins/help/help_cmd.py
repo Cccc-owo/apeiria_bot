@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 
 import nonebot
-from arclet.alconna import Args, Option
+from arclet.alconna import Args, CommandMeta, Option
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
@@ -19,7 +19,12 @@ from apeiria.plugins.help.generator import (
 )
 
 _help = on_alconna(
-    Alconna("help", Args["plugin_name?", str], Option("--all")),
+    Alconna(
+        "help",
+        Args["plugin_name?", str],
+        Option("--all"),
+        meta=CommandMeta(description="查看帮助菜单或指定插件详情"),
+    ),
     aliases={"帮助", "菜单", "功能"},
     use_cmd_start=True,
     priority=1,

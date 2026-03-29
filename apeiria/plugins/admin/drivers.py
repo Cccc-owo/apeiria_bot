@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import nonebot
+from arclet.alconna import CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
@@ -13,7 +14,7 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
 
 _drivers = on_alconna(
-    Alconna("drivers"),
+    Alconna("drivers", meta=CommandMeta(description="查看当前驱动器运行信息")),
     use_cmd_start=True,
     priority=5,
     block=True,

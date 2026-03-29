@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from apscheduler.jobstores.base import JobLookupError
-from arclet.alconna import Args
+from arclet.alconna import Args, CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
@@ -14,14 +14,19 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
 
 _tasks = on_alconna(
-    Alconna("tasks"),
+    Alconna("tasks", meta=CommandMeta(description="查看当前调度任务列表")),
     use_cmd_start=True,
     priority=5,
     block=True,
 )
 
 _task = on_alconna(
-    Alconna("task", Args["action", str], Args["task_id", str]),
+    Alconna(
+        "task",
+        Args["action", str],
+        Args["task_id", str],
+        meta=CommandMeta(description="查看、暂停或恢复调度任务"),
+    ),
     use_cmd_start=True,
     priority=5,
     block=True,
