@@ -1,4 +1,4 @@
-"""Admin plugin — group management commands."""
+"""Admin plugin — owner management commands."""
 
 from pathlib import Path
 
@@ -10,57 +10,61 @@ from apeiria.core.i18n import load_locales
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_orm")
+require("nonebot_plugin_apscheduler")
 
 # Register plugin locales
 load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
-    name="群管理",
-    description="群组管理功能：封禁、禁言、踢出、插件开关、权限设置",
+    name="主人管理",
+    description="主人专用的系统管理命令：状态、插件、配置、任务、重启",
     usage=(
-        "/ban @user [时长(分钟)] [原因] - 封禁用户\n"
-        "/unban @user - 解除封禁\n"
-        "/mute @user <时长(分钟)> - 禁言\n"
-        "/unmute @user - 解除禁言\n"
-        "/kick @user - 踢出群聊\n"
-        "/enable <插件名> - 启用插件\n"
-        "/disable <插件名> - 禁用插件\n"
-        "/setlevel @user <等级> - 设置权限等级(0-4)\n"
-        "/boton - 开启Bot\n"
-        "/botoff - 关闭Bot\n"
-        "/banlist - 查看封禁列表\n"
-        "/pluginlist - 查看插件状态"
+        "/status - 查看运行状态\n"
+        "/adapters - 查看适配器状态\n"
+        "/drivers - 查看 driver 状态\n"
+        "/plugins - 查看插件总览\n"
+        "/plugin info <插件名> - 查看插件详情\n"
+        "/plugin configs <插件名> - 查看插件配置摘要\n"
+        "/plugin enable <插件名> - 启用插件\n"
+        "/plugin disable <插件名> - 禁用插件\n"
+        "/config core - 查看核心配置摘要\n"
+        "/config plugin <插件名> - 查看插件配置摘要\n"
+        "/restart - 重启 Bot\n"
+        "/tasks - 查看调度任务\n"
+        "/task info <任务ID> - 查看任务详情\n"
+        "/task pause <任务ID> - 暂停任务\n"
+        "/task resume <任务ID> - 恢复任务"
     ),
     type="application",
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
     extra=PluginExtraData(
         author="apeiria",
         version="0.1.0",
-        plugin_type=PluginType.ADMIN,
-        admin_level=5,
+        plugin_type=PluginType.SUPERUSER,
+        admin_level=6,
         commands=[
-            "ban",
-            "unban",
-            "mute",
-            "unmute",
-            "kick",
-            "enable",
-            "disable",
-            "setlevel",
-            "boton",
-            "botoff",
-            "banlist",
-            "pluginlist",
+            "status",
+            "adapters",
+            "drivers",
+            "plugins",
+            "plugin",
+            "config",
+            "restart",
+            "tasks",
+            "task",
         ],
-        required_plugins=["nonebot_plugin_alconna", "nonebot_plugin_orm"],
+        required_plugins=[
+            "nonebot_plugin_alconna",
+            "nonebot_plugin_orm",
+            "nonebot_plugin_apscheduler",
+        ],
     ).to_dict(),
 )
 
-from . import ban as ban
-from . import banlist as banlist
-from . import bot_switch as bot_switch
-from . import kick as kick
-from . import mute as mute
-from . import plugin_switch as plugin_switch
-from . import pluginlist as pluginlist
-from . import set_level as set_level
+from . import adapters as adapters
+from . import config_view as config_view
+from . import drivers as drivers
+from . import plugin_admin as plugin_admin
+from . import restart as restart
+from . import status as status
+from . import tasks as tasks

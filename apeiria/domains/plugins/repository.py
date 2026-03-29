@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select
 
+from apeiria.core.configs.models import PluginExtraData
 from apeiria.core.models.plugin_info import PluginInfo
 from apeiria.domains.exceptions import ResourceNotFoundError
+
+if TYPE_CHECKING:
+    from nonebot.plugin import Plugin
 
 
 class PluginCatalogRepository:
@@ -20,7 +26,7 @@ class PluginCatalogRepository:
             rows = result.all()
         return {row[0]: row[1] for row in rows}
 
-    async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> None:
+    async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> bool:
         async with get_session() as session:
             result = await session.execute(
                 select(PluginInfo).where(PluginInfo.module_name == module_name)
@@ -28,7 +34,47 @@ class PluginCatalogRepository:
             record = result.scalar_one_or_none()
             if record is None:
                 raise ResourceNotFoundError(module_name)
+            changed = record.is_global_enabled != enabled
+            if not changed:
+                return False
             record.is_global_enabled = enabled
+            await session.commit()
+        return True
+
+    async def ensure_plugin_record(self, plugin: Plugin) -> None:
+        meta = plugin.metadata
+        extra: PluginExtraData | None = None
+        if meta and meta.extra:
+            extra = PluginExtraData.from_extra(meta.extra)
+
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginInfo).where(PluginInfo.module_name == plugin.module_name)
+            )
+            record = result.scalar_one_or_none()
+            if record is None:
+                session.add(
+                    PluginInfo(
+                        module_name=plugin.module_name,
+                        name=meta.name if meta else plugin.name,
+                        description=meta.description if meta else None,
+                        usage=meta.usage if meta else None,
+                        plugin_type=extra.plugin_type.value if extra else "normal",
+                        admin_level=extra.admin_level if extra else 0,
+                        author=extra.author if extra else None,
+                        version=extra.version if extra else None,
+                    )
+                )
+                await session.commit()
+                return
+
+            record.name = meta.name if meta else plugin.name
+            record.description = meta.description if meta else None
+            record.usage = meta.usage if meta else None
+            record.plugin_type = extra.plugin_type.value if extra else "normal"
+            record.admin_level = extra.admin_level if extra else 0
+            record.author = extra.author if extra else None
+            record.version = extra.version if extra else None
             await session.commit()
 
 

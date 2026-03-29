@@ -56,6 +56,10 @@ class SchedulerService:
             for job in jobs
         ]
 
+    def get_job(self, job_id: str) -> Any | None:
+        """Return one job by ID if it exists."""
+        return _scheduler.get_job(job_id)
+
     def pause_job(self, job_id: str) -> None:
         _scheduler.pause_job(job_id)
 
