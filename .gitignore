@@ -146,7 +146,8 @@ dmypy.json
 .vscode/
 
 # Bot runtime data
-cache/
+/cache/
+/config/
 /data/
 user_bot.py
 apeiria.config.toml
