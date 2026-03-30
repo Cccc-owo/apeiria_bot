@@ -218,58 +218,79 @@
             <div class="plugin-card__footer">
               <div class="plugin-card__footer-bar">
                 <div class="plugin-card__actions">
-                  <v-btn
-                    v-if="canUninstallPlugin(item)"
-                    color="warning"
-                    :loading="uninstallingModule === item.module_name"
-                    size="small"
-                    variant="text"
-                    @click="uninstallPluginItem(item)"
-                  >
+                  <v-tooltip v-if="canUninstallPlugin(item)" location="top">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="warning"
+                        icon="mdi-trash-can-outline"
+                        :loading="uninstallingModule === item.module_name"
+                        size="small"
+                        variant="text"
+                        @click="uninstallPluginItem(item)"
+                      />
+                    </template>
                     {{ t('plugins.settingsUninstall') }}
-                  </v-btn>
-                  <v-btn
-                    v-if="pluginProjectUrl(item)"
-                    color="primary"
-                    :href="pluginProjectUrl(item)"
-                    rel="noopener noreferrer"
-                    size="small"
-                    target="_blank"
-                    variant="text"
-                  >
+                  </v-tooltip>
+                  <v-tooltip v-if="pluginProjectUrl(item)" location="top">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="primary"
+                        :href="pluginProjectUrl(item)"
+                        icon="mdi-open-in-new"
+                        rel="noopener noreferrer"
+                        size="small"
+                        target="_blank"
+                        variant="text"
+                      />
+                    </template>
                     {{ t('plugins.projectPage') }}
-                  </v-btn>
-                  <v-btn
-                    v-if="item.can_view_readme"
-                    color="primary"
-                    :loading="readmeLoadingModule === item.module_name"
-                    size="small"
-                    variant="text"
-                    @click="openReadme(item)"
-                  >
+                  </v-tooltip>
+                  <v-tooltip v-if="item.can_view_readme" location="top">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="primary"
+                        icon="mdi-file-document-outline"
+                        :loading="readmeLoadingModule === item.module_name"
+                        size="small"
+                        variant="text"
+                        @click="openReadme(item)"
+                      />
+                    </template>
                     {{ t('plugins.readme') }}
-                  </v-btn>
-                  <v-btn
-                    v-if="canUpdatePlugin(item)"
-                    :color="hasPluginUpdate(item) ? 'primary' : undefined"
-                    :disabled="updateCheckLoading || !hasPluginUpdate(item)"
-                    :loading="packageUpdatingModule === item.module_name"
-                    size="small"
-                    :variant="hasPluginUpdate(item) ? 'tonal' : 'text'"
-                    @click="updatePluginItem(item)"
-                  >
-                    {{ t('plugins.packageUpdate') }}
-                  </v-btn>
-                  <v-btn
-                    v-if="item.can_edit_config"
-                    color="primary"
-                    :loading="settingsLoadingModule === item.module_name"
-                    size="small"
-                    variant="text"
-                    @click="openSettings(item)"
-                  >
+                  </v-tooltip>
+                  <v-tooltip v-if="canUpdatePlugin(item)" location="top">
+                    <template #activator="{ props }">
+                      <span v-bind="props" class="plugin-card__action-anchor">
+                        <v-btn
+                          :color="hasPluginUpdate(item) ? 'primary' : undefined"
+                          :disabled="updateCheckLoading || !hasPluginUpdate(item)"
+                          icon="mdi-update"
+                          :loading="packageUpdatingModule === item.module_name"
+                          size="small"
+                          :variant="hasPluginUpdate(item) ? 'tonal' : 'text'"
+                          @click="updatePluginItem(item)"
+                        />
+                      </span>
+                    </template>
+                    {{ updateButtonTooltip(item) }}
+                  </v-tooltip>
+                  <v-tooltip v-if="item.can_edit_config" location="top">
+                    <template #activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        color="primary"
+                        icon="mdi-cog-outline"
+                        :loading="settingsLoadingModule === item.module_name"
+                        size="small"
+                        variant="text"
+                        @click="openSettings(item)"
+                      />
+                    </template>
                     {{ t('plugins.settings') }}
-                  </v-btn>
+                  </v-tooltip>
                 </div>
                 <div class="plugin-card__switch-wrap">
                   <v-switch
@@ -1187,6 +1208,25 @@
     return !!pluginUpdateCheck(item)?.has_update
   }
 
+  function updateButtonTooltip (item: PluginItem) {
+    if (updateCheckLoading.value) return t('plugins.checkingUpdates')
+    const result = pluginUpdateCheck(item)
+    if (!result) return t('plugins.updateUnavailable')
+    if (result.has_update) {
+      return t('plugins.updateAvailableVersion', {
+        current: result.current_version || '?',
+        latest: result.latest_version || '?',
+      })
+    }
+    if (result.checked) {
+      return t('plugins.updateLatestVersion', {
+        version: result.current_version || result.latest_version || '?',
+      })
+    }
+    if (result.error?.trim()) return result.error.trim()
+    return t('plugins.updateUnavailable')
+  }
+
   function pluginToggleHint (item: PluginItem) {
     if (item.is_pending_uninstall) return t('plugins.pendingUninstallHint')
     if (item.is_protected && item.protected_reason) return item.protected_reason
@@ -1553,7 +1593,7 @@
   function canUpdatePlugin (item: PluginItem) {
     return (
       authStore.role === 'owner'
-      && item.can_uninstall
+      && item.can_package_update
       && !item.is_pending_uninstall
       && !!item.installed_package
     )
@@ -2135,6 +2175,10 @@
   gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.plugin-card__action-anchor {
+  display: inline-flex;
 }
 
 .plugin-card__actions :deep(.v-btn) {

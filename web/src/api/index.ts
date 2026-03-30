@@ -195,6 +195,7 @@ export interface PluginItem {
   can_view_readme: boolean
   can_enable_disable: boolean
   can_uninstall: boolean
+  can_package_update: boolean
   child_plugins: string[]
   required_plugins: string[]
   dependent_plugins: string[]

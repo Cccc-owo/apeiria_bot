@@ -10,7 +10,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from apeiria.core.i18n import t
-from apeiria.core.services.plugin_update_check import plugin_update_check_service
+from apeiria.core.services.plugin_update_check import (
+    plugin_update_check_service,
+    supports_plugin_update_check,
+)
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
 from apeiria.domains.plugin_store import plugin_store_task_service
 from apeiria.domains.plugins import (
@@ -490,6 +493,11 @@ async def list_plugins(
             can_view_readme=plugin.can_view_readme,
             can_enable_disable=plugin.can_enable_disable,
             can_uninstall=plugin.can_uninstall,
+            can_package_update=(
+                plugin.can_uninstall
+                and bool(plugin.installed_package)
+                and supports_plugin_update_check(plugin.installed_package)
+            ),
             child_plugins=plugin.child_plugins,
             required_plugins=plugin.required_plugins,
             dependent_plugins=plugin.dependent_plugins,
@@ -666,7 +674,11 @@ async def update_plugin_package_task(
             status_code=404,
             detail=t("web_ui.plugins.not_found"),
         ) from None
-    if not plugin.can_uninstall or plugin.installed_package != payload.package_name:
+    if (
+        not plugin.can_uninstall
+        or plugin.installed_package != payload.package_name
+        or not supports_plugin_update_check(payload.package_name)
+    ):
         raise HTTPException(
             status_code=400,
             detail="plugin package update is not allowed",

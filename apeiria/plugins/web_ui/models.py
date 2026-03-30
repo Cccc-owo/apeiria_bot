@@ -189,6 +189,7 @@ class PluginItem(BaseModel):
     can_view_readme: bool = False
     can_enable_disable: bool = False
     can_uninstall: bool = False
+    can_package_update: bool = False
     child_plugins: list[str] = []
     required_plugins: list[str] = []
     dependent_plugins: list[str] = []
