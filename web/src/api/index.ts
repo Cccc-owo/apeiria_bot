@@ -206,6 +206,24 @@ export interface PluginItem {
   installed_module_names: string[]
 }
 
+export interface PluginTogglePreview {
+  module_name: string
+  enabled: boolean
+  allowed: boolean
+  summary: string
+  blocked_reason: string | null
+  requires_enable: string[]
+  requires_disable: string[]
+  protected_dependents: string[]
+  missing_dependencies: string[]
+}
+
+export interface PluginToggleResult {
+  module_name: string
+  enabled: boolean
+  affected_modules: string[]
+}
+
 export interface OrphanPluginConfigItem {
   section: string
   module_name: string | null
@@ -562,8 +580,17 @@ export const updatePluginConfig = (payload: {
     dirs: DirConfigItem[]
   }>('/plugins/config', payload)
 
-export const updatePlugin = (moduleName: string, enabled: boolean) =>
-  client.patch(`/plugins/${moduleName}`, null, {
+export const updatePlugin = (
+  moduleName: string,
+  enabled: boolean,
+  cascade = false,
+) =>
+  client.patch<PluginToggleResult>(`/plugins/${moduleName}`, null, {
+    params: { enabled, cascade },
+  })
+
+export const getPluginTogglePreview = (moduleName: string, enabled: boolean) =>
+  client.get<PluginTogglePreview>(`/plugins/${moduleName}/toggle-preview`, {
     params: { enabled },
   })
 

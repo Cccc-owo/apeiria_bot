@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from apeiria.core.i18n import t
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
@@ -48,10 +49,16 @@ from apeiria.plugins.web_ui.models import (
     PluginSettingsResponse,
     PluginSettingsUpdateRequest,
     PluginStoreTaskItem,
+    PluginTogglePreviewResponse,
+    PluginToggleResponse,
     PluginUninstallRequest,
 )
 
 router = APIRouter()
+
+
+class _PluginTogglePreviewQuery(BaseModel):
+    enabled: bool
 
 
 def _to_orphan_plugin_config_response(
@@ -417,15 +424,20 @@ async def list_plugins(
     ]
 
 
-@router.patch("/{module_name}")
+@router.patch("/{module_name}", response_model=PluginToggleResponse)
 async def update_plugin(
     module_name: str,
     _: Annotated[Any, Depends(require_control_panel)],
     *,
     enabled: bool = True,
-) -> dict[str, str]:
+    cascade: bool = False,
+) -> PluginToggleResponse:
     try:
-        await plugin_catalog_service.set_plugin_enabled(module_name, enabled=enabled)
+        result = await plugin_catalog_service.apply_plugin_toggle(
+            module_name,
+            enabled=enabled,
+            cascade=cascade,
+        )
     except ResourceNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -436,7 +448,42 @@ async def update_plugin(
             status_code=400,
             detail=t("web_ui.plugins.protected", reason=str(exc)),
         ) from None
-    return {"status": "ok"}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return PluginToggleResponse(
+        module_name=result.module_name,
+        enabled=result.enabled,
+        affected_modules=result.affected_modules,
+    )
+
+
+@router.get("/{module_name}/toggle-preview", response_model=PluginTogglePreviewResponse)
+async def preview_toggle_plugin(
+    module_name: str,
+    query: Annotated[_PluginTogglePreviewQuery, Depends()],
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginTogglePreviewResponse:
+    try:
+        preview = await plugin_catalog_service.preview_toggle_plugin(
+            module_name,
+            enabled=query.enabled,
+        )
+    except ResourceNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.not_found"),
+        ) from None
+    return PluginTogglePreviewResponse(
+        module_name=preview.module_name,
+        enabled=preview.enabled,
+        allowed=preview.allowed,
+        summary=preview.summary,
+        blocked_reason=preview.blocked_reason,
+        requires_enable=preview.requires_enable,
+        requires_disable=preview.requires_disable,
+        protected_dependents=preview.protected_dependents,
+        missing_dependencies=preview.missing_dependencies,
+    )
 
 
 @router.post("/{module_name}/uninstall", response_model=OperationStatusResponse)

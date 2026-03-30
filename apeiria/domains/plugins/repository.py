@@ -26,6 +26,13 @@ class PluginCatalogRepository:
             rows = result.all()
         return {row[0]: row[1] for row in rows}
 
+    async def get_plugin_info_map(self) -> dict[str, PluginInfo]:
+        """Return persisted plugin info indexed by module name."""
+        async with get_session() as session:
+            result = await session.execute(select(PluginInfo))
+            rows = result.scalars().all()
+        return {row.module_name: row for row in rows}
+
     async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> bool:
         async with get_session() as session:
             result = await session.execute(
@@ -40,6 +47,24 @@ class PluginCatalogRepository:
             record.is_global_enabled = enabled
             await session.commit()
         return True
+
+    async def ensure_plugin_record_by_module_name(self, module_name: str) -> None:
+        """Ensure a minimal plugin record exists for unloaded-but-managed plugins."""
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginInfo).where(PluginInfo.module_name == module_name)
+            )
+            record = result.scalar_one_or_none()
+            if record is not None:
+                return
+
+            session.add(
+                PluginInfo(
+                    module_name=module_name,
+                    name=module_name,
+                )
+            )
+            await session.commit()
 
     async def ensure_plugin_record(self, plugin: Plugin) -> None:
         meta = plugin.metadata

@@ -14,13 +14,13 @@ from apeiria.config.plugins import plugin_config_service
 from apeiria.config.project import project_config_service
 from apeiria.core.i18n import t
 from apeiria.core.plugin_policy import is_framework_dependency_plugin_module
+from apeiria.core.services.plugin_runtime_state import get_disabled_plugin_modules
 from apeiria.core.utils.helpers import (
     find_loaded_plugin,
     get_module_required_plugins,
     get_pending_uninstall_plugin_modules,
     get_plugin_extra,
     get_plugin_name,
-    get_plugin_protection_reason,
     get_plugin_required_plugins,
     get_plugin_source,
     get_plugin_source_by_module_name,
@@ -38,6 +38,7 @@ from apeiria.runtime_env import (
     enqueue_plugin_requirement_removal,
     resolve_declared_plugin_requirement,
 )
+from apeiria.runtime_framework import iter_builtin_plugin_modules
 
 if TYPE_CHECKING:
     from nonebot.plugin import Plugin
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class _PluginListContext:
     enabled_map: dict[str, bool]
+    info_map: dict[str, object]
     package_bindings: dict[str, list[str]]
     pending_uninstall_modules: set[str]
     top_level_packages: dict[str, list[str]]
@@ -90,6 +92,30 @@ class PluginCatalogItem:
 
 
 @dataclass(frozen=True)
+class PluginTogglePreview:
+    """Preview result for enabling or disabling one plugin."""
+
+    module_name: str
+    enabled: bool
+    allowed: bool
+    summary: str
+    blocked_reason: str | None
+    requires_enable: list[str]
+    requires_disable: list[str]
+    protected_dependents: list[str]
+    missing_dependencies: list[str]
+
+
+@dataclass(frozen=True)
+class PluginToggleResult:
+    """Applied toggle result for one plugin operation."""
+
+    module_name: str
+    enabled: bool
+    affected_modules: list[str]
+
+
+@dataclass(frozen=True)
 class OrphanPluginConfigItem:
     """One orphaned plugin config entry in project config."""
 
@@ -104,8 +130,10 @@ class PluginCatalogService:
 
     async def list_plugins(self) -> list[PluginCatalogItem]:
         enabled_map = await plugin_catalog_repository.get_enabled_map()
+        info_map = await plugin_catalog_repository.get_plugin_info_map()
         project_plugin_config = plugin_config_service.read_project_plugin_config()
         explicit_modules = set(project_plugin_config["modules"])
+        builtin_modules = set(iter_builtin_plugin_modules())
         package_bindings = project_plugin_config["packages"]
         pending_uninstall_modules = get_pending_uninstall_plugin_modules()
         loaded_plugins = {
@@ -128,14 +156,19 @@ class PluginCatalogService:
             required_by_module=required_by_module,
         )
         top_level_packages = packages_distributions()
+        disabled_modules = await get_disabled_plugin_modules()
         build_context = _PluginListContext(
             enabled_map=enabled_map,
+            info_map=info_map,
             package_bindings=package_bindings,
             pending_uninstall_modules=pending_uninstall_modules,
             top_level_packages=top_level_packages,
         )
 
-        for module_name in sorted(explicit_modules - loaded_modules):
+        unloaded_declared_modules = (
+            explicit_modules | builtin_modules
+        ) - loaded_modules
+        for module_name in sorted(unloaded_declared_modules):
             required_by_module[module_name] = get_module_required_plugins(module_name)
             display_name_by_module.setdefault(module_name, module_name)
 
@@ -157,6 +190,7 @@ class PluginCatalogService:
         candidate_modules = (
             loaded_modules
             | explicit_modules
+            | builtin_modules
             | visible_dependency_modules
         )
 
@@ -165,6 +199,8 @@ class PluginCatalogService:
         }
         for owner_module, dependencies in required_by_module.items():
             if owner_module in pending_uninstall_modules:
+                continue
+            if owner_module in disabled_modules:
                 continue
             owner_name = display_name_by_module.get(owner_module, owner_module)
             for dependency in dependencies:
@@ -206,22 +242,197 @@ class PluginCatalogService:
         return self._collapse_child_plugins(items)
 
     async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> bool:
-        plugin = find_loaded_plugin(module_name)
-        if plugin is None:
+        result = await self.apply_plugin_toggle(
+            module_name,
+            enabled=enabled,
+            cascade=False,
+        )
+        return bool(result.affected_modules)
+
+    async def apply_plugin_toggle(
+        self,
+        module_name: str,
+        *,
+        enabled: bool,
+        cascade: bool = False,
+    ) -> PluginToggleResult:
+        preview = await self.preview_toggle_plugin(module_name, enabled=enabled)
+        if not preview.allowed:
+            raise ProtectedPluginError(
+                preview.blocked_reason
+                or t("common.required_by_plugins", plugins=module_name)
+            )
+
+        related_modules = (
+            preview.requires_enable if enabled else preview.requires_disable
+        )
+        if related_modules and not cascade:
+            raise ValueError(preview.summary)
+
+        operation_order = (
+            [*preview.requires_enable, module_name]
+            if enabled
+            else [*preview.requires_disable, module_name]
+        )
+        changed_modules: list[str] = []
+        for target_module in operation_order:
+            changed = await self._set_plugin_enabled_record(
+                target_module,
+                enabled=enabled,
+            )
+            if changed:
+                changed_modules.append(target_module)
+
+        return PluginToggleResult(
+            module_name=module_name,
+            enabled=enabled,
+            affected_modules=changed_modules,
+        )
+
+    async def preview_toggle_plugin(
+        self,
+        module_name: str,
+        *,
+        enabled: bool,
+    ) -> PluginTogglePreview:
+        items = await self.list_plugins()
+        item_map = {item.module_name: item for item in items}
+        item = item_map.get(module_name)
+        if item is None:
             raise ResourceNotFoundError(module_name)
 
-        if not enabled:
-            reason = get_plugin_protection_reason(module_name)
-            if reason:
-                raise ProtectedPluginError(reason)
+        if enabled:
+            return self._preview_enable(item, item_map)
+        return self._preview_disable(item, items)
 
+    def _preview_enable(
+        self,
+        item: PluginCatalogItem,
+        item_map: dict[str, PluginCatalogItem],
+    ) -> PluginTogglePreview:
+        requires_enable: list[str] = []
+        missing_dependencies: list[str] = []
+        for dependency in item.required_plugins:
+            dependency_item = item_map.get(dependency)
+            if dependency_item is None:
+                missing_dependencies.append(dependency)
+                continue
+            if not dependency_item.is_global_enabled:
+                requires_enable.append(dependency)
+
+        blocked_reason = (
+            t(
+                "common.missing_required_plugins",
+                plugins=", ".join(missing_dependencies),
+            )
+            if missing_dependencies
+            else None
+        )
+        summary = (
+            t("plugins.enabledAction")
+            if not requires_enable
+            else t(
+                "common.enable_required_plugins",
+                plugins=", ".join(requires_enable),
+            )
+        )
+        return PluginTogglePreview(
+            module_name=item.module_name,
+            enabled=True,
+            allowed=not missing_dependencies,
+            summary=summary,
+            blocked_reason=blocked_reason,
+            requires_enable=requires_enable,
+            requires_disable=[],
+            protected_dependents=[],
+            missing_dependencies=missing_dependencies,
+        )
+
+    def _preview_disable(
+        self,
+        item: PluginCatalogItem,
+        items: list[PluginCatalogItem],
+    ) -> PluginTogglePreview:
+        requires_disable: list[str] = []
+        requires_disable_names: list[str] = []
+        protected_dependents: list[str] = []
+        for dependent_name in item.dependent_plugins:
+            dependent = next(
+                (
+                    candidate
+                    for candidate in items
+                    if dependent_name in {candidate.name, candidate.module_name}
+                ),
+                None,
+            )
+            if dependent is None or not dependent.is_global_enabled:
+                continue
+            if dependent.is_protected:
+                protected_dependents.append(dependent.name or dependent.module_name)
+                continue
+            requires_disable.append(dependent.module_name)
+            requires_disable_names.append(dependent.name or dependent.module_name)
+
+        blocked_reason = None
+        if item.is_protected and item.protected_reason:
+            blocked_reason = item.protected_reason
+        elif protected_dependents:
+            blocked_reason = t(
+                "common.required_by_plugins",
+                plugins=", ".join(protected_dependents),
+            )
+        summary = (
+            t("plugins.disabledAction")
+            if not requires_disable_names
+            else t(
+                "common.required_by_plugins",
+                plugins=", ".join(requires_disable_names),
+            )
+        )
+        return PluginTogglePreview(
+            module_name=item.module_name,
+            enabled=False,
+            allowed=blocked_reason is None,
+            summary=summary,
+            blocked_reason=blocked_reason,
+            requires_enable=[],
+            requires_disable=requires_disable,
+            protected_dependents=protected_dependents,
+            missing_dependencies=[],
+        )
+
+    async def _resolve_protection_reason(self, module_name: str) -> str | None:
+        items = await self.list_plugins()
+        item = next(
+            (entry for entry in items if entry.module_name == module_name),
+            None,
+        )
+        if item is not None:
+            return item.protected_reason
+        reasons = self._collect_core_block_reasons(module_name)
+        return "；".join(reasons) if reasons else None
+
+    async def _set_plugin_enabled_record(
+        self,
+        module_name: str,
+        *,
+        enabled: bool,
+    ) -> bool:
+        plugin = find_loaded_plugin(module_name)
         try:
             changed = await plugin_catalog_repository.set_plugin_enabled(
                 module_name,
                 enabled=enabled,
             )
         except ResourceNotFoundError:
-            await plugin_catalog_repository.ensure_plugin_record(plugin)
+            if plugin is not None:
+                await plugin_catalog_repository.ensure_plugin_record(plugin)
+            elif is_module_importable(module_name):
+                await plugin_catalog_repository.ensure_plugin_record_by_module_name(
+                    module_name
+                )
+            else:
+                raise ResourceNotFoundError(module_name) from None
             changed = await plugin_catalog_repository.set_plugin_enabled(
                 module_name,
                 enabled=enabled,
@@ -444,6 +655,7 @@ class PluginCatalogService:
         context: _PluginListContext,
         facts: _PluginItemFacts,
     ) -> PluginCatalogItem:
+        persisted = context.info_map.get(module_name)
         installed_package = self._resolve_listed_installed_package(
             module_name,
             context.package_bindings,
@@ -454,25 +666,30 @@ class PluginCatalogService:
             facts.dependent_plugins,
         )
         is_importable = is_module_importable(module_name)
+        can_enable_disable = (
+            is_importable
+            and module_name not in context.pending_uninstall_modules
+            and protected_reason is None
+        )
         return PluginCatalogItem(
             module_name=module_name,
-            name=module_name,
-            description=None,
+            name=persisted.name if persisted and persisted.name else module_name,
+            description=persisted.description if persisted else None,
             homepage=None,
             source=get_plugin_source_by_module_name(module_name),
             is_global_enabled=context.enabled_map.get(module_name, facts.is_explicit),
             is_protected=protected_reason is not None,
             protected_reason=protected_reason,
-            plugin_type="normal",
-            admin_level=0,
-            author=None,
-            version=None,
+            plugin_type=persisted.plugin_type if persisted else "normal",
+            admin_level=persisted.admin_level if persisted else 0,
+            author=persisted.author if persisted else None,
+            version=persisted.version if persisted else None,
             is_loaded=False,
             is_explicit=facts.is_explicit,
             is_dependency=facts.is_dependency,
             is_pending_uninstall=module_name in context.pending_uninstall_modules,
             can_edit_config=is_importable or facts.is_explicit,
-            can_enable_disable=False,
+            can_enable_disable=can_enable_disable,
             can_uninstall=False,
             child_plugins=[],
             required_plugins=facts.required_plugins,
