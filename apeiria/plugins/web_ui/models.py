@@ -108,7 +108,7 @@ class StatusResponse(BaseModel):
     disabled_plugins_count: int
     groups_count: int
     disabled_groups_count: int
-    bans_count: int
+    access_rules_count: int
     adapters: list[str]
 
 
@@ -183,6 +183,8 @@ class WebUIBuildRunResponse(WebUIBuildStatusResponse):
 
 class PluginItem(BaseModel):
     module_name: str
+    kind: str = "plugin"
+    access_mode: str = "default_allow"
     name: str | None
     description: str | None
     homepage: str | None = None
@@ -224,6 +226,32 @@ class PluginToggleResponse(BaseModel):
     module_name: str
     enabled: bool
     affected_modules: list[str] = []
+
+
+class AccessRuleItem(BaseModel):
+    subject_type: str
+    subject_id: str
+    plugin_module: str
+    effect: str
+    note: str | None = None
+
+
+class AccessRuleCreateRequest(BaseModel):
+    subject_type: str = Field(min_length=1, max_length=16)
+    subject_id: str = Field(min_length=1, max_length=64)
+    plugin_module: str = Field(min_length=1, max_length=256)
+    effect: str = Field(min_length=1, max_length=16)
+    note: str | None = Field(default=None, max_length=512)
+
+
+class AccessRuleDeleteRequest(BaseModel):
+    subject_type: str = Field(min_length=1, max_length=16)
+    subject_id: str = Field(min_length=1, max_length=64)
+    plugin_module: str = Field(min_length=1, max_length=256)
+
+
+class PluginAccessModeUpdateRequest(BaseModel):
+    access_mode: str = Field(min_length=1, max_length=16)
 
 
 class PluginStoreSourceItem(BaseModel):
@@ -446,21 +474,6 @@ class DriverConfigResponse(BaseModel):
 
 class DriverConfigRequest(BaseModel):
     builtin: list[str]
-
-
-class BanItem(BaseModel):
-    id: int
-    user_id: str | None
-    group_id: str | None
-    duration: int
-    reason: str | None
-
-
-class BanCreateRequest(BaseModel):
-    user_id: str
-    group_id: str | None = None
-    duration: int = 0
-    reason: str | None = None
 
 
 class GroupItem(BaseModel):

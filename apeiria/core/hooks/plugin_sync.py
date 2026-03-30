@@ -17,6 +17,7 @@ async def sync_plugins() -> None:
     from sqlalchemy import select
 
     from apeiria.core.models.plugin_info import PluginInfo
+    from apeiria.domains.plugins import plugin_policy_service
 
     plugins = nonebot.get_loaded_plugins()
     logger.info("{}", t("plugin_sync.syncing", count=len(plugins)))
@@ -63,6 +64,12 @@ async def sync_plugins() -> None:
                         version=version,
                     )
                 )
+
+            await plugin_policy_service.ensure_defaults(
+                module_name,
+                access_mode="default_allow",
+                required_level=admin_level,
+            )
 
         await session.commit()
 

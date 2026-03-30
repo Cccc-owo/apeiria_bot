@@ -396,6 +396,8 @@ async def list_plugins(
     return [
         PluginItem(
             module_name=plugin.module_name,
+            kind=plugin.kind,
+            access_mode=plugin.access_mode,
             name=plugin.name,
             description=plugin.description,
             homepage=plugin.homepage,

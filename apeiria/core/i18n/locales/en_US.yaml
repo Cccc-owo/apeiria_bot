@@ -12,6 +12,7 @@ auth:
   banned: "You have been banned and cannot use this feature"
   plugin_disabled: "This feature is disabled in this group"
   permission_denied: "Insufficient permission, requires {need}"
+  access_not_allowed: "You are not allowed to use this feature by default"
   level_admin: "Admin"
   level_owner: "Owner"
 

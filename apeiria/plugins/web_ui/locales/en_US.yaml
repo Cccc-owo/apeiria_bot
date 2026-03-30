@@ -33,16 +33,20 @@ web_ui:
     fields_not_editable: "Fields not editable: {fields}"
     table_users: "Users"
     table_groups: "Groups"
-    table_levels: "Levels"
-    table_bans: "Bans"
+    table_levels: "User Levels"
+    table_access_rules: "Access Rules"
     table_plugins: "Plugins"
+    table_plugin_policies: "Plugin Policies"
     table_statistics: "Statistics"
   groups:
     not_found: "Group not found"
     protected_plugins: "These plugins cannot be disabled: {plugins}"
   permissions:
     group_id_required: "group_id is required"
-    ban_not_found: "Ban record not found"
+    invalid_subject: "Invalid access rule subject type"
+    invalid_effect: "Invalid access rule effect"
+    invalid_access_mode: "Invalid plugin access mode"
+    rule_not_found: "Access rule not found"
   plugins:
     not_found: "Plugin not found"
     protected: "This plugin cannot be disabled: {reason}"

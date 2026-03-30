@@ -35,7 +35,7 @@ async def get_status(
         disabled_plugins_count=snapshot.disabled_plugins_count,
         groups_count=snapshot.groups_count,
         disabled_groups_count=snapshot.disabled_groups_count,
-        bans_count=snapshot.bans_count,
+        access_rules_count=snapshot.access_rules_count,
         adapters=snapshot.adapters,
     )
 

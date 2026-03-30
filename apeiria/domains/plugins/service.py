@@ -28,7 +28,7 @@ from apeiria.core.utils.helpers import (
     is_module_importable,
 )
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
-from apeiria.domains.permissions import permission_service
+from apeiria.domains.plugins.policy_service import plugin_policy_service
 from apeiria.domains.plugins.repository import plugin_catalog_repository
 from apeiria.domains.plugins.settings_support import get_plugin_declared_configs
 from apeiria.package_ids import normalize_package_id
@@ -66,6 +66,8 @@ class PluginCatalogItem:
     """Normalized plugin list entry."""
 
     module_name: str
+    kind: str
+    access_mode: str
     name: str
     description: str | None
     homepage: str | None
@@ -131,6 +133,7 @@ class PluginCatalogService:
     async def list_plugins(self) -> list[PluginCatalogItem]:
         enabled_map = await plugin_catalog_repository.get_enabled_map()
         info_map = await plugin_catalog_repository.get_plugin_info_map()
+        policy_map = await plugin_catalog_repository.get_plugin_policy_map()
         project_plugin_config = plugin_config_service.read_project_plugin_config()
         explicit_modules = set(project_plugin_config["modules"])
         builtin_modules = set(iter_builtin_plugin_modules())
@@ -228,6 +231,11 @@ class PluginCatalogService:
                         plugin=loaded_plugins[module_name],
                         context=build_context,
                         facts=facts,
+                        access_mode=(
+                            policy_map.get(module_name).access_mode
+                            if module_name in policy_map
+                            else "default_allow"
+                        ),
                     )
                 )
                 continue
@@ -237,9 +245,118 @@ class PluginCatalogService:
                     module_name=module_name,
                     context=build_context,
                     facts=facts,
+                    access_mode=(
+                        policy_map.get(module_name).access_mode
+                        if module_name in policy_map
+                        else "default_allow"
+                    ),
                 )
             )
         return self._collapse_child_plugins(items)
+
+    async def get_plugin(self, module_name: str) -> PluginCatalogItem | None:
+        enabled_map = await plugin_catalog_repository.get_enabled_map()
+        info_map = await plugin_catalog_repository.get_plugin_info_map()
+        policy = await plugin_catalog_repository.get_plugin_policy(module_name)
+        project_plugin_config = plugin_config_service.read_project_plugin_config()
+        explicit_modules = set(project_plugin_config["modules"])
+        builtin_modules = set(iter_builtin_plugin_modules())
+        package_bindings = project_plugin_config["packages"]
+        pending_uninstall_modules = get_pending_uninstall_plugin_modules()
+        loaded_plugins = {
+            plugin.module_name: plugin
+            for plugin in nonebot.get_loaded_plugins()
+        }
+        required_by_module: dict[str, list[str]] = {}
+        display_name_by_module: dict[str, str] = {}
+
+        for loaded_module_name, plugin in loaded_plugins.items():
+            required_by_module[loaded_module_name] = get_plugin_required_plugins(plugin)
+            display_name_by_module[loaded_module_name] = get_plugin_name(plugin)
+
+        pending_uninstall_modules = self._expand_pending_uninstall_modules(
+            loaded_plugins=loaded_plugins,
+            explicit_modules=explicit_modules,
+            seed_modules=pending_uninstall_modules,
+            required_by_module=required_by_module,
+        )
+        disabled_modules = await get_disabled_plugin_modules()
+
+        loaded_modules = set(loaded_plugins)
+        unloaded_declared_modules = (
+            explicit_modules | builtin_modules
+        ) - loaded_modules
+        for unloaded_module_name in unloaded_declared_modules:
+            required_by_module[unloaded_module_name] = get_module_required_plugins(
+                unloaded_module_name
+            )
+            display_name_by_module.setdefault(
+                unloaded_module_name,
+                unloaded_module_name,
+            )
+
+        dependency_modules = {
+            dependency
+            for dependencies in required_by_module.values()
+            for dependency in dependencies
+        }
+        importable_modules = {
+            candidate_module
+            for candidate_module in (dependency_modules | explicit_modules)
+            if is_module_importable(candidate_module)
+        }
+        visible_dependency_modules = {
+            dependency
+            for dependency in dependency_modules
+            if dependency in importable_modules
+        }
+        candidate_modules = (
+            loaded_modules
+            | explicit_modules
+            | builtin_modules
+            | visible_dependency_modules
+        )
+        if module_name not in candidate_modules:
+            return None
+
+        dependent_plugins = sorted(
+            {
+                display_name_by_module.get(owner_module, owner_module)
+                for owner_module, dependencies in required_by_module.items()
+                if owner_module not in pending_uninstall_modules
+                if owner_module not in disabled_modules
+                if module_name in dependencies
+            }
+        )
+        facts = _PluginItemFacts(
+            is_explicit=module_name in explicit_modules,
+            is_dependency=module_name in dependency_modules,
+            required_plugins=required_by_module.get(module_name, []),
+            dependent_plugins=dependent_plugins,
+        )
+        build_context = _PluginListContext(
+            enabled_map=enabled_map,
+            info_map=info_map,
+            package_bindings=package_bindings,
+            pending_uninstall_modules=pending_uninstall_modules,
+            top_level_packages=packages_distributions(),
+        )
+        access_mode = policy.access_mode if policy else "default_allow"
+
+        plugin = loaded_plugins.get(module_name)
+        if plugin is not None:
+            return self._build_loaded_plugin_item(
+                plugin=plugin,
+                context=build_context,
+                facts=facts,
+                access_mode=access_mode,
+            )
+        return self._build_unloaded_plugin_item(
+            module_name=module_name,
+            context=build_context,
+            facts=facts,
+            access_mode=access_mode,
+        )
 
     async def set_plugin_enabled(self, module_name: str, *, enabled: bool) -> bool:
         result = await self.apply_plugin_toggle(
@@ -438,7 +555,6 @@ class PluginCatalogService:
                 enabled=enabled,
             )
 
-        await permission_service.invalidate_plugin_global_cache(module_name)
         return changed
 
     async def uninstall_plugin(
@@ -492,13 +608,10 @@ class PluginCatalogService:
         if removal_requirement:
             enqueue_plugin_requirement_removal(removal_requirement)
         invalidate_plugin_management_caches()
-        result = PluginUninstallResult(
+        return PluginUninstallResult(
             requirement=removal_requirement or "",
             module_names=sorted(pending_modules),
         )
-        for pending_module in pending_modules:
-            await permission_service.invalidate_plugin_global_cache(pending_module)
-        return result
 
     async def list_orphan_plugin_configs(self) -> list[OrphanPluginConfigItem]:
         loaded_plugins = list(nonebot.get_loaded_plugins())
@@ -589,6 +702,7 @@ class PluginCatalogService:
         plugin: Plugin,
         context: _PluginListContext,
         facts: _PluginItemFacts,
+        access_mode: str,
     ) -> PluginCatalogItem:
         meta = plugin.metadata
         extra = get_plugin_extra(plugin)
@@ -615,6 +729,8 @@ class PluginCatalogService:
         )
         return PluginCatalogItem(
             module_name=plugin.module_name,
+            kind=plugin_policy_service.get_kind(plugin.module_name),
+            access_mode=access_mode,
             name=get_plugin_name(plugin),
             description=meta.description if meta else None,
             homepage=meta.homepage if meta else None,
@@ -654,6 +770,7 @@ class PluginCatalogService:
         module_name: str,
         context: _PluginListContext,
         facts: _PluginItemFacts,
+        access_mode: str,
     ) -> PluginCatalogItem:
         persisted = context.info_map.get(module_name)
         installed_package = self._resolve_listed_installed_package(
@@ -673,6 +790,8 @@ class PluginCatalogService:
         )
         return PluginCatalogItem(
             module_name=module_name,
+            kind=plugin_policy_service.get_kind(module_name),
+            access_mode=access_mode,
             name=persisted.name if persisted and persisted.name else module_name,
             description=persisted.description if persisted else None,
             homepage=None,

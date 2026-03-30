@@ -1,4 +1,4 @@
-"""Pure helpers for permission context and adapter role extraction."""
+"""Pure helpers for access context and adapter role extraction."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def resolve_conversation_type(
     user_id: str,
     group_id: str | None,
 ) -> ConversationType:
-    """Normalize the conversation type used by permission checks."""
+    """Normalize the conversation type used by access checks."""
     if group_id is not None:
         return "group"
     if is_private_event(event, user_id):
@@ -91,7 +91,7 @@ def to_onebot_numeric_id(value: str) -> int | None:
 
 
 def map_role_to_level(role: object) -> int:
-    """Map adapter role names onto Apeiria permission levels."""
+    """Map adapter role names onto Apeiria access levels."""
     if not isinstance(role, str):
         return 0
     if role == "owner":
@@ -99,3 +99,37 @@ def map_role_to_level(role: object) -> int:
     if role == "admin":
         return 5
     return 0
+
+
+class AccessRuntimeGateway:
+    """Adapter/runtime-specific access lookups."""
+
+    async def get_adapter_role_level(
+        self,
+        bot: Bot,
+        event: Event,
+        *,
+        group_id: str,
+    ) -> int:
+        """Resolve adapter role level through runtime-specific APIs."""
+        if not is_onebot_api_available(bot):
+            return 0
+
+        try:
+            user_id = event.get_user_id()
+            api_group_id = to_onebot_numeric_id(group_id)
+            api_user_id = to_onebot_numeric_id(user_id)
+            if api_group_id is None or api_user_id is None:
+                return 0
+
+            info = await bot.call_api(
+                "get_group_member_info",
+                group_id=api_group_id,
+                user_id=api_user_id,
+            )
+            return map_role_to_level(info.get("role"))
+        except Exception:  # noqa: BLE001
+            return 0
+
+
+access_runtime_gateway = AccessRuntimeGateway()

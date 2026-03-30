@@ -1,17 +1,19 @@
-from .ban import BanConsole
+from .access_policy import AccessPolicyEntry
 from .group import GroupConsole
 from .level import LevelUser
 from .plugin_info import PluginInfo
+from .plugin_policy import PluginPolicyEntry
 from .schema_meta import SchemaMeta
 from .statistics import CommandStatistics
 from .user import UserConsole
 
 __all__ = [
-    "BanConsole",
+    "AccessPolicyEntry",
     "CommandStatistics",
     "GroupConsole",
     "LevelUser",
     "PluginInfo",
+    "PluginPolicyEntry",
     "SchemaMeta",
     "UserConsole",
 ]

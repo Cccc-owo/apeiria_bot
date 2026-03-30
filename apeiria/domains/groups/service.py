@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from apeiria.core.utils.helpers import get_plugin_protection_reason, safe_json_loads
 from apeiria.domains.exceptions import ProtectedPluginError
 from apeiria.domains.groups.repository import group_repository
-from apeiria.domains.permissions import permission_service
 
 if TYPE_CHECKING:
     from apeiria.core.models.group import GroupConsole
@@ -47,7 +46,6 @@ class GroupService:
             row.bot_status = enabled
 
         await group_repository.save_group(row)
-        await permission_service.invalidate_group_bot_status_cache(group_id)
 
     async def update_group_disabled_plugins(
         self,
@@ -66,7 +64,6 @@ class GroupService:
         row.disabled_plugins = json.dumps(sorted(set(disabled_plugins)))
 
         await group_repository.save_group(row)
-        await permission_service.invalidate_group_plugin_cache(group_id)
 
     async def toggle_group_plugin(
         self,

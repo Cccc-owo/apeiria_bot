@@ -12,6 +12,7 @@ auth:
   banned: "你已被封禁，无法使用此功能"
   plugin_disabled: "该功能在本群已被禁用"
   permission_denied: "权限不足，需要{need}权限"
+  access_not_allowed: "当前未被授予使用权限"
   level_admin: "管理员"
   level_owner: "群主"
 

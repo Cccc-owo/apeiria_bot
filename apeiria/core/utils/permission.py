@@ -2,28 +2,31 @@
 
 from __future__ import annotations
 
-from apeiria.domains.permissions import permission_service
+from apeiria.core.plugin_policy import get_default_protection_mode
+from apeiria.domains.access import access_service
+from apeiria.domains.access.runtime import extract_group_id as _extract_group_id
+from apeiria.domains.plugins import plugin_policy_service
 
 
 def extract_group_id(session_id: str, user_id: str) -> str | None:
     """Extract group_id from a NoneBot session id."""
-    return permission_service.extract_group_id(session_id, user_id)
+    return _extract_group_id(session_id, user_id)
 
 
-async def invalidate_user_level_cache(user_id: str, group_id: str) -> None:
-    await permission_service.invalidate_user_level_cache(user_id, group_id)
+async def invalidate_user_level_cache(_user_id: str, _group_id: str) -> None:
+    return None
 
 
-async def invalidate_ban_cache(user_id: str, group_id: str | None = None) -> None:
-    await permission_service.invalidate_ban_cache(user_id, group_id)
+async def invalidate_ban_cache(_user_id: str, _group_id: str | None = None) -> None:
+    return None
 
 
-async def invalidate_group_plugin_cache(group_id: str) -> None:
-    await permission_service.invalidate_group_plugin_cache(group_id)
+async def invalidate_group_plugin_cache(_group_id: str) -> None:
+    return None
 
 
-async def invalidate_group_bot_status_cache(group_id: str) -> None:
-    await permission_service.invalidate_group_bot_status_cache(group_id)
+async def invalidate_group_bot_status_cache(_group_id: str) -> None:
+    return None
 
 
 async def get_user_level(user_id: str, group_id: str) -> int:
@@ -31,34 +34,36 @@ async def get_user_level(user_id: str, group_id: str) -> int:
 
     Checks cache first, falls back to DB query.
     """
-    return await permission_service.get_user_level(user_id, group_id)
+    return await access_service.get_user_level(user_id, group_id)
 
 
 async def check_permission(user_id: str, group_id: str, required_level: int) -> bool:
     """Check if user meets the required permission level."""
-    return await permission_service.check_permission(user_id, group_id, required_level)
+    return await get_user_level(user_id, group_id) >= required_level
 
 
-async def is_banned(user_id: str, group_id: str | None = None) -> bool:
-    """Check if a user is banned (globally or in a specific group)."""
-    return await permission_service.is_banned(user_id, group_id)
+async def is_banned(_user_id: str, _group_id: str | None = None) -> bool:
+    """Compatibility shim for removed ban semantics."""
+    return False
 
 
 async def is_plugin_enabled(group_id: str, plugin_module: str) -> bool:
     """Check if a plugin is enabled in a group."""
-    return await permission_service.is_plugin_enabled(group_id, plugin_module)
+    if get_default_protection_mode(plugin_module) == "required":
+        return True
+    return await access_service.is_group_plugin_enabled(group_id, plugin_module)
 
 
 async def is_group_bot_enabled(group_id: str) -> bool:
     """Check whether the bot is enabled for a group."""
-    return await permission_service.is_group_bot_enabled(group_id)
+    return await access_service.is_group_bot_enabled(group_id)
 
 
 async def is_plugin_globally_enabled(plugin_module: str) -> bool:
     """Check if a plugin is globally enabled."""
-    return await permission_service.is_plugin_globally_enabled(plugin_module)
+    return await plugin_policy_service.is_globally_enabled(plugin_module)
 
 
 async def set_user_level(user_id: str, group_id: str, level: int) -> None:
     """Set user's permission level in a group. Invalidates cache."""
-    await permission_service.set_user_level(user_id, group_id, level)
+    await access_service.set_user_level(user_id, group_id, level)

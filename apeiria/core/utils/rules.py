@@ -7,7 +7,8 @@ from nonebot.adapters import Bot, Event
 from nonebot.rule import Rule
 
 from apeiria.core.i18n import t
-from apeiria.domains.permissions import permission_service
+from apeiria.domains.access import access_service
+from apeiria.domains.access.runtime import extract_group_id
 
 
 def owner_check() -> Rule:
@@ -34,11 +35,11 @@ def admin_check(level: int = 5) -> Rule:
     """Rule that requires minimum permission level."""
 
     async def _check(bot: Bot, event: Event) -> bool:
-        context = await permission_service.build_context(bot, event)
+        context = await access_service.build_context(bot, event)
         if context is None:
             return False
 
-        if context.user_id in get_driver().config.superusers:
+        if context.is_superuser:
             return True
 
         if context.group_id is None:
@@ -47,11 +48,11 @@ def admin_check(level: int = 5) -> Rule:
         if context.adapter_role_level >= level:
             return True
 
-        return await permission_service.check_permission(
+        user_level = await access_service.get_user_level(
             context.user_id,
             context.group_id,
-            level,
         )
+        return user_level >= level
 
     return Rule(_check)
 
@@ -64,10 +65,7 @@ def ensure_group() -> Rule:
             user_id = event.get_user_id()
         except Exception:  # noqa: BLE001
             return False
-        return (
-            permission_service.extract_group_id(event.get_session_id(), user_id)
-            is not None
-        )
+        return extract_group_id(event.get_session_id(), user_id) is not None
 
     return Rule(_check)
 
@@ -87,4 +85,7 @@ def ensure_private() -> Rule:
 
 async def _get_adapter_role_level(bot: Bot, event: Event, group_id: str) -> int:
     """Detect adapter-level roles. Returns 6=owner, 5=admin, 0=other."""
-    return await permission_service.get_adapter_role_level(bot, event, group_id)
+    context = await access_service.build_context(bot, event)
+    if context is None or context.group_id != group_id:
+        return 0
+    return context.adapter_role_level

@@ -187,8 +187,8 @@
           <v-col cols="12" md="6" sm="6">
             <v-card class="compact-metric-card">
               <v-card-text class="compact-metric-card__body">
-                <div class="compact-metric-card__label">{{ t('dashboard.bans') }}</div>
-                <div class="compact-metric-card__value">{{ status?.bans_count ?? '...' }}</div>
+                <div class="compact-metric-card__label">{{ t('dashboard.accessRules') }}</div>
+                <div class="compact-metric-card__value">{{ status?.access_rules_count ?? '...' }}</div>
               </v-card-text>
             </v-card>
           </v-col>
