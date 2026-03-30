@@ -2,12 +2,20 @@
 
 from pathlib import Path
 
-from nonebot import require
+from nonebot import get_driver, require
+from nonebot.log import logger
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
 from apeiria.core.configs.models import PluginExtraData, PluginType, RegisterConfig
 from apeiria.core.i18n import load_locales
-from apeiria.plugins.help.config import HelpConfig
+from apeiria.plugins.help.config import HelpConfig, get_help_config
+from apeiria.plugins.help.generator import generate_help_list, get_command_prefix
+from apeiria.plugins.help.renderer import (
+    _build_main_menu_data,
+    _build_sub_menu_data,
+    build_render_cache_key,
+    cleanup_stale_disk_cache,
+)
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_localstore")
@@ -15,6 +23,41 @@ require("apeiria.plugins.render")
 
 # Register plugin locales
 load_locales(Path(__file__).parent / "locales")
+
+
+def _cleanup_help_disk_cache() -> None:
+    config = get_help_config()
+    if not config.disk_cache:
+        return
+
+    prefix = get_command_prefix()
+    valid_keys: set[str] = set()
+    for show_all in (False, True):
+        plugins = generate_help_list(config, show_all=show_all)
+        template_name = (
+            "expanded_menu.html" if config.expand_commands else "main_menu.html"
+        )
+        main_data = _build_main_menu_data(plugins, prefix=prefix, config=config)
+        valid_keys.add(
+            build_render_cache_key(
+                template_name,
+                main_data,
+                use_custom_templates=config.custom_templates,
+            )
+        )
+        for plugin in plugins:
+            detail_data = _build_sub_menu_data(plugin, prefix=prefix, config=config)
+            valid_keys.add(
+                build_render_cache_key(
+                    "sub_menu.html",
+                    detail_data,
+                    use_custom_templates=config.custom_templates,
+                )
+            )
+
+    removed = cleanup_stale_disk_cache(valid_keys)
+    if removed > 0:
+        logger.info("Removed {} stale help cache file(s)", removed)
 
 __plugin_meta__ = PluginMetadata(
     name="帮助系统",
@@ -163,3 +206,5 @@ __plugin_meta__ = PluginMetadata(
 )
 
 from . import help_cmd as help_cmd
+
+get_driver().on_startup(_cleanup_help_disk_cache)

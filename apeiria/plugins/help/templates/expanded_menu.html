@@ -19,10 +19,9 @@
     --accent: {{ accent_color | default('#4e96f7') }};
     --font-main: {% if latin_font_family %}"{{ latin_font_family }}", {% endif %}{% if font_family %}"{{ font_family }}", {% endif %}"Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
     --font-mono: {% if mono_font_family %}"{{ mono_font_family }}", {% endif %}"JetBrains Mono", "Noto Sans Mono", "Consolas", monospace;
-    --card-width: 172px;
     --grid-gap: 12px;
     --content-padding: 20px;
-    --container-width: calc(var(--card-width) * 3 + var(--grid-gap) * 2 + var(--content-padding) * 2);
+    --container-width: 610px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,8 +31,9 @@
     font-family: var(--font-main);
     color: var(--text-primary);
     background:
-      radial-gradient(circle at top right, rgba(59, 96, 167, 0.3), transparent 34%),
-      linear-gradient(180deg, #151b26 0%, var(--bg-color) 34%, var(--bg-color) 100%);
+      radial-gradient(circle at top center, rgba(78, 150, 247, 0.12), transparent 32%),
+      radial-gradient(circle at top right, rgba(59, 96, 167, 0.22), transparent 38%),
+      linear-gradient(180deg, #151b26 0%, #111721 22%, #0d121b 44%, var(--bg-color) 100%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -44,11 +44,35 @@
     overflow: hidden;
   }
 
+  .shell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 220px;
+    background:
+      radial-gradient(circle at 50% 0, rgba(84, 136, 248, 0.12), transparent 58%),
+      linear-gradient(180deg, rgba(255,255,255,0.02), transparent 72%);
+    pointer-events: none;
+  }
+
+  .shell::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 160px;
+    background: linear-gradient(180deg, rgba(10, 14, 22, 0.08), transparent 100%);
+    pointer-events: none;
+  }
+
   .banner {
     padding: 28px 26px 18px;
     text-align: center;
     {% if banner_image %}
-    background: linear-gradient(180deg, rgba(11,14,20,0.4), rgba(11,14,20,0.84)), url('{{ banner_image }}') center/cover no-repeat;
+    background: linear-gradient(180deg, rgba(11,14,20,0.18), rgba(11,14,20,0.52) 52%, rgba(11,14,20,0.04)), url('{{ banner_image }}') center/cover no-repeat;
     {% endif %}
   }
 
@@ -89,7 +113,7 @@
   }
 
   .content {
-    padding: 8px var(--content-padding) 18px;
+    padding: 8px var(--content-padding) 0;
   }
 
   .plugin-section {
@@ -137,6 +161,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    flex-wrap: wrap;
     margin-bottom: 4px;
   }
 
@@ -166,18 +191,30 @@
 
   .cmd-grid {
     display: grid;
-    grid-template-columns: repeat(3, var(--card-width));
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--grid-gap);
   }
 
   .cmd-card {
     position: relative;
-    min-height: 92px;
+    min-width: 0;
+    min-height: 64px;
     padding: 10px 11px 10px 15px;
     border-radius: 14px;
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.06);
     overflow: hidden;
+  }
+
+  .cmd-card--compact {
+    display: flex;
+    align-items: center;
+  }
+
+  .cmd-card--with-desc {
+    min-height: 92px;
   }
 
   .cmd-card::before {
@@ -199,6 +236,10 @@
     margin-bottom: 6px;
   }
 
+  .cmd-card--compact .cmd-card-header {
+    margin-bottom: 0;
+  }
+
   .cmd-card-name {
     font-size: 11px;
     line-height: 1.35;
@@ -206,6 +247,11 @@
     color: var(--accent);
     font-family: var(--font-mono);
     word-break: break-all;
+  }
+
+  .cmd-card--compact .cmd-card-name {
+    font-size: 13px;
+    line-height: 1.3;
   }
 
   .cmd-card-admin {
@@ -232,13 +278,16 @@
   }
 
   .footer {
-    padding-top: 12px;
+    margin-top: 8px;
+    padding: 10px 0 0;
     text-align: center;
     border-top: 1px solid rgba(255,255,255,0.05);
   }
 
   .footer-text {
+    display: block;
     font-size: 10px;
+    line-height: 1;
     color: var(--text-muted);
   }
 </style>
@@ -274,7 +323,7 @@
 
         <div class="cmd-grid">
           {% for cmd in plugin.commands %}
-          <div class="cmd-card">
+          <div class="cmd-card{% if cmd.description %} cmd-card--with-desc{% else %} cmd-card--compact{% endif %}">
             <div class="cmd-card-header">
               <span class="cmd-card-name">{{ cmd.display_name }}</span>
               {% if cmd.admin_only %}

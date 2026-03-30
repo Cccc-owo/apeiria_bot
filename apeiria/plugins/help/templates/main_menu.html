@@ -32,8 +32,9 @@
     font-family: var(--font-main);
     color: var(--text-primary);
     background:
-      radial-gradient(circle at top right, rgba(59, 96, 167, 0.34), transparent 34%),
-      linear-gradient(180deg, #151b26 0%, var(--bg-color) 34%, var(--bg-color) 100%);
+      radial-gradient(circle at top center, rgba(78, 150, 247, 0.12), transparent 32%),
+      radial-gradient(circle at top right, rgba(59, 96, 167, 0.22), transparent 38%),
+      linear-gradient(180deg, #151b26 0%, #111721 22%, #0d121b 44%, var(--bg-color) 100%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -48,10 +49,12 @@
     content: '';
     position: absolute;
     top: 0;
-    left: 52px;
-    right: 52px;
-    height: 150px;
-    background: linear-gradient(180deg, rgba(84, 136, 248, 0.06), transparent 78%);
+    left: 0;
+    right: 0;
+    height: 220px;
+    background:
+      radial-gradient(circle at 50% 0, rgba(84, 136, 248, 0.12), transparent 58%),
+      linear-gradient(180deg, rgba(255,255,255,0.02), transparent 72%);
     pointer-events: none;
   }
 
@@ -61,8 +64,8 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 88px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.015), transparent 30%, transparent 70%, rgba(255,255,255,0.015));
+    height: 160px;
+    background: linear-gradient(180deg, rgba(10, 14, 22, 0.08), transparent 100%);
     pointer-events: none;
   }
 
@@ -71,7 +74,7 @@
     padding: 28px 26px 20px;
     text-align: center;
     {% if banner_image %}
-    background: linear-gradient(180deg, rgba(11,14,20,0.4), rgba(11,14,20,0.84)), url('{{ banner_image }}') center/cover no-repeat;
+    background: linear-gradient(180deg, rgba(11,14,20,0.18), rgba(11,14,20,0.52) 52%, rgba(11,14,20,0.04)), url('{{ banner_image }}') center/cover no-repeat;
     {% endif %}
   }
 

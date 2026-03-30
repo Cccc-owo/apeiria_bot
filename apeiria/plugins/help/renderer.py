@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from hashlib import md5
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from apeiria.plugins.help.utils import (
@@ -160,7 +161,11 @@ async def _render_with_cache(
     use_custom_templates: bool,
     use_disk_cache: bool,
 ) -> bytes:
-    key = _cache_key(template_name, data)
+    template_dir, render_options, key = _resolve_render_cache_context(
+        template_name,
+        data,
+        use_custom_templates=use_custom_templates,
+    )
     cache_file = get_cache_dir() / f"{key}.png"
 
     if use_disk_cache and cache_file.is_file():
@@ -186,14 +191,11 @@ async def _render_with_cache(
         rendered = await template_to_pic(
             template_name,
             context=data,
-            template_dir=get_template_dir(
-                template_name,
-                use_custom=use_custom_templates,
-            ),
-            width=960,
-            timeout_ms=12_000,
-            wait_until="networkidle",
-            selector="body",
+            template_dir=template_dir,
+            width=render_options["width"],
+            timeout_ms=render_options["timeout_ms"],
+            wait_until=render_options["wait_until"],
+            selector=render_options["selector"],
         )
 
         if use_disk_cache:
@@ -203,14 +205,88 @@ async def _render_with_cache(
         return rendered
 
 
-def _cache_key(template_name: str, data: dict[str, object]) -> str:
+def _cache_key(
+    template_name: str,
+    data: dict[str, object],
+    *,
+    template_dir: Path,
+    render_options: dict[str, object],
+) -> str:
+    try:
+        template_path = Path(template_dir) / template_name
+        template_source = template_path.read_text(encoding="utf-8")
+    except OSError:
+        template_source = ""
     payload = json.dumps(
-        {"template": template_name, "data": data},
+        {
+            "template": template_name,
+            "template_source": template_source,
+            "render_options": render_options,
+            "data": data,
+        },
         sort_keys=True,
         ensure_ascii=False,
         default=str,
     ).encode("utf-8")
     return md5(payload).hexdigest()
+
+
+def build_render_cache_key(
+    template_name: str,
+    data: dict[str, object],
+    *,
+    use_custom_templates: bool,
+) -> str:
+    """Build the disk cache key for one help render payload."""
+
+    _, _, key = _resolve_render_cache_context(
+        template_name,
+        data,
+        use_custom_templates=use_custom_templates,
+    )
+    return key
+
+
+def cleanup_stale_disk_cache(valid_keys: set[str]) -> int:
+    """Remove help disk cache files that are no longer valid."""
+
+    cache_dir = get_cache_dir()
+    removed = 0
+    for cache_file in cache_dir.glob("*.png"):
+        try:
+            if cache_file.stem in valid_keys:
+                continue
+            cache_file.unlink()
+            removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _resolve_render_cache_context(
+    template_name: str,
+    data: dict[str, object],
+    *,
+    use_custom_templates: bool,
+) -> tuple[Path, dict[str, object], str]:
+    template_dir = get_template_dir(
+        template_name,
+        use_custom=use_custom_templates,
+    )
+    selector = ".shell" if template_name != "sub_menu.html" else "body"
+    render_options = {
+        "selector": selector,
+        "width": 960,
+        "timeout_ms": 12_000,
+        "wait_until": "networkidle",
+    }
+    key = _cache_key(
+        template_name,
+        data,
+        template_dir=template_dir,
+        render_options=render_options,
+    )
+    return template_dir, render_options, key
 
 
 def _display_command_name(command: CommandHelpInfo, prefix: str) -> str:
