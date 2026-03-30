@@ -8,32 +8,64 @@
     :rail-width="56"
     :width="228"
   >
-    <div class="app-drawer__header">
-      <v-list-item
-        v-if="!rail"
-        class="app-drawer__brand"
-        nav
-        prepend-icon="mdi-robot-happy"
-        :subtitle="t('layout.subtitle')"
-        :title="t('layout.brand')"
-      />
-      <v-btn
-        class="app-drawer__toggle"
-        :icon="rail ? 'mdi-chevron-right' : 'mdi-chevron-left'"
-        size="small"
-        variant="text"
-        @click="rail = !rail"
-      />
+    <div class="app-drawer__hero">
+      <div class="app-drawer__header">
+        <v-list-item
+          v-if="!rail"
+          class="app-drawer__brand"
+          nav
+          prepend-icon="mdi-robot-happy"
+          :subtitle="t('layout.subtitle')"
+          :title="t('layout.brand')"
+        />
+        <v-btn
+          class="app-drawer__toggle"
+          :icon="rail ? 'mdi-chevron-right' : 'mdi-chevron-left'"
+          size="small"
+          variant="text"
+          @click="rail = !rail"
+        />
+      </div>
+      <v-divider />
     </div>
-
-    <v-divider />
 
     <div class="app-drawer__nav">
       <div v-if="!rail" class="app-drawer__section-label">{{ t('layout.navigation') }}</div>
       <v-list v-model:opened="openedGroups" class="app-drawer__list" density="compact" nav>
         <template v-for="item in navItems" :key="item.key">
+          <v-menu
+            v-if="rail && item.children"
+            location="end"
+            offset="12"
+            open-on-click
+          >
+            <template #activator="{ props }">
+              <v-list-item
+                v-bind="props"
+                class="app-drawer__group-activator"
+                :class="{ 'app-drawer__group-activator--active': isGroupActive(item) }"
+                :prepend-icon="item.icon"
+                rounded="lg"
+                :title="item.title"
+              />
+            </template>
+            <div class="app-drawer__rail-menu">
+              <div class="app-drawer__rail-menu-title">{{ item.title }}</div>
+              <v-list class="app-drawer__rail-menu-list" density="compact" nav>
+                <v-list-item
+                  v-for="child in item.children"
+                  :key="child.to"
+                  class="app-drawer__rail-menu-item"
+                  :prepend-icon="child.icon"
+                  rounded="lg"
+                  :title="child.title"
+                  :to="child.to"
+                />
+              </v-list>
+            </div>
+          </v-menu>
           <v-list-group
-            v-if="item.children"
+            v-else-if="item.children"
             class="app-drawer__group"
             :value="item.key"
           >
@@ -228,12 +260,26 @@
         { icon: 'mdi-storefront-outline', title: t('layout.pluginStore'), to: '/plugins/store' },
       ],
     },
-    { key: 'permissions', icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
-    { key: 'groups', icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
-    { key: 'data', icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
     { key: 'chat', icon: 'mdi-chat-outline', title: t('layout.chat'), to: '/chat' },
-    { key: 'logs', icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
-    { key: 'logs-history', icon: 'mdi-history', title: t('layout.logsHistory'), to: '/logs/history' },
+    {
+      key: 'logs-group',
+      icon: 'mdi-text-box-outline',
+      title: t('layout.logsGroup'),
+      children: [
+        { icon: 'mdi-text-box-outline', title: t('layout.logs'), to: '/logs' },
+        { icon: 'mdi-history', title: t('layout.logsHistory'), to: '/logs/history' },
+      ],
+    },
+    {
+      key: 'more-group',
+      icon: 'mdi-dots-horizontal-circle-outline',
+      title: t('layout.moreGroup'),
+      children: [
+        { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
+        { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
+        { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
+      ],
+    },
     ...(authStore.isOwner
       ? [{ key: 'accounts', icon: 'mdi-account-cog-outline', title: t('layout.accounts'), to: '/accounts' }]
       : []),
@@ -257,6 +303,16 @@
     nextPath => {
       if (nextPath.startsWith('/plugins')) {
         openedGroups.value = Array.from(new Set([...openedGroups.value, 'plugins-group']))
+      }
+      if (nextPath.startsWith('/logs')) {
+        openedGroups.value = Array.from(new Set([...openedGroups.value, 'logs-group']))
+      }
+      if (
+        nextPath.startsWith('/permissions')
+        || nextPath.startsWith('/groups')
+        || nextPath.startsWith('/data')
+      ) {
+        openedGroups.value = Array.from(new Set([...openedGroups.value, 'more-group']))
       }
     },
     { immediate: true },
@@ -296,6 +352,15 @@
     restartStore.clearPending()
     authStore.logout()
     router.push('/login')
+  }
+
+  function isGroupActive (
+    item: { children?: Array<{ to: string }> },
+  ) {
+    if (!item.children) {
+      return false
+    }
+    return item.children.some(child => route.path.startsWith(child.to))
   }
 </script>
 
@@ -339,11 +404,18 @@
   box-shadow: inset -1px 0 0 rgba(var(--v-theme-outline-variant), 0.72);
 }
 
+.app-drawer__hero {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgb(var(--v-theme-surface));
+}
+
 .app-drawer__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
-  padding: 6px 4px 4px;
+  padding: 8px 6px 6px;
 }
 
 .app-drawer__toggle {
@@ -367,17 +439,21 @@
 }
 
 .app-drawer__brand:deep(.v-list-item-title) {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: 0.98rem;
-  line-height: 1.1;
-  white-space: nowrap;
+  line-height: 1.08;
+  white-space: normal;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .app-drawer__brand:deep(.v-list-item-subtitle) {
-  display: -webkit-box;
   overflow: hidden;
-  line-height: 1.1;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-drawer__nav,
@@ -394,9 +470,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 6px 0 2px 10px;
-  padding: 10px 8px 6px 10px;
+  gap: 4px;
+  margin: 4px 0 2px 8px;
+  padding: 6px 6px 4px 8px;
 }
 
 .app-drawer__group-panel::before {
@@ -408,15 +484,47 @@
 }
 
 .app-drawer__group-activator:deep(.v-list-item-title) {
+  font-weight: 500;
+}
+
+.app-drawer__group-activator--active {
+  background: rgb(var(--v-theme-secondary-container)) !important;
+  color: rgb(var(--v-theme-on-secondary-container)) !important;
+}
+
+.app-drawer__rail-menu {
+  min-width: 188px;
+  padding: 8px;
+  border: 1px solid rgba(var(--v-theme-outline), 0.12);
+  border-radius: 18px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+}
+
+.app-drawer__rail-menu-title {
+  padding: 4px 8px 8px;
+  color: rgba(var(--v-theme-on-surface), 0.56);
+  font-size: 0.72rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-drawer__rail-menu-list {
+  padding: 0;
+  background: transparent;
+}
+
+.app-drawer__rail-menu-item {
+  min-height: 40px;
 }
 
 .app-drawer__child-item {
   position: relative;
   z-index: 1;
   margin-inline-start: 0;
-  min-height: 52px;
-  padding-inline-start: 10px;
+  min-height: 44px;
+  padding-inline-start: 8px;
   color: rgba(var(--v-theme-on-surface), 0.86);
   background: transparent;
 }
@@ -427,8 +535,7 @@
 }
 
 .app-drawer__group :deep(.v-list-group__header .v-list-item) {
-  font-weight: 600;
-  min-height: 52px;
+  min-height: 46px;
 }
 
 .app-drawer__group :deep(.v-list-group__items .v-list-item) {
