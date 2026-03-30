@@ -5,33 +5,16 @@ import mimetypes
 from pathlib import Path
 from urllib.parse import quote
 
-from nonebot_plugin_localstore import get_data_dir, get_plugin_data_dir
+from nonebot_plugin_localstore import get_plugin_data_dir
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
-_LEGACY_HELP_DATA_DIR = get_data_dir("help")
-
-
-def _get_standard_help_data_dir() -> Path:
-    try:
-        return get_plugin_data_dir()
-    except RuntimeError:
-        return get_data_dir("apeiria.plugins.help")
-
-
-def _help_data_dirs() -> tuple[Path, ...]:
-    standard_dir = _get_standard_help_data_dir()
-    if standard_dir == _LEGACY_HELP_DATA_DIR:
-        return (standard_dir,)
-    return (standard_dir, _LEGACY_HELP_DATA_DIR)
+_DEFAULT_NONEBOT_LOGO_URL = "https://nonebot.dev/logo.png"
 
 
 def get_help_data_dir() -> Path:
-    standard_dir, *legacy_dirs = _help_data_dirs()
-    for legacy_dir in legacy_dirs:
-        if legacy_dir.exists() and not standard_dir.exists():
-            return legacy_dir
-    standard_dir.mkdir(parents=True, exist_ok=True)
-    return standard_dir
+    data_dir = get_plugin_data_dir()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 def get_cache_dir() -> Path:
@@ -48,19 +31,17 @@ def get_custom_template_dir() -> Path:
 
 def get_template_dir(name: str, *, use_custom: bool) -> Path:
     if use_custom:
-        for base_dir in _help_data_dirs():
-            custom_dir = base_dir / "custom_templates"
-            if (custom_dir / name).is_file():
-                return custom_dir
+        custom_dir = get_custom_template_dir()
+        if (custom_dir / name).is_file():
+            return custom_dir
     return _TEMPLATES_DIR
 
 
 def read_template(name: str, *, use_custom: bool) -> str:
     if use_custom:
-        for base_dir in _help_data_dirs():
-            custom_path = base_dir / "custom_templates" / name
-            if custom_path.is_file():
-                return custom_path.read_text(encoding="utf-8")
+        custom_path = get_custom_template_dir() / name
+        if custom_path.is_file():
+            return custom_path.read_text(encoding="utf-8")
     return (_TEMPLATES_DIR / name).read_text(encoding="utf-8")
 
 
@@ -69,16 +50,14 @@ def resolve_data_file(raw_path: str) -> Path | None:
     if not stripped:
         return None
     path = Path(stripped)
+    base_dir = get_help_data_dir().resolve()
     if not path.is_absolute():
-        for base_dir in _help_data_dirs():
-            candidate = (base_dir / path).resolve()
-            if candidate.is_relative_to(base_dir.resolve()) and candidate.is_file():
-                return candidate
+        candidate = (base_dir / path).resolve()
+        if candidate.is_relative_to(base_dir) and candidate.is_file():
+            return candidate
         return None
     resolved = path.resolve()
-    if resolved.is_file() and any(
-        resolved.is_relative_to(base_dir.resolve()) for base_dir in _help_data_dirs()
-    ):
+    if resolved.is_file() and resolved.is_relative_to(base_dir):
         return resolved
     return None
 
@@ -95,27 +74,7 @@ def read_image_as_data_uri(path: Path | None) -> str:
 
 def build_default_icon_data_uri(seed: str) -> str:
     _ = seed
-    svg = """
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#78d7ff"/>
-      <stop offset="100%" stop-color="#4a86ff"/>
-    </linearGradient>
-  </defs>
-  <rect x="14" y="14" width="68" height="68" rx="18" fill="url(#g)"/>
-  <rect x="28" y="28" width="16" height="16" rx="4" fill="#ffffff"/>
-  <rect x="52" y="28" width="16" height="16" rx="4" fill="#ffffff" opacity="0.98"/>
-  <rect x="28" y="52" width="16" height="16" rx="4" fill="#ffffff" opacity="0.98"/>
-  <rect x="52" y="52" width="16" height="16" rx="4" fill="#ffffff" opacity="0.9"/>
-  <path d="M44 36h8M36 44v8M60 44v8M44 60h8"
-        stroke="#4a86ff"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        opacity="0.22"/>
-</svg>
-""".strip()
-    return "data:image/svg+xml;utf8," + quote(svg)
+    return _DEFAULT_NONEBOT_LOGO_URL
 
 
 def build_default_logo_data_uri() -> str:
