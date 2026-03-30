@@ -186,6 +186,7 @@ class PluginItem(BaseModel):
     is_dependency: bool = False
     is_pending_uninstall: bool = False
     can_edit_config: bool = True
+    can_view_readme: bool = False
     can_enable_disable: bool = False
     can_uninstall: bool = False
     child_plugins: list[str] = []
@@ -211,6 +212,12 @@ class PluginToggleResponse(BaseModel):
     module_name: str
     enabled: bool
     affected_modules: list[str] = []
+
+
+class PluginReadmeResponse(BaseModel):
+    module_name: str
+    filename: str
+    content: str
 
 
 class AccessRuleItem(BaseModel):

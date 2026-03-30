@@ -231,6 +231,16 @@
                     {{ t('plugins.projectPage') }}
                   </v-btn>
                   <v-btn
+                    v-if="item.can_view_readme"
+                    color="primary"
+                    :loading="readmeLoadingModule === item.module_name"
+                    size="small"
+                    variant="text"
+                    @click="openReadme(item)"
+                  >
+                    {{ t('plugins.readme') }}
+                  </v-btn>
+                  <v-btn
                     v-if="item.can_edit_config"
                     color="primary"
                     :loading="settingsLoadingModule === item.module_name"
@@ -736,17 +746,45 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="readmeDialogVisible" max-width="960">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center justify-space-between ga-4">
+          <div class="d-flex flex-column">
+            <span>{{ readmeDialogTitle }}</span>
+            <span v-if="readmeFilename" class="text-caption text-medium-emphasis">{{ readmeFilename }}</span>
+          </div>
+          <v-btn icon="mdi-close" variant="text" @click="readmeDialogVisible = false" />
+        </v-card-title>
+        <v-card-text class="readme-dialog__body">
+          <v-alert v-if="readmeErrorMessage" density="comfortable" type="error" variant="tonal">
+            {{ readmeErrorMessage }}
+          </v-alert>
+          <v-progress-linear v-else-if="readmeLoading" color="primary" indeterminate />
+          <div v-else class="readme-card__content markdown-content" v-html="readmeHtml" />
+        </v-card-text>
+        <v-card-actions>
+          <v-btn rounded="xl" variant="text" @click="readmeDialogVisible = false">
+            {{ t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import DOMPurify from 'dompurify'
+  import MarkdownIt from 'markdown-it'
+  import markdownItTaskLists from 'markdown-it-task-lists'
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
   import {
     cleanupOrphanPluginConfigs,
     getOrphanPluginConfigs,
     getPluginInstallTask,
+    getPluginReadme,
     getPlugins,
     getPluginSettings,
     getPluginSettingsRaw,
@@ -754,6 +792,7 @@
     installManualPlugin,
     type OrphanPluginConfigItem,
     type PluginItem,
+    type PluginReadmeResponse,
     type PluginStoreTask,
     type RawSettingsResponse,
     uninstallPlugin,
@@ -779,6 +818,43 @@
   import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
   import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
 
+  const markdown = new MarkdownIt({
+    html: true,
+    linkify: true,
+    breaks: false,
+  })
+  markdown.use(markdownItTaskLists, {
+    enabled: false,
+    label: true,
+    labelAfter: true,
+  })
+
+  const defaultLinkRender = markdown.renderer.rules.link_open
+  markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    const href = tokens[idx].attrGet('href')
+    if (href) {
+      tokens[idx].attrSet('href', resolveReadmeRelativeUrl(href))
+    }
+    tokens[idx].attrSet('target', '_blank')
+    tokens[idx].attrSet('rel', 'noopener noreferrer')
+    if (defaultLinkRender) {
+      return defaultLinkRender(tokens, idx, options, env, self)
+    }
+    return self.renderToken(tokens, idx, options)
+  }
+
+  const defaultImageRender = markdown.renderer.rules.image
+  markdown.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const src = tokens[idx].attrGet('src')
+    if (src) {
+      tokens[idx].attrSet('src', resolveReadmeRelativeUrl(src))
+    }
+    if (defaultImageRender) {
+      return defaultImageRender(tokens, idx, options, env, self)
+    }
+    return self.renderToken(tokens, idx, options)
+  }
+
   const plugins = ref<PluginItem[]>([])
   const loading = ref(false)
   const pendingModule = ref('')
@@ -794,6 +870,12 @@
   const manualInstallTask = ref<PluginStoreTask | null>(null)
   const activeManualInstallRequirement = ref('')
   let manualInstallTaskPollTimer: number | null = null
+  const readmeDialogVisible = ref(false)
+  const readmeLoading = ref(false)
+  const readmeLoadingModule = ref('')
+  const readmeTarget = ref<PluginItem | null>(null)
+  const readmeDocument = ref<PluginReadmeResponse | null>(null)
+  const readmeErrorMessage = ref('')
   const settingsDialogVisible = ref(false)
   const settingsLoadingModule = ref('')
   const settingsPlugin = ref<PluginItem | null>(null)
@@ -984,6 +1066,13 @@
     if (status === 'failed') return manualInstallTaskErrorSummary.value || t('plugins.manualInstallFailed')
     return ''
   })
+  const readmeDialogTitle = computed(() =>
+    t('plugins.readmeTitle', {
+      name: readmeTarget.value?.name || readmeTarget.value?.module_name || '',
+    }),
+  )
+  const readmeFilename = computed(() => readmeDocument.value?.filename || '')
+  const readmeHtml = computed(() => renderReadmeHtml(readmeDocument.value?.content || ''))
 
   function applyRouteFilters () {
     const searchQuery = route.query.search
@@ -1028,6 +1117,63 @@
       return candidate
     }
     return ''
+  }
+
+  function resolveReadmeRelativeUrl (rawUrl: string) {
+    const normalized = rawUrl.trim()
+    if (!normalized || !readmeTarget.value) {
+      return normalized
+    }
+
+    if (
+      normalized.startsWith('#')
+      || normalized.startsWith('/')
+      || normalized.startsWith('//')
+      || /^[a-z][a-z0-9+.-]*:/i.test(normalized)
+    ) {
+      return normalized
+    }
+
+    const hashIndex = normalized.indexOf('#')
+    const hash = hashIndex >= 0 ? normalized.slice(hashIndex) : ''
+    const pathWithQuery = hashIndex >= 0 ? normalized.slice(0, hashIndex) : normalized
+    const queryIndex = pathWithQuery.indexOf('?')
+    const relativePath = queryIndex >= 0
+      ? pathWithQuery.slice(0, queryIndex)
+      : pathWithQuery
+
+    if (!relativePath) {
+      return normalized
+    }
+
+    const basePath = `/api/plugins/${encodeURIComponent(readmeTarget.value.module_name)}/readme/asset`
+    const params = new URLSearchParams({ path: relativePath })
+    return `${basePath}?${params.toString()}${hash}`
+  }
+
+  function renderReadmeHtml (content: string) {
+    const sanitized = DOMPurify.sanitize(markdown.render(content), {
+      ADD_ATTR: ['align'],
+      ADD_TAGS: ['details', 'summary'],
+    })
+
+    const document = new DOMParser().parseFromString(sanitized, 'text/html')
+
+    document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach(element => {
+      const href = element.getAttribute('href')
+      if (!href) return
+      element.setAttribute('href', resolveReadmeRelativeUrl(href))
+      element.setAttribute('target', '_blank')
+      element.setAttribute('rel', 'noopener noreferrer')
+    })
+
+    document.querySelectorAll<HTMLImageElement>('img[src]').forEach(element => {
+      const src = element.getAttribute('src')
+      if (!src) return
+      element.setAttribute('src', resolveReadmeRelativeUrl(src))
+    })
+
+    return document.body.innerHTML
   }
 
   function settingsSourceLabel (source: string) {
@@ -1231,6 +1377,23 @@
       settingsLoadingModule.value = ''
     }
     await loadPluginRawSettings(item.module_name)
+  }
+
+  async function openReadme (item: PluginItem) {
+    readmeTarget.value = item
+    readmeDialogVisible.value = true
+    readmeLoading.value = true
+    readmeLoadingModule.value = item.module_name
+    readmeDocument.value = null
+    readmeErrorMessage.value = ''
+    try {
+      readmeDocument.value = (await getPluginReadme(item.module_name)).data
+    } catch (error) {
+      readmeErrorMessage.value = getErrorMessage(error, t('plugins.readmeLoadFailed'))
+    } finally {
+      readmeLoading.value = false
+      readmeLoadingModule.value = ''
+    }
   }
 
   async function saveSettings () {
@@ -1835,6 +1998,143 @@
   font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.readme-dialog__body {
+  padding-top: 8px;
+}
+
+.readme-card__content {
+  margin: 0;
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.markdown-content {
+  white-space: normal;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  margin: 24px 0 12px;
+  line-height: 1.3;
+}
+
+.markdown-content :deep(h1) {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  font-size: 1.7rem;
+}
+
+.markdown-content :deep(h2) {
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  font-size: 1.4rem;
+}
+
+.markdown-content :deep(h3) {
+  font-size: 1.15rem;
+}
+
+.markdown-content :deep(p),
+.markdown-content :deep(ul),
+.markdown-content :deep(ol),
+.markdown-content :deep(pre),
+.markdown-content :deep(blockquote),
+.markdown-content :deep(table) {
+  margin: 0 0 12px;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  padding-left: 20px;
+}
+
+.markdown-content :deep(li) {
+  margin: 0.25em 0;
+}
+
+.markdown-content :deep(a) {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+}
+
+.markdown-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.markdown-content :deep(blockquote) {
+  padding-left: 14px;
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.35);
+  color: rgba(var(--v-theme-on-surface), 0.76);
+}
+
+.markdown-content :deep(hr) {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.markdown-content :deep(code) {
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.markdown-content :deep(pre code) {
+  display: block;
+  padding: 12px 14px;
+  overflow: auto;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  line-height: 1.55;
+}
+
+.markdown-content :deep(table) {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-content :deep(th) {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  font-weight: 700;
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-content :deep(.contains-task-list) {
+  padding-left: 0;
+  list-style: none;
+}
+
+.markdown-content :deep(.task-list-item) {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.markdown-content :deep(.task-list-item-checkbox) {
+  margin-top: 0.35em;
 }
 
 .plugin-detail-meta {

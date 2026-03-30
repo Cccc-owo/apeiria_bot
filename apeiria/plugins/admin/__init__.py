@@ -17,7 +17,7 @@ load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
     name="主人管理",
-    description="主人专用的应急控制台：状态、群、插件、访问、任务、重启",
+    description="主人专用的管理命令集：状态、群、插件、访问、任务、重启",
     usage=(
         "/admin - 查看总览\n"
         "/status | /sid - 查看运行与会话状态\n"

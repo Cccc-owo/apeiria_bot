@@ -22,6 +22,7 @@ from .service import (
     OrphanPluginConfigItem,
     PluginCatalogItem,
     PluginCatalogService,
+    PluginReadme,
     plugin_catalog_service,
 )
 from .settings_support import UnknownPluginSettingFieldError
@@ -38,6 +39,7 @@ __all__ = [
     "PluginPolicyService",
     "PluginRawSettingsState",
     "PluginRawValidationState",
+    "PluginReadme",
     "PluginSettingsNotConfigurableError",
     "PluginSettingsState",
     "UnknownPluginSettingFieldError",

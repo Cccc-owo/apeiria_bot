@@ -50,6 +50,8 @@ web_ui:
     rule_not_found: "访问规则不存在"
   plugins:
     not_found: "插件不存在"
+    readme_not_found: "未找到插件 README"
+    readme_asset_forbidden: "README 相对路径不能越过所在目录"
     protected: "该插件不可禁用：{reason}"
     framework_required: "框架依赖"
     package_required: "必须提供包名"
