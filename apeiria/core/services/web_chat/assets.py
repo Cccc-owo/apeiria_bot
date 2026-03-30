@@ -23,7 +23,7 @@ class ChatAsset:
 class AssetManager:
     def __init__(self) -> None:
         self._assets: dict[str, ChatAsset] = {}
-        self._asset_dir = Path("data/webui_chat/assets")
+        self._asset_dir = Path("data/web_ui/chat/assets")
         self._asset_dir.mkdir(parents=True, exist_ok=True)
 
     def get(self, asset_id: str) -> ChatAsset | None:
