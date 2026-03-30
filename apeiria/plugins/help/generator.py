@@ -66,8 +66,8 @@ class PluginHelpInfo:
     order: int = 99
 
     @property
-    def is_official(self) -> bool:
-        return self.source == "official"
+    def is_builtin(self) -> bool:
+        return self.source == "builtin"
 
     @property
     def initials(self) -> str:
@@ -125,7 +125,7 @@ def generate_help_list(
     result.sort(
         key=lambda item: (
             item.order,
-            0 if item.is_official else 1,
+            0 if item.is_builtin else 1,
             item.display_name.lower(),
         )
     )

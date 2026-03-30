@@ -194,6 +194,14 @@ class PluginItem(BaseModel):
     admin_level: int = 0
     author: str | None = None
     version: str | None = None
+    is_loaded: bool = True
+    is_explicit: bool = False
+    is_dependency: bool = False
+    is_pending_uninstall: bool = False
+    can_edit_config: bool = True
+    can_enable_disable: bool = False
+    can_uninstall: bool = False
+    child_plugins: list[str] = []
     required_plugins: list[str] = []
     dependent_plugins: list[str] = []
     installed_package: str | None = None

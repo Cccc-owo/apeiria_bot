@@ -35,7 +35,7 @@ from apeiria.config import (
     driver_config_service,
     plugin_config_service,
 )
-from apeiria.core.plugin_policy import is_framework_protected_plugin_module
+from apeiria.core.plugin_policy import is_protected_plugin_module
 from apeiria.runtime_env import update_plugin_requirement
 
 add_project_adapter_module = adapter_config_service.add_project_adapter_module
@@ -158,7 +158,7 @@ def select_store_package_cli(
 
 
 def ensure_plugin_can_be_removed(module_name: str) -> None:
-    if is_framework_protected_plugin_module(module_name):
+    if is_protected_plugin_module(module_name):
         fail(
             _("cannot remove protected plugin {module}: framework required").format(
                 module=module_name

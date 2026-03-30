@@ -3,6 +3,7 @@ common:
   error: "An error occurred, please try again later"
   plugin_not_found: "Plugin not found: {name}"
   framework_required: "Required by the framework runtime"
+  control_panel_required: "Required by the control panel"
   required_by_plugins: "Required by plugins: {plugins}"
 
 auth:

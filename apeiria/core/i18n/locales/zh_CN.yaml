@@ -3,6 +3,7 @@ common:
   error: "出错了，请稍后重试"
   plugin_not_found: "未找到插件: {name}"
   framework_required: "系统运行依赖"
+  control_panel_required: "管理面板依赖"
   required_by_plugins: "被以下插件依赖：{plugins}"
 
 auth:

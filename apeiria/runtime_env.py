@@ -20,6 +20,7 @@ _PLUGIN_PROJECT_RELATIVE_PATH: Final = Path(".apeiria") / "extensions"
 _PLUGIN_PROJECT_NAME: Final = "apeiria-user-plugins"
 _PYTHON_VERSION_FALLBACK: Final = ">=3.10, <4.0"
 _PENDING_PLUGIN_UNINSTALLS_FILE: Final = "pending_plugin_uninstalls.json"
+_PENDING_PLUGIN_MODULE_UNINSTALLS_FILE: Final = "pending_plugin_module_uninstalls.json"
 _logger = logging.getLogger("apeiria.runtime_env")
 
 
@@ -58,6 +59,10 @@ def plugin_project_lock_path() -> Path:
 
 def plugin_pending_uninstalls_path() -> Path:
     return plugin_project_root() / _PENDING_PLUGIN_UNINSTALLS_FILE
+
+
+def plugin_pending_module_uninstalls_path() -> Path:
+    return plugin_project_root() / _PENDING_PLUGIN_MODULE_UNINSTALLS_FILE
 
 
 def plugin_project_venv_path() -> Path:
@@ -205,6 +210,73 @@ def enqueue_plugin_requirement_removal(requirement: str) -> bool:
     return True
 
 
+def pending_plugin_requirement_removals() -> list[str]:
+    """Return package requirements scheduled for deferred removal."""
+    return _read_pending_plugin_uninstalls()
+
+
+def discard_plugin_requirement_removal(requirement: str) -> bool:
+    """Remove one scheduled package requirement removal marker."""
+    target = resolve_declared_plugin_requirement(requirement).strip()
+    if not target:
+        return False
+
+    pending = _read_pending_plugin_uninstalls()
+    normalized_target = normalize_package_id(target) or target
+    remaining = [
+        item
+        for item in pending
+        if (normalize_package_id(item) or item) != normalized_target
+    ]
+    if len(remaining) == len(pending):
+        return False
+    _write_pending_plugin_uninstalls(remaining)
+    return True
+
+
+def enqueue_plugin_module_uninstall(module_name: str) -> bool:
+    """Mark a loaded plugin module as pending removal until restart."""
+    target = module_name.strip()
+    if not target:
+        return False
+
+    pending = _read_pending_plugin_module_uninstalls()
+    if target in pending:
+        return False
+
+    pending.append(target)
+    _write_pending_plugin_module_uninstalls(pending)
+    return True
+
+
+def pending_plugin_module_uninstalls() -> list[str]:
+    """Return plugin module names scheduled for deferred unload."""
+    return _read_pending_plugin_module_uninstalls()
+
+
+def discard_plugin_module_uninstall(module_name: str) -> bool:
+    """Remove one scheduled module removal marker."""
+    target = module_name.strip()
+    if not target:
+        return False
+
+    pending = _read_pending_plugin_module_uninstalls()
+    remaining = [item for item in pending if item != target]
+    if len(remaining) == len(pending):
+        return False
+    _write_pending_plugin_module_uninstalls(remaining)
+    return True
+
+
+def process_pending_plugin_module_uninstalls() -> list[str]:
+    """Consume deferred module removal markers after a process restart."""
+    pending = _read_pending_plugin_module_uninstalls()
+    if not pending:
+        return []
+    _write_pending_plugin_module_uninstalls([])
+    return pending
+
+
 def declared_plugin_requirements() -> dict[str, str]:
     """Return normalized dependency names mapped to declared requirement strings."""
     pyproject_path = plugin_project_pyproject_path()
@@ -332,6 +404,23 @@ def _extend_loaded_package_path(module_name: str, package_dir: Path) -> None:
 
 def _read_pending_plugin_uninstalls() -> list[str]:
     path = plugin_pending_uninstalls_path()
+    return _read_pending_json_items(path)
+
+
+def _write_pending_plugin_uninstalls(requirements: list[str]) -> None:
+    _write_pending_json_items(plugin_pending_uninstalls_path(), requirements)
+
+
+def _read_pending_plugin_module_uninstalls() -> list[str]:
+    path = plugin_pending_module_uninstalls_path()
+    return _read_pending_json_items(path)
+
+
+def _write_pending_plugin_module_uninstalls(module_names: list[str]) -> None:
+    _write_pending_json_items(plugin_pending_module_uninstalls_path(), module_names)
+
+
+def _read_pending_json_items(path: Path) -> list[str]:
     if not path.is_file():
         return []
     try:
@@ -347,11 +436,10 @@ def _read_pending_plugin_uninstalls() -> list[str]:
     ]
 
 
-def _write_pending_plugin_uninstalls(requirements: list[str]) -> None:
-    path = plugin_pending_uninstalls_path()
+def _write_pending_json_items(path: Path, items: list[str]) -> None:
     normalized = [
         item.strip()
-        for item in requirements
+        for item in items
         if isinstance(item, str) and item.strip()
     ]
     if not normalized:

@@ -192,6 +192,14 @@ export interface PluginItem {
   admin_level: number
   author: string | null
   version: string | null
+  is_loaded: boolean
+  is_explicit: boolean
+  is_dependency: boolean
+  is_pending_uninstall: boolean
+  can_edit_config: boolean
+  can_enable_disable: boolean
+  can_uninstall: boolean
+  child_plugins: string[]
   required_plugins: string[]
   dependent_plugins: string[]
   installed_package: string | null
