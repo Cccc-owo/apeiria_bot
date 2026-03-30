@@ -17,24 +17,17 @@ load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
     name="主人管理",
-    description="主人专用的系统管理命令：状态、插件、配置、任务、重启",
+    description="主人专用的应急控制台：状态、群、插件、访问、任务、重启",
     usage=(
-        "/status - 查看运行状态\n"
-        "/sid - 查看当前会话 ID 信息\n"
-        "/adapters - 查看适配器状态\n"
-        "/drivers - 查看 driver 状态\n"
-        "/plugins - 查看插件总览\n"
-        "/plugin info <插件名> - 查看插件详情\n"
-        "/plugin configs <插件名> - 查看插件配置摘要\n"
-        "/plugin enable <插件名> - 启用插件\n"
-        "/plugin disable <插件名> - 禁用插件\n"
-        "/config core - 查看核心配置摘要\n"
-        "/config plugin <插件名> - 查看插件配置摘要\n"
+        "/admin - 查看总览\n"
+        "/status | /sid - 查看运行与会话状态\n"
+        "/group status|bot|plugin|access ... - 管理当前群\n"
+        "/plugins | /plugin info|enable|disable|configs <插件名> - 管理插件\n"
+        "/config core|plugin ... - 查看配置摘要\n"
+        "/access plugin|rule|remove|level ... - 管理访问控制\n"
+        "/tasks | /task info|pause|resume <任务ID> - 管理任务\n"
         "/restart - 重启 Bot\n"
-        "/tasks - 查看调度任务\n"
-        "/task info <任务ID> - 查看任务详情\n"
-        "/task pause <任务ID> - 暂停任务\n"
-        "/task resume <任务ID> - 恢复任务"
+        "/adapters | /drivers - 查看运行环境"
     ),
     type="application",
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
@@ -44,13 +37,16 @@ __plugin_meta__ = PluginMetadata(
         plugin_type=PluginType.SUPERUSER,
         admin_level=6,
         commands=[
+            "admin",
             "status",
             "sid",
             "adapters",
             "drivers",
+            "group",
             "plugins",
             "plugin",
             "config",
+            "access",
             "restart",
             "tasks",
             "task",
@@ -63,9 +59,12 @@ __plugin_meta__ = PluginMetadata(
     ).to_dict(),
 )
 
+from . import access_admin as access_admin
 from . import adapters as adapters
 from . import config_view as config_view
 from . import drivers as drivers
+from . import group_admin as group_admin
+from . import overview as overview
 from . import plugin_admin as plugin_admin
 from . import restart as restart
 from . import session_info as session_info
