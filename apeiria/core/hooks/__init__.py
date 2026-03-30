@@ -1,1 +1,1 @@
-from . import auth, error, plugin_sync, statistics  # noqa: F401
+from . import auth, error, plugin_sync, schema, statistics  # noqa: F401

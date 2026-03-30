@@ -14,34 +14,9 @@ from apeiria.core.i18n import t
 async def sync_plugins() -> None:
     """Iterate all loaded plugins, parse metadata, upsert into PluginInfo table."""
     from nonebot_plugin_orm import get_session
-    from sqlalchemy import inspect as sa_inspect
     from sqlalchemy import select
 
     from apeiria.core.models.plugin_info import PluginInfo
-
-    # Ensure tables exist (dev convenience — production uses Alembic)
-    async with get_session() as session:
-        conn = await session.connection()
-
-        def _check(sync_conn):  # noqa: ANN001
-            return sa_inspect(sync_conn).has_table("plugin_info")
-
-        exists = await conn.run_sync(_check)
-        if not exists:
-            logger.warning("{}", t("plugin_sync.tables_missing"))
-            from nonebot_plugin_orm import Model
-
-            from apeiria.core.models import (  # noqa: F401
-                BanConsole,
-                CommandStatistics,
-                GroupConsole,
-                LevelUser,
-                UserConsole,
-            )
-
-            await conn.run_sync(Model.metadata.create_all)
-            await session.commit()
-            logger.info("{}", t("plugin_sync.tables_created"))
 
     plugins = nonebot.get_loaded_plugins()
     logger.info("{}", t("plugin_sync.syncing", count=len(plugins)))
