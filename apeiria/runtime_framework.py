@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import pkgutil
 from functools import lru_cache
+from importlib import import_module
 from importlib.util import find_spec
 from pathlib import Path
 
@@ -168,5 +169,6 @@ def load_framework() -> None:
             continue
         nonebot.load_plugin(plugin)
 
-    import apeiria.core.hooks
-    import apeiria.core.models  # noqa: F401
+    import_module("apeiria.core.models")
+    import_module("apeiria.core.hooks.schema")
+    import_module("apeiria.core.hooks")

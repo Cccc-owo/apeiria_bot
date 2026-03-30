@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ from pathlib import Path
 import click
 
 from apeiria.cli_i18n import _
+from apeiria.core.services.db_schema import ensure_database_ready
 from apeiria.core.utils.webui_build import write_frontend_build_meta
 from apeiria.domains.system import system_health_service
 from apeiria.runtime_bootstrap import initialize_nonebot
@@ -79,6 +81,30 @@ def initialize_user_environment(*, no_dev: bool = False) -> None:
 
 def repair_user_environment() -> None:
     initialize_user_environment()
+
+
+def validate_database_schema() -> None:
+    """Initialize NoneBot once and verify Apeiria database schema readiness."""
+    initialize_nonebot()
+    asyncio.run(ensure_database_ready())
+
+
+def repair_database_schema() -> None:
+    """Repair database metadata or fail with an actionable CLI error."""
+    try:
+        validate_database_schema()
+    except Exception as exc:
+        hint = _startup_check_hint(str(exc))
+        if hint:
+            raise click.ClickException(
+                _("database repair failed: {error}\nnext step: {hint}").format(
+                    error=str(exc),
+                    hint=hint,
+                )
+            ) from exc
+        raise click.ClickException(
+            _("database repair failed: {error}").format(error=str(exc))
+        ) from exc
 
 
 def raise_click_runtime_error(exc: RuntimeError) -> None:
@@ -201,6 +227,7 @@ def env_repair() -> None:
     check_system_dependencies()
     try:
         repair_user_environment()
+        repair_database_schema()
     except RuntimeError as exc:
         raise_click_runtime_error(exc)
     click.echo(_("repaired environment"))
@@ -301,6 +328,22 @@ def _startup_check_hint(error_text: str) -> str | None:
             "check plugin config conflicts in project plugins and rerun check",
         ),
         (
+            "partially initialized apeiria database tables",
+            "run `apeiria env repair` after backing up or fixing the database state",
+        ),
+        (
+            "schema metadata is missing a valid schema version",
+            "run `apeiria env repair` to reconcile Apeiria database metadata",
+        ),
+        (
+            "database schema version is newer than this apeiria build",
+            "use a matching Apeiria version or restore a compatible database backup",
+        ),
+        (
+            "no schema migration path is available",
+            "upgrade with a compatible Apeiria release or add the required migration",
+        ),
+        (
             "web_ui auth storage is corrupted",
             (
                 "fix or restore `data/apeiria.plugins.web_ui/secret.json`, "
@@ -327,7 +370,7 @@ def status() -> None:
 @click.command(help=_("Validate bot startup without entering the event loop."))
 def check() -> None:
     try:
-        initialize_nonebot()
+        validate_database_schema()
     except Exception as exc:
         hint = _startup_check_hint(str(exc))
         if hint:
