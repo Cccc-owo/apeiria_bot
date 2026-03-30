@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import pkgutil
 from functools import lru_cache
 from importlib import import_module
 from importlib.util import find_spec
@@ -14,7 +13,13 @@ FRAMEWORK_PLUGIN_MODULES = (
     "nonebot_plugin_localstore",
     "nonebot_plugin_orm",
     "nonebot_plugin_alconna",
+)
+
+BUILTIN_APPLICATION_PLUGIN_MODULES = (
     "apeiria.plugins.render",
+    "apeiria.plugins.admin",
+    "apeiria.plugins.help",
+    "apeiria.plugins.web_ui",
 )
 
 FRAMEWORK_BUILTIN_PLUGIN_NAMES = ("echo",)
@@ -24,26 +29,9 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _official_plugin_root() -> Path:
-    return _project_root() / "apeiria" / "plugins"
-
-
-def _iter_official_plugin_modules() -> tuple[str, ...]:
-    official_plugin_dir = _official_plugin_root().resolve()
-    if not official_plugin_dir.is_dir():
-        return ()
-
-    discovered: list[str] = []
-    for module_info in pkgutil.iter_modules([str(official_plugin_dir)]):
-        if module_info.name.startswith("_"):
-            continue
-        discovered.append(f"apeiria.plugins.{module_info.name}")
-    return tuple(sorted(discovered))
-
-
 def iter_builtin_plugin_modules() -> tuple[str, ...]:
-    """Return Apeiria built-in plugin modules discovered from the repo."""
-    return _iter_official_plugin_modules()
+    """Return Apeiria built-in application plugin modules."""
+    return tuple(sorted(BUILTIN_APPLICATION_PLUGIN_MODULES))
 
 
 def get_framework_dependency_plugin_modules() -> frozenset[str]:
@@ -164,9 +152,7 @@ def load_framework() -> None:
     for plugin in FRAMEWORK_PLUGIN_MODULES:
         nonebot.load_plugin(plugin)
 
-    for plugin in _iter_official_plugin_modules():
-        if plugin in FRAMEWORK_PLUGIN_MODULES:
-            continue
+    for plugin in BUILTIN_APPLICATION_PLUGIN_MODULES:
         nonebot.load_plugin(plugin)
 
     import_module("apeiria.core.models")
