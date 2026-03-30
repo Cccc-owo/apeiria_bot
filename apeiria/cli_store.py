@@ -19,6 +19,7 @@ from apeiria.runtime_env import (
     discard_plugin_requirement_removal,
     plugin_site_packages_paths,
     remove_plugin_requirement,
+    update_plugin_requirement,
 )
 
 
@@ -257,6 +258,44 @@ def uninstall_plugin_package(
     return PluginUninstallResult(
         requirement=target,
         module_names=[resolved_module],
+    )
+
+
+def update_plugin_package(
+    requirement: str,
+    module_name: str,
+    extra_args: tuple[str, ...] = (),
+) -> PluginInstallResult:
+    """Update one installed plugin package without changing its binding."""
+
+    target = requirement.strip()
+    resolved_module = module_name.strip()
+    if not target:
+        raise _missing_package_name_error()
+    if not resolved_module:
+        raise _missing_plugin_module_name_error()
+
+    registered_modules = plugin_config_service.get_project_plugin_package_modules(
+        target
+    )
+    if not registered_modules:
+        msg = f"package {target} is not registered in project config"
+        raise StoreInstallError(msg)
+    if resolved_module not in registered_modules:
+        msg = f"module {resolved_module} is not bound to package {target}"
+        raise StoreInstallError(msg)
+
+    try:
+        update_plugin_requirement(target, extra_args)
+    except RuntimeError as exc:
+        raise StoreInstallError(str(exc)) from exc
+
+    discard_plugin_requirement_removal(target)
+    discard_plugin_module_uninstall(resolved_module)
+    invalidate_plugin_management_caches()
+    return PluginInstallResult(
+        requirement=target,
+        module_name=resolved_module,
     )
 
 

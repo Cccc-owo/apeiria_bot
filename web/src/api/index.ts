@@ -202,6 +202,16 @@ export interface PluginItem {
   installed_module_names: string[]
 }
 
+export interface PluginUpdateCheckItem {
+  module_name: string
+  package_name: string
+  current_version: string | null
+  latest_version: string | null
+  has_update: boolean
+  checked: boolean
+  error: string | null
+}
+
 export interface PluginTogglePreview {
   module_name: string
   enabled: boolean
@@ -270,6 +280,7 @@ export interface PluginStoreItem {
   is_registered: boolean
   installed_package: string | null
   installed_module_names: string[]
+  can_update: boolean
 }
 
 export interface PluginStoreCategoryItem {
@@ -440,6 +451,9 @@ export const getLogSources = (signal?: AbortSignal) =>
 export const getPlugins = () =>
   client.get<PluginItem[]>('/plugins/')
 
+export const checkPluginUpdates = (payload?: { force_refresh?: boolean }) =>
+  client.post<PluginUpdateCheckItem[]>('/plugins/update-checks', payload || {})
+
 export const getOrphanPluginConfigs = () =>
   client.get<OrphanPluginConfigResponse>('/plugins/orphan-configs')
 
@@ -454,6 +468,12 @@ export const installManualPlugin = (payload: {
 
 export const getPluginInstallTask = (taskId: string) =>
   client.get<PluginStoreTask>(`/plugins/install/tasks/${taskId}`)
+
+export const updateInstalledPlugin = (
+  moduleName: string,
+  payload: { package_name: string },
+) =>
+  client.post<PluginStoreTask>(`/plugins/${moduleName}/update`, payload)
 
 export const getPluginStoreSources = () =>
   client.get<PluginStoreSource[]>('/plugins/store/sources')
@@ -485,6 +505,14 @@ export const installPluginStoreItem = (payload: {
   module_name: string
 }) =>
   client.post<PluginStoreTask>('/plugins/store/install', payload)
+
+export const updatePluginStoreItem = (payload: {
+  source_id: string
+  plugin_id: string
+  package_name: string
+  module_name: string
+}) =>
+  client.post<PluginStoreTask>('/plugins/store/update', payload)
 
 export const getPluginStoreTask = (taskId: string) =>
   client.get<PluginStoreTask>(`/plugins/store/tasks/${taskId}`)

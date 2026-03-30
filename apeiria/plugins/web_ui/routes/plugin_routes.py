@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from apeiria.core.i18n import t
+from apeiria.core.services.plugin_update_check import plugin_update_check_service
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
 from apeiria.domains.plugin_store import plugin_store_task_service
 from apeiria.domains.plugins import (
@@ -45,6 +46,7 @@ from apeiria.plugins.web_ui.models import (
     PluginConfigResponse,
     PluginItem,
     PluginManualInstallRequest,
+    PluginPackageUpdateRequest,
     PluginRawSettingsResponse,
     PluginReadmeResponse,
     PluginSettingFieldItem,
@@ -56,6 +58,8 @@ from apeiria.plugins.web_ui.models import (
     PluginTogglePreviewResponse,
     PluginToggleResponse,
     PluginUninstallRequest,
+    PluginUpdateCheckItem,
+    PluginUpdateCheckRequest,
 )
 
 router = APIRouter()
@@ -496,6 +500,30 @@ async def list_plugins(
     ]
 
 
+@router.post("/update-checks", response_model=list[PluginUpdateCheckItem])
+async def check_plugin_updates(
+    payload: PluginUpdateCheckRequest,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> list[PluginUpdateCheckItem]:
+    plugins = await plugin_catalog_service.list_plugins()
+    results = await plugin_update_check_service.check_plugins(
+        plugins,
+        force_refresh=payload.force_refresh,
+    )
+    return [
+        PluginUpdateCheckItem(
+            module_name=item.module_name,
+            package_name=item.package_name,
+            current_version=item.current_version,
+            latest_version=item.latest_version,
+            has_update=item.has_update,
+            checked=item.checked,
+            error=item.error,
+        )
+        for item in results
+    ]
+
+
 @router.patch("/{module_name}", response_model=PluginToggleResponse)
 async def update_plugin(
     module_name: str,
@@ -609,6 +637,45 @@ async def install_plugin_manual(
         task = await plugin_store_task_service.create_manual_plugin_install_task(
             payload.requirement,
             payload.module_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return PluginStoreTaskItem(
+        task_id=task.task_id,
+        title=task.title,
+        status=task.status,
+        logs=task.logs,
+        error=task.error,
+        result=task.result,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+    )
+
+
+@router.post("/{module_name}/update", response_model=PluginStoreTaskItem)
+async def update_plugin_package_task(
+    module_name: str,
+    payload: PluginPackageUpdateRequest,
+    _: Annotated[Any, Depends(require_owner)],
+) -> PluginStoreTaskItem:
+    plugin = await plugin_catalog_service.get_plugin(module_name)
+    if plugin is None:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.not_found"),
+        ) from None
+    if not plugin.can_uninstall or plugin.installed_package != payload.package_name:
+        raise HTTPException(
+            status_code=400,
+            detail="plugin package update is not allowed",
+        ) from None
+
+    try:
+        task = await plugin_store_task_service.create_manual_plugin_update_task(
+            payload.package_name,
+            module_name,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

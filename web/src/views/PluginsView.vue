@@ -52,6 +52,15 @@
             >
               {{ t('plugins.orphanConfigCleanup') }}
             </v-btn>
+            <v-btn
+              v-if="authStore.role === 'owner'"
+              color="primary"
+              :loading="updateCheckLoading"
+              variant="text"
+              @click="runPluginUpdateCheck(true)"
+            >
+              {{ updateCheckLoading ? t('plugins.checkingUpdates') : t('plugins.checkUpdates') }}
+            </v-btn>
           </div>
           <div class="section-heading__actions">
             <div :aria-label="t('plugins.scopeTabs')" class="plugin-scope-tabs" role="tablist">
@@ -239,6 +248,17 @@
                     @click="openReadme(item)"
                   >
                     {{ t('plugins.readme') }}
+                  </v-btn>
+                  <v-btn
+                    v-if="canUpdatePlugin(item)"
+                    :color="hasPluginUpdate(item) ? 'primary' : undefined"
+                    :disabled="updateCheckLoading || !hasPluginUpdate(item)"
+                    :loading="packageUpdatingModule === item.module_name"
+                    size="small"
+                    :variant="hasPluginUpdate(item) ? 'tonal' : 'text'"
+                    @click="updatePluginItem(item)"
+                  >
+                    {{ t('plugins.packageUpdate') }}
                   </v-btn>
                   <v-btn
                     v-if="item.can_edit_config"
@@ -747,6 +767,38 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="packageUpdateTaskDialogVisible" max-width="840">
+      <v-card rounded="xl">
+        <v-card-title>{{ packageUpdateTask?.title || t('plugins.packageUpdateTaskTitle') }}</v-card-title>
+        <v-card-text class="d-flex flex-column ga-4">
+          <div class="text-body-2 text-medium-emphasis">
+            {{ packageUpdateTaskStatusLabel }}
+          </div>
+          <v-alert
+            v-if="packageUpdateTaskErrorSummary"
+            density="comfortable"
+            type="error"
+            variant="tonal"
+          >
+            {{ packageUpdateTaskErrorSummary }}
+          </v-alert>
+          <v-progress-linear
+            v-if="packageUpdateTask?.status === 'pending' || packageUpdateTask?.status === 'running'"
+            color="primary"
+            indeterminate
+          />
+          <v-sheet class="task-log-card" rounded="lg">
+            <pre class="task-log-card__content">{{ packageUpdateTask?.logs || t('plugins.packageUpdateWaiting') }}</pre>
+          </v-sheet>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn rounded="xl" variant="text" @click="packageUpdateTaskDialogVisible = false">
+            {{ t('common.close') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="readmeDialogVisible" max-width="960">
       <v-card rounded="xl">
         <v-card-title class="d-flex align-center justify-space-between ga-4">
@@ -781,6 +833,7 @@
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
   import {
+    checkPluginUpdates,
     cleanupOrphanPluginConfigs,
     getOrphanPluginConfigs,
     getPluginInstallTask,
@@ -794,8 +847,10 @@
     type PluginItem,
     type PluginReadmeResponse,
     type PluginStoreTask,
+    type PluginUpdateCheckItem,
     type RawSettingsResponse,
     uninstallPlugin,
+    updateInstalledPlugin,
     updatePlugin,
     updatePluginSettings,
     updatePluginSettingsRaw,
@@ -870,6 +925,12 @@
   const manualInstallTask = ref<PluginStoreTask | null>(null)
   const activeManualInstallRequirement = ref('')
   let manualInstallTaskPollTimer: number | null = null
+  const packageUpdateTaskDialogVisible = ref(false)
+  const packageUpdateTask = ref<PluginStoreTask | null>(null)
+  const packageUpdatingModule = ref('')
+  let packageUpdateTaskPollTimer: number | null = null
+  const updateCheckLoading = ref(false)
+  const pluginUpdateChecks = ref<Record<string, PluginUpdateCheckItem>>({})
   const readmeDialogVisible = ref(false)
   const readmeLoading = ref(false)
   const readmeLoadingModule = ref('')
@@ -1066,6 +1127,19 @@
     if (status === 'failed') return manualInstallTaskErrorSummary.value || t('plugins.manualInstallFailed')
     return ''
   })
+  const packageUpdateTaskErrorSummary = computed(() => {
+    const error = packageUpdateTask.value?.error?.trim()
+    if (!error) return ''
+    return error.split('\n')[0]?.trim() || error
+  })
+  const packageUpdateTaskStatusLabel = computed(() => {
+    const status = packageUpdateTask.value?.status || ''
+    if (status === 'pending') return t('plugins.packageUpdatePending')
+    if (status === 'running') return t('plugins.packageUpdateRunning')
+    if (status === 'succeeded') return t('plugins.packageUpdateSucceeded')
+    if (status === 'failed') return packageUpdateTaskErrorSummary.value || t('plugins.packageUpdateFailed')
+    return ''
+  })
   const readmeDialogTitle = computed(() =>
     t('plugins.readmeTitle', {
       name: readmeTarget.value?.name || readmeTarget.value?.module_name || '',
@@ -1103,6 +1177,14 @@
     if (author) return author
     if (version) return `v${version}`
     return ''
+  }
+
+  function pluginUpdateCheck (item: PluginItem) {
+    return pluginUpdateChecks.value[item.module_name] || null
+  }
+
+  function hasPluginUpdate (item: PluginItem) {
+    return !!pluginUpdateCheck(item)?.has_update
   }
 
   function pluginToggleHint (item: PluginItem) {
@@ -1270,15 +1352,33 @@
     }
   }
 
-  async function loadPluginManagement () {
+  async function loadPluginManagement (options?: { forceUpdateRefresh?: boolean }) {
     loading.value = true
     errorMessage.value = ''
     try {
       plugins.value = (await getPlugins()).data
+      await runPluginUpdateCheck(options?.forceUpdateRefresh === true)
     } catch (error) {
       errorMessage.value = getErrorMessage(error, t('plugins.loadFailed'))
     } finally {
       loading.value = false
+    }
+  }
+
+  async function runPluginUpdateCheck (forceRefresh = false) {
+    if (updateCheckLoading.value) return
+    updateCheckLoading.value = true
+    try {
+      const response = await checkPluginUpdates({
+        force_refresh: forceRefresh || undefined,
+      })
+      pluginUpdateChecks.value = Object.fromEntries(
+        response.data.map(item => [item.module_name, item]),
+      )
+    } catch (error) {
+      noticeStore.show(getErrorMessage(error, t('plugins.updateCheckFailed')), 'error')
+    } finally {
+      updateCheckLoading.value = false
     }
   }
 
@@ -1318,6 +1418,13 @@
     }
   }
 
+  function stopPackageUpdateTaskPolling () {
+    if (packageUpdateTaskPollTimer !== null) {
+      window.clearInterval(packageUpdateTaskPollTimer)
+      packageUpdateTaskPollTimer = null
+    }
+  }
+
   function startManualInstallTaskPolling (taskId: string) {
     stopManualInstallTaskPolling()
     manualInstallTaskPollTimer = window.setInterval(async () => {
@@ -1352,6 +1459,44 @@
       } catch (error) {
         stopManualInstallTaskPolling()
         noticeStore.show(getErrorMessage(error, t('plugins.manualInstallFailed')), 'error')
+      }
+    }, 1500)
+  }
+
+  function startPackageUpdateTaskPolling (taskId: string) {
+    stopPackageUpdateTaskPolling()
+    packageUpdateTaskPollTimer = window.setInterval(async () => {
+      try {
+        const response = await getPluginInstallTask(taskId)
+        packageUpdateTask.value = response.data
+        if (response.data.status === 'succeeded' || response.data.status === 'failed') {
+          stopPackageUpdateTaskPolling()
+          if (response.data.status === 'succeeded') {
+            const moduleName = typeof response.data.result.module_name === 'string'
+              ? response.data.result.module_name
+              : packageUpdatingModule.value
+            const requirement = typeof response.data.result.requirement === 'string'
+              ? response.data.result.requirement
+              : ''
+            restartStore.markPending({
+              id: `plugin-package-update:${moduleName || requirement}`,
+              scope: 'plugins',
+              summary: t('plugins.packageUpdateRestartPending', { name: moduleName || requirement }),
+            })
+            noticeStore.show(t('plugins.packageUpdateSucceeded'), 'success')
+            void loadPluginManagement({ forceUpdateRefresh: true })
+          } else {
+            noticeStore.show(
+              summarizeTaskError(response.data.error) || t('plugins.packageUpdateFailed'),
+              'error',
+            )
+          }
+          packageUpdatingModule.value = ''
+        }
+      } catch (error) {
+        stopPackageUpdateTaskPolling()
+        packageUpdatingModule.value = ''
+        noticeStore.show(getErrorMessage(error, t('plugins.packageUpdateFailed')), 'error')
       }
     }, 1500)
   }
@@ -1403,6 +1548,31 @@
 
   function canUninstallPlugin (item: PluginItem) {
     return authStore.role === 'owner' && item.can_uninstall
+  }
+
+  function canUpdatePlugin (item: PluginItem) {
+    return (
+      authStore.role === 'owner'
+      && item.can_uninstall
+      && !item.is_pending_uninstall
+      && !!item.installed_package
+    )
+  }
+
+  async function updatePluginItem (item: PluginItem) {
+    if (!item.installed_package || packageUpdatingModule.value) return
+    packageUpdatingModule.value = item.module_name
+    try {
+      const response = await updateInstalledPlugin(item.module_name, {
+        package_name: item.installed_package,
+      })
+      packageUpdateTask.value = response.data
+      packageUpdateTaskDialogVisible.value = true
+      startPackageUpdateTaskPolling(response.data.task_id)
+    } catch (error) {
+      packageUpdatingModule.value = ''
+      noticeStore.show(getErrorMessage(error, t('plugins.packageUpdateFailed')), 'error')
+    }
   }
 
   async function uninstallPluginItem (item: PluginItem) {
@@ -1633,6 +1803,7 @@
 
   onBeforeUnmount(() => {
     stopManualInstallTaskPolling()
+    stopPackageUpdateTaskPolling()
   })
 </script>
 

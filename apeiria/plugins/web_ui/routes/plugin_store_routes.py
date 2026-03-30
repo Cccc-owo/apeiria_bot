@@ -75,6 +75,7 @@ def _build_plugin_store_item(item: DomainStorePluginItem) -> PluginStoreItem:
         is_registered=item.is_registered,
         installed_package=item.installed_package,
         installed_module_names=item.installed_module_names,
+        can_update=item.can_update,
     )
 
 
@@ -175,6 +176,37 @@ async def install_plugin_store_item(
 ) -> PluginStoreTaskItem:
     try:
         task = await plugin_store_task_service.create_plugin_install_task(
+            PluginStoreInstallCommand(
+                source_id=payload.source_id,
+                item_id=payload.plugin_id,
+                type="plugin",
+                package_requirement=payload.package_name,
+                binding_value=payload.module_name,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return PluginStoreTaskItem(
+        task_id=task.task_id,
+        title=task.title,
+        status=task.status,
+        logs=task.logs,
+        error=task.error,
+        result=task.result,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        finished_at=task.finished_at,
+    )
+
+
+@router.post("/update", response_model=PluginStoreTaskItem)
+async def update_plugin_store_item(
+    payload: PluginStoreInstallRequest,
+    _: Annotated[Any, Depends(require_owner)],
+) -> PluginStoreTaskItem:
+    try:
+        task = await plugin_store_task_service.create_plugin_update_task(
             PluginStoreInstallCommand(
                 source_id=payload.source_id,
                 item_id=payload.plugin_id,
