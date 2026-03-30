@@ -15,25 +15,60 @@
 
     <div class="page-summary-grid mb-4">
       <v-sheet class="summary-card" rounded="lg">
-        <div class="summary-card__label">{{ t('accounts.totalAccounts') }}</div>
-        <div class="summary-card__value">{{ accounts.length }}</div>
-      </v-sheet>
-      <v-sheet class="summary-card" rounded="lg">
-        <div class="summary-card__label">{{ t('accounts.totalRegistrationCodes') }}</div>
-        <div class="summary-card__value">{{ registrationCodes.length }}</div>
-      </v-sheet>
-      <v-sheet class="summary-card" rounded="lg">
         <div class="summary-card__label">{{ t('accounts.currentRole') }}</div>
         <div class="summary-card__value summary-card__value--text">{{ roleLabel(authStore.role) }}</div>
+      </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('accounts.username') }}</div>
+        <div class="summary-card__value summary-card__value--text">{{ currentAccount?.username || t('common.none') }}</div>
       </v-sheet>
       <v-sheet class="summary-card" rounded="lg">
         <div class="summary-card__label">{{ t('accounts.lastLogin') }}</div>
         <div class="summary-card__value summary-card__value--text">{{ formatTimestamp(currentAccount?.last_login_at) }}</div>
       </v-sheet>
+      <v-sheet class="summary-card" rounded="lg">
+        <div class="summary-card__label">{{ t('accounts.passwordChangedAt') }}</div>
+        <div class="summary-card__value summary-card__value--text">{{ formatTimestamp(currentAccount?.password_changed_at) }}</div>
+      </v-sheet>
     </div>
 
     <v-row>
       <v-col cols="12" lg="5">
+        <v-card class="page-panel">
+          <v-card-title class="page-panel__title">{{ t('accounts.profileTitle') }}</v-card-title>
+          <v-card-text class="d-flex flex-column ga-4">
+            <div class="security-stat">
+              <div class="security-stat__label">{{ t('accounts.username') }}</div>
+              <div class="security-stat__value">{{ currentAccount?.username || t('common.none') }}</div>
+            </div>
+            <div class="security-stat">
+              <div class="security-stat__label">{{ t('accounts.currentRole') }}</div>
+              <div class="security-stat__value">{{ roleLabel(authStore.role) }}</div>
+            </div>
+            <div class="security-stat">
+              <div class="security-stat__label">{{ t('accounts.lastLogin') }}</div>
+              <div class="security-stat__value">{{ formatTimestamp(currentAccount?.last_login_at) }}</div>
+            </div>
+            <div class="security-stat">
+              <div class="security-stat__label">{{ t('accounts.passwordChangedAt') }}</div>
+              <div class="security-stat__value">{{ formatTimestamp(currentAccount?.password_changed_at) }}</div>
+            </div>
+          </v-card-text>
+        </v-card>
+
+        <v-card class="page-panel mt-4">
+          <v-card-title class="page-panel__title">{{ t('accounts.securityTitle') }}</v-card-title>
+          <v-card-text class="d-flex flex-column ga-3">
+            <div class="d-flex justify-end">
+              <v-btn color="warning" :loading="revokingSessions" variant="tonal" @click="handleRevokeOtherSessions">
+                {{ t('accounts.revokeOtherSessions') }}
+              </v-btn>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" lg="7">
         <v-card class="page-panel">
           <v-card-title class="page-panel__title">{{ t('accounts.passwordTitle') }}</v-card-title>
           <v-card-text class="d-flex flex-column ga-3">
@@ -60,86 +95,8 @@
             </div>
           </v-card-text>
         </v-card>
-
-        <v-card class="page-panel mt-4">
-          <v-card-title class="page-panel__title">{{ t('accounts.securityTitle') }}</v-card-title>
-          <v-card-text class="d-flex flex-column ga-3">
-            <div class="security-stat">
-              <div class="security-stat__label">{{ t('accounts.lastLogin') }}</div>
-              <div class="security-stat__value">{{ formatTimestamp(currentAccount?.last_login_at) }}</div>
-            </div>
-            <div class="security-stat">
-              <div class="security-stat__label">{{ t('accounts.passwordChangedAt') }}</div>
-              <div class="security-stat__value">{{ formatTimestamp(currentAccount?.password_changed_at) }}</div>
-            </div>
-            <div class="d-flex justify-end">
-              <v-btn color="warning" :loading="revokingSessions" variant="tonal" @click="handleRevokeOtherSessions">
-                {{ t('accounts.revokeOtherSessions') }}
-              </v-btn>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" lg="7">
-        <v-card class="page-panel">
-          <v-card-title class="page-panel__title">{{ t('accounts.registrationCodesTitle') }}</v-card-title>
-          <v-card-text class="d-flex flex-column ga-4">
-            <div class="account-toolbar">
-              <div class="text-body-2">{{ roleLabel('owner') }}</div>
-              <v-btn color="primary" :loading="registrationCodeSaving" @click="submitRegistrationCode">
-                {{ t('accounts.createRegistrationCode') }}
-              </v-btn>
-            </div>
-
-            <v-data-table
-              class="page-table"
-              density="compact"
-              :headers="registrationCodeHeaders"
-              :items="registrationCodes"
-              :loading="loading"
-            >
-              <template #item.role="{ value }">
-                {{ roleLabel(value) }}
-              </template>
-              <template #item.actions="{ item }">
-                <v-btn
-                  color="error"
-                  icon="mdi-delete-outline"
-                  :loading="revokingCode === item.code"
-                  size="small"
-                  variant="text"
-                  @click="handleRevokeRegistrationCode(item.code)"
-                />
-              </template>
-            </v-data-table>
-          </v-card-text>
-        </v-card>
       </v-col>
     </v-row>
-
-    <v-card class="page-panel mt-4">
-      <v-card-title class="page-panel__title">{{ t('accounts.accountsTitle') }}</v-card-title>
-      <v-card-text>
-        <v-data-table
-          class="page-table"
-          density="compact"
-          :headers="accountHeaders"
-          :items="accounts"
-          :loading="loading"
-        >
-          <template #item.role="{ item }">
-            <span>{{ roleLabel(item.role) }}</span>
-          </template>
-          <template #item.last_login_at="{ value }">
-            <span>{{ formatTimestamp(value) }}</span>
-          </template>
-          <template #item.password_changed_at="{ value }">
-            <span>{{ formatTimestamp(value) }}</span>
-          </template>
-        </v-data-table>
-      </v-card-text>
-    </v-card>
 
     <v-card class="page-panel mt-4">
       <v-card-title class="page-panel__title">{{ t('accounts.auditTitle') }}</v-card-title>
@@ -175,15 +132,12 @@
 <script setup lang="ts">
   import { computed, onMounted, reactive, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import type { RegistrationCodeItem, SecurityAuditEventItem, WebUIAccountItem } from '@/api'
+  import type { SecurityAuditEventItem, WebUIAccountItem } from '@/api'
   import {
     changePassword,
-    createRegistrationCode,
-    getAccounts,
-    getRegistrationCodes,
+    getCurrentAccount,
     getSecurityAuditEvents,
     revokeOtherSessions,
-    revokeRegistrationCode,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useAuthStore } from '@/stores/auth'
@@ -195,36 +149,17 @@
 
   const loading = ref(false)
   const passwordSaving = ref(false)
-  const registrationCodeSaving = ref(false)
   const revokingSessions = ref(false)
-  const revokingCode = ref('')
   const errorMessage = ref('')
   const passwordError = ref('')
   const confirmPassword = ref('')
-  const accounts = ref<WebUIAccountItem[]>([])
-  const registrationCodes = ref<RegistrationCodeItem[]>([])
+  const currentAccount = ref<WebUIAccountItem | null>(null)
   const auditEvents = ref<SecurityAuditEventItem[]>([])
   const passwordForm = reactive({
     current_password: '',
     new_password: '',
   })
-  const currentAccount = computed(() =>
-    accounts.value.find(item => item.user_id === authStore.principal?.user_id) || null,
-  )
 
-  const accountHeaders = computed(() => [
-    { title: t('accounts.username'), key: 'username' },
-    { title: t('accounts.role'), key: 'role', sortable: false },
-    { title: t('accounts.lastLogin'), key: 'last_login_at', sortable: false },
-    { title: t('accounts.passwordChangedAt'), key: 'password_changed_at', sortable: false },
-  ])
-  const registrationCodeHeaders = computed(() => [
-    { title: t('accounts.registrationCode'), key: 'code' },
-    { title: t('accounts.role'), key: 'role', sortable: false },
-    { title: t('accounts.createdBy'), key: 'created_by' },
-    { title: t('accounts.createdAt'), key: 'created_at' },
-    { title: t('accounts.actions'), key: 'actions', sortable: false },
-  ])
   const auditHeaders = computed(() => [
     { title: t('accounts.auditTime'), key: 'occurred_at', sortable: false },
     { title: t('accounts.auditType'), key: 'event_type', sortable: false },
@@ -258,13 +193,11 @@
     loading.value = true
     errorMessage.value = ''
     try {
-      const [accountsResponse, registrationCodesResponse, auditEventsResponse] = await Promise.all([
-        getAccounts(),
-        getRegistrationCodes(),
+      const [currentAccountResponse, auditEventsResponse] = await Promise.all([
+        getCurrentAccount(),
         getSecurityAuditEvents(),
       ])
-      accounts.value = accountsResponse.data
-      registrationCodes.value = registrationCodesResponse.data
+      currentAccount.value = currentAccountResponse.data
       auditEvents.value = auditEventsResponse.data
     } catch (err) {
       errorMessage.value = getErrorMessage(err, t('accounts.loadFailed'))
@@ -299,32 +232,6 @@
     }
   }
 
-  async function submitRegistrationCode () {
-    registrationCodeSaving.value = true
-    try {
-      const response = await createRegistrationCode({ role: 'owner' })
-      registrationCodes.value = [response.data, ...registrationCodes.value]
-      noticeStore.show(t('accounts.registrationCodeCreated'), 'success')
-    } catch (err) {
-      errorMessage.value = getErrorMessage(err, t('accounts.registrationCodeCreateFailed'))
-    } finally {
-      registrationCodeSaving.value = false
-    }
-  }
-
-  async function handleRevokeRegistrationCode (code: string) {
-    revokingCode.value = code
-    try {
-      await revokeRegistrationCode(code)
-      registrationCodes.value = registrationCodes.value.filter(item => item.code !== code)
-      noticeStore.show(t('accounts.registrationCodeRevoked'), 'success')
-    } catch (err) {
-      errorMessage.value = getErrorMessage(err, t('accounts.registrationCodeRevokeFailed'))
-    } finally {
-      revokingCode.value = ''
-    }
-  }
-
   async function handleRevokeOtherSessions () {
     revokingSessions.value = true
     try {
@@ -343,12 +250,6 @@
 </script>
 
 <style scoped>
-.account-toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
 .security-stat {
   display: flex;
   flex-direction: column;

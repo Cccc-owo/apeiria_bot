@@ -46,5 +46,5 @@ def can_access_control_panel(role: object) -> bool:
 
 
 def can_manage_accounts(role: object) -> bool:
-    """Return whether one role may manage accounts and registration codes."""
+    """Return whether one role may manage Web UI accounts."""
     return has_capability(role, CAP_ACCOUNT_MANAGE)

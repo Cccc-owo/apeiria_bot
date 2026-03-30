@@ -16,13 +16,6 @@ export interface WebUIAccountItem {
   password_changed_at: string | null
 }
 
-export interface RegistrationCodeItem {
-  code: string
-  role: string
-  created_at: string
-  created_by: string
-}
-
 export interface SecurityAuditEventItem {
   event_type: string
   occurred_at: string
@@ -334,32 +327,17 @@ export const register = (payload: {
 export const getCurrentUser = () =>
   client.get<WebUIPrincipal>('/auth/me')
 
+export const getCurrentAccount = () =>
+  client.get<WebUIAccountItem>('/auth/me/account')
+
 export const changePassword = (payload: {
   current_password: string
   new_password: string
 }) =>
   client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/password', payload)
 
-export const getAccounts = () =>
-  client.get<WebUIAccountItem[]>('/auth/accounts')
-
-export const updateAccountRole = (
-  userId: string,
-  payload: { role: string },
-) =>
-  client.patch<WebUIAccountItem>(`/auth/accounts/${userId}/role`, payload)
-
-export const getRegistrationCodes = () =>
-  client.get<RegistrationCodeItem[]>('/auth/registration-codes')
-
 export const getSecurityAuditEvents = () =>
   client.get<SecurityAuditEventItem[]>('/auth/audit-events')
-
-export const createRegistrationCode = (payload: { role: string }) =>
-  client.post<RegistrationCodeItem>('/auth/registration-codes', payload)
-
-export const revokeRegistrationCode = (code: string) =>
-  client.delete<{ status: string; detail?: string | null }>(`/auth/registration-codes/${encodeURIComponent(code)}`)
 
 export const revokeOtherSessions = () =>
   client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/sessions/revoke-others')

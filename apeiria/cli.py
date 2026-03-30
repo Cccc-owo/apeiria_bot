@@ -4,6 +4,7 @@ import click
 
 from apeiria.cli_env_commands import check, env, init, repair, run, status
 from apeiria.cli_resource_commands import adapter, driver, plugin
+from apeiria.cli_webui_commands import webui
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -20,6 +21,7 @@ cli.add_command(check)
 cli.add_command(plugin)
 cli.add_command(adapter)
 cli.add_command(driver)
+cli.add_command(webui)
 
 
 def main() -> None:

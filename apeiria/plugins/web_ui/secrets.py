@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from nonebot.log import logger
-from nonebot_plugin_localstore import get_data_file, get_plugin_data_file
+from nonebot_plugin_localstore import get_data_file
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.files import atomic_write_text
@@ -82,23 +82,8 @@ def _apply_secret_permissions(secret_file: "Path") -> None:
         secret_file.chmod(0o600)
 
 
-def _legacy_secret_file() -> "Path":
-    return get_data_file("apeiria.plugins.web_ui", "secret.json")
-
-
 def _get_secret_file() -> "Path":
-    try:
-        secret_file = get_plugin_data_file("secret.json")
-    except RuntimeError:
-        return _legacy_secret_file()
-    legacy_file = _legacy_secret_file()
-    if (
-        secret_file != legacy_file
-        and legacy_file.is_file()
-        and not secret_file.exists()
-    ):
-        return legacy_file
-    return secret_file
+    return get_data_file("web_ui", "secret.json")
 
 
 def _hash_password(password: str, *, salt: str | None = None) -> str:
@@ -136,7 +121,7 @@ def _iso_now() -> str:
 
 def _new_registration_code(*, role: str, created_by: str) -> dict[str, str]:
     return {
-        "code": secrets.token_urlsafe(12),
+        "code": secrets.token_urlsafe(32),
         "role": normalize_supported_role(role, fallback=ROLE_OWNER),
         "created_at": _iso_now(),
         "created_by": created_by,
@@ -163,6 +148,20 @@ def _record_audit_event(
         }
     )
     _auth_store["audit_events"] = current_events[-100:]
+
+
+def _ensure_bootstrap_registration_code(data: dict[str, Any]) -> dict[str, Any]:
+    """Ensure there is one bootstrap registration code when auth is fully empty."""
+    users = [item for item in data.get("users", []) if isinstance(item, dict)]
+    registration_codes = [
+        item for item in data.get("registration_codes", []) if isinstance(item, dict)
+    ]
+    if users or registration_codes:
+        return data
+    data["registration_codes"] = [
+        _new_registration_code(role=ROLE_OWNER, created_by="system")
+    ]
+    return data
 
 
 def _normalize_user_item(item: object, *, index: int) -> dict[str, object] | None:
@@ -255,11 +254,10 @@ def _load_or_create_raw() -> dict[str, Any]:
     data = {
         "token_secret": secrets.token_urlsafe(32),
         "users": [],
-        "registration_codes": [
-            _new_registration_code(role=ROLE_OWNER, created_by="system")
-        ],
+        "registration_codes": [],
         "audit_events": [],
     }
+    data = _ensure_bootstrap_registration_code(data)
     _persist_raw(data)
     logger.info("{}", t("web_ui.secrets.generated"))
     return data
@@ -288,7 +286,7 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
                 _new_registration_code(role=ROLE_OWNER, created_by="system")
             ]
 
-        return {
+        return _ensure_bootstrap_registration_code({
             "token_secret": str(data["token_secret"]),
             "users": normalized_users,
             "registration_codes": normalized_registration_codes,
@@ -297,14 +295,12 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
                 for item in data.get("audit_events", [])
                 if isinstance(item, dict)
             ],
-        }
+        })
 
     upgraded = {
         "token_secret": str(data["token_secret"]),
         "users": [],
-        "registration_codes": [
-            _new_registration_code(role=ROLE_OWNER, created_by="system")
-        ],
+        "registration_codes": [],
         "audit_events": [],
     }
     legacy_password = data.get("password")
@@ -318,7 +314,7 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
                 "is_disabled": False,
             }
         )
-    return upgraded
+    return _ensure_bootstrap_registration_code(upgraded)
 
 
 def _persist_raw(data: dict[str, Any]) -> None:
@@ -478,7 +474,7 @@ def create_registration_code(
     _record_audit_event(
         "registration_code_created",
         actor_username=created_by,
-        detail=registration_code["code"],
+        detail=registration_code["role"],
     )
     _persist_raw(_auth_store)
     return WebUIRegistrationCode(**registration_code)
@@ -505,7 +501,7 @@ def revoke_registration_code(code: str, *, revoked_by: str | None = None) -> boo
     _record_audit_event(
         "registration_code_revoked",
         actor_username=revoked_by,
-        detail=normalized,
+        detail=None,
     )
     _persist_raw(_auth_store)
     return True
@@ -651,7 +647,7 @@ def register_account(
         "registration_code_used",
         actor_username=normalized_username,
         target_username=normalized_username,
-        detail=normalized_registration_code,
+        detail=account.role,
     )
     _persist_raw(_auth_store)
     return account
