@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import mimetypes
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from apeiria.core.i18n import t
@@ -17,6 +19,7 @@ from apeiria.domains.plugins import (
     PluginConfigState,
     PluginRawSettingsState,
     PluginRawValidationState,
+    PluginReadme,
     PluginSettingsNotConfigurableError,
     PluginSettingsState,
     plugin_catalog_service,
@@ -43,6 +46,7 @@ from apeiria.plugins.web_ui.models import (
     PluginItem,
     PluginManualInstallRequest,
     PluginRawSettingsResponse,
+    PluginReadmeResponse,
     PluginSettingFieldItem,
     PluginSettingsRawUpdateRequest,
     PluginSettingsRawValidationResponse,
@@ -168,6 +172,14 @@ def _to_plugin_raw_settings_response(
         module_name=state.module_name,
         section=state.section,
         text=state.text,
+    )
+
+
+def _to_plugin_readme_response(state: PluginReadme) -> PluginReadmeResponse:
+    return PluginReadmeResponse(
+        module_name=state.module_name,
+        filename=state.filename,
+        content=state.content,
     )
 
 
@@ -333,6 +345,63 @@ async def get_plugin_settings_raw(
     return _to_plugin_raw_settings_response(state)
 
 
+@router.get("/{module_name}/readme", response_model=PluginReadmeResponse)
+async def get_plugin_readme(
+    module_name: str,
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> PluginReadmeResponse:
+    try:
+        state = await plugin_catalog_service.get_plugin_readme(module_name)
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.readme_not_found"),
+        ) from None
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _to_plugin_readme_response(state)
+
+
+@router.get("/{module_name}/readme/asset")
+async def get_plugin_readme_asset(
+    module_name: str,
+    path: Annotated[str, Query(min_length=1)],
+    _: Annotated[Any, Depends(require_control_panel)],
+) -> FileResponse:
+    try:
+        asset_path = await plugin_catalog_service.get_plugin_readme_asset_path(
+            module_name,
+            path,
+        )
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.readme_not_found"),
+        ) from None
+    except PermissionError:
+        raise HTTPException(
+            status_code=403,
+            detail=t("web_ui.plugins.readme_asset_forbidden"),
+        ) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    media_type, _ = mimetypes.guess_type(asset_path.name)
+    return FileResponse(
+        asset_path,
+        media_type=media_type or "application/octet-stream",
+        filename=asset_path.name,
+        headers={
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.patch("/{module_name}/settings", response_model=PluginSettingsResponse)
 async def update_plugin_settings(
     module_name: str,
@@ -414,6 +483,7 @@ async def list_plugins(
             is_dependency=plugin.is_dependency,
             is_pending_uninstall=plugin.is_pending_uninstall,
             can_edit_config=plugin.can_edit_config,
+            can_view_readme=plugin.can_view_readme,
             can_enable_disable=plugin.can_enable_disable,
             can_uninstall=plugin.can_uninstall,
             child_plugins=plugin.child_plugins,

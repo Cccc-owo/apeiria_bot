@@ -192,6 +192,7 @@ export interface PluginItem {
   is_dependency: boolean
   is_pending_uninstall: boolean
   can_edit_config: boolean
+  can_view_readme: boolean
   can_enable_disable: boolean
   can_uninstall: boolean
   child_plugins: string[]
@@ -217,6 +218,12 @@ export interface PluginToggleResult {
   module_name: string
   enabled: boolean
   affected_modules: string[]
+}
+
+export interface PluginReadmeResponse {
+  module_name: string
+  filename: string
+  content: string
 }
 
 export interface OrphanPluginConfigItem {
@@ -511,6 +518,9 @@ export const getPluginSettings = (moduleName: string) =>
 
 export const getPluginSettingsRaw = (moduleName: string) =>
   client.get<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`)
+
+export const getPluginReadme = (moduleName: string) =>
+  client.get<PluginReadmeResponse>(`/plugins/${moduleName}/readme`)
 
 export const updatePluginSettings = (
   moduleName: string,

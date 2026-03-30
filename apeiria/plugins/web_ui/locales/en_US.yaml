@@ -50,6 +50,8 @@ web_ui:
     rule_not_found: "Access rule not found"
   plugins:
     not_found: "Plugin not found"
+    readme_not_found: "Plugin README not found"
+    readme_asset_forbidden: "README relative paths cannot escape the current directory"
     protected: "This plugin cannot be disabled: {reason}"
     framework_required: "framework required"
     package_required: "Package name is required"
