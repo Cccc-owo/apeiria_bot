@@ -74,9 +74,7 @@ class PluginGuardService:
         group_id: str | None,
         spec: PluginAccessSpec,
     ) -> Decision | None:
-        is_enabled = await plugin_policy_service.is_globally_enabled(
-            spec.plugin_module
-        )
+        is_enabled = await plugin_policy_service.is_globally_enabled(spec.plugin_module)
         if spec.protection_mode != "required" and not is_enabled:
             return Decision(allowed=False, code="plugin_globally_disabled")
 

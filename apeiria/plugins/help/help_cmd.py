@@ -219,11 +219,15 @@ def _display_name(prefix: str, name: str, custom_prefix: str | None) -> str:
 
 
 def _merge_plugin_name(plugin_name: Match[tuple[str, ...]]) -> str | None:
-    parts = [
-        item.strip()
-        for item in plugin_name.result
-        if isinstance(item, str) and item.strip()
-    ] if plugin_name.available else []
+    parts = (
+        [
+            item.strip()
+            for item in plugin_name.result
+            if isinstance(item, str) and item.strip()
+        ]
+        if plugin_name.available
+        else []
+    )
     if not parts:
         return None
     return " ".join(parts)

@@ -17,4 +17,3 @@ class PermissionDeniedError(DomainError):
 
 class ProtectedPluginError(DomainError):
     """Raised when a protected plugin cannot be disabled."""
-

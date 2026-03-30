@@ -345,10 +345,7 @@ def _startup_check_hint(error_text: str) -> str | None:
         ),
         (
             "web_ui auth storage is corrupted",
-            (
-                "fix or restore `data/web_ui/secret.json`, "
-                "then rerun check"
-            ),
+            ("fix or restore `data/web_ui/secret.json`, then rerun check"),
         ),
     )
     for pattern, hint in rules:
@@ -375,9 +372,9 @@ def check() -> None:
         hint = _startup_check_hint(str(exc))
         if hint:
             raise click.ClickException(
-                _(
-                    "startup check failed: {error}\nnext step: {hint}"
-                ).format(error=str(exc), hint=hint)
+                _("startup check failed: {error}\nnext step: {hint}").format(
+                    error=str(exc), hint=hint
+                )
             ) from exc
         raise click.ClickException(
             _("startup check failed: {error}").format(error=str(exc))

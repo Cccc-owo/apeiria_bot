@@ -52,9 +52,7 @@ def get_framework_dependency_plugin_modules() -> frozenset[str]:
         )
 
     return frozenset(
-        module_name
-        for module_name in discovered
-        if module_name not in builtin_modules
+        module_name for module_name in discovered if module_name not in builtin_modules
     )
 
 

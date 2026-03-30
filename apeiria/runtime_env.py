@@ -198,10 +198,7 @@ def enqueue_plugin_requirement_removal(requirement: str) -> bool:
 
     normalized_target = normalize_package_id(target) or target
     pending = _read_pending_plugin_uninstalls()
-    normalized_pending = {
-        normalize_package_id(item) or item
-        for item in pending
-    }
+    normalized_pending = {normalize_package_id(item) or item for item in pending}
     if normalized_target in normalized_pending:
         return False
 
@@ -429,18 +426,12 @@ def _read_pending_json_items(path: Path) -> list[str]:
         return []
     if not isinstance(payload, list):
         return []
-    return [
-        item.strip()
-        for item in payload
-        if isinstance(item, str) and item.strip()
-    ]
+    return [item.strip() for item in payload if isinstance(item, str) and item.strip()]
 
 
 def _write_pending_json_items(path: Path, items: list[str]) -> None:
     normalized = [
-        item.strip()
-        for item in items
-        if isinstance(item, str) and item.strip()
+        item.strip() for item in items if isinstance(item, str) and item.strip()
     ]
     if not normalized:
         try:

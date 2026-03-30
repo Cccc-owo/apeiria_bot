@@ -369,9 +369,13 @@ def _build_html_document(
 </body>
 </html>
 """.strip()
-    return Environment(autoescape=False).from_string(template).render(
-        head_markup=head_markup,
-        html=html,
+    return (
+        Environment(autoescape=False)
+        .from_string(template)
+        .render(
+            head_markup=head_markup,
+            html=html,
+        )
     )
 
 

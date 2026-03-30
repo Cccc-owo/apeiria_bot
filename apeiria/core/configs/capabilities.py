@@ -182,9 +182,8 @@ def _supports_nested_config(config: RegisterConfig) -> bool:
     if _capability_for_simple(config) is not None:
         return True
     if config.type in {list, set}:
-        return (
-            config.item_schema is not None
-            and _supports_nested_config(config.item_schema)
+        return config.item_schema is not None and _supports_nested_config(
+            config.item_schema
         )
     if config.type is dict:
         return (

@@ -1,4 +1,5 @@
 """Web UI plugin — management dashboard API + static file serving."""
+
 from pathlib import Path
 
 import nonebot

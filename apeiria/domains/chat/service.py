@@ -328,6 +328,7 @@ class ChatGatewayService:
             raise ChatAuthError(msg)
         return principal
 
+
 chat_gateway_service = ChatGatewayService()
 
 __all__ = [

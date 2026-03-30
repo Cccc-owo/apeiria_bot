@@ -51,10 +51,7 @@ MESSAGES_ZH_CN = {
         "账号：{username} role={role} status={status} "
         "last_login={last_login} password_changed={password_changed}"
     ),
-    (
-        "code: {code} role={role} created_by={created_by} "
-        "created_at={created_at}"
-    ): (
+    ("code: {code} role={role} created_by={created_by} created_at={created_at}"): (
         "注册码：{code} role={role} created_by={created_by} created_at={created_at}"
     ),
     "no webui accounts": "没有 Web UI 账号",

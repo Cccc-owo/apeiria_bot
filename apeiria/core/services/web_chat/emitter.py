@@ -195,9 +195,7 @@ class WebChatEmitter:
             session=session.to_state(),
             message_count=len(history),
             last_message=(
-                self.summarize_segments(last_message.segments)
-                if last_message
-                else None
+                self.summarize_segments(last_message.segments) if last_message else None
             ),
             last_message_at=last_message.timestamp if last_message else None,
         )

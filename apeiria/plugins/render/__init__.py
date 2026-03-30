@@ -120,9 +120,7 @@ __plugin_meta__ = PluginMetadata(
 )
 
 _service = RenderService(get_render_config())
-_markdown = MarkdownIt("commonmark", {"breaks": True, "html": False}).enable(
-    "table"
-)
+_markdown = MarkdownIt("commonmark", {"breaks": True, "html": False}).enable("table")
 _DEFAULT_MARKDOWN_STYLE = """
 body {
   margin: 0;

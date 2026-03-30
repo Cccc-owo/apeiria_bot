@@ -95,9 +95,7 @@ class AccessRepository:
                     & (AccessPolicyEntry.subject_id == group_id)
                 )
             subject_filter = (
-                conditions[0]
-                if len(conditions) == 1
-                else conditions[0] | conditions[1]
+                conditions[0] if len(conditions) == 1 else conditions[0] | conditions[1]
             )
             result = await session.execute(
                 select(AccessPolicyEntry).where(

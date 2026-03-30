@@ -127,9 +127,7 @@ async def _render_plugin_info(module_name: str) -> str:
     try:
         settings = plugin_config_view_service.get_plugin_settings(module_name)
         configurable = (
-            t("admin.common.yes")
-            if settings.has_config_model
-            else t("admin.common.no")
+            t("admin.common.yes") if settings.has_config_model else t("admin.common.no")
         )
         section = settings.section
     except PluginSettingsNotConfigurableError:

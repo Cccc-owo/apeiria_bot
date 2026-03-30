@@ -382,10 +382,7 @@ def _collect_history_page(
     remaining_skip = before
     remaining_take = limit
     collected: list[StructuredLogEntry] = []
-    iterators = [
-        _iter_log_entries_reverse(path)
-        for path in paths
-    ]
+    iterators = [_iter_log_entries_reverse(path) for path in paths]
     heap: list[tuple[str, int, StructuredLogEntry]] = []
 
     for source_index, iterator in enumerate(iterators):
