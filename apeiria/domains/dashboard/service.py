@@ -113,9 +113,7 @@ class DashboardService:
                 or 0
             )
             groups_count = (
-                await session.scalar(
-                    select(func.count()).select_from(GroupConsole)
-                )
+                await session.scalar(select(func.count()).select_from(GroupConsole))
                 or 0
             )
             disabled_groups_count = (
@@ -168,9 +166,9 @@ class DashboardService:
     def get_web_ui_build_status(self) -> WebUIBuildStatusSnapshot:
         """Return whether frontend assets match the current source fingerprint."""
         build_tool = shutil.which("pnpm") or shutil.which("npm")
-        can_build = build_tool is not None and (
-            self._web_dir / "package.json"
-        ).is_file()
+        can_build = (
+            build_tool is not None and (self._web_dir / "package.json").is_file()
+        )
         status = read_frontend_build_status(self._project_root)
         return WebUIBuildStatusSnapshot(
             is_built=status.is_built,

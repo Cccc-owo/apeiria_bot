@@ -111,10 +111,7 @@ def ensure_owner_message(event: Event) -> str | None:
 
 
 def _format_plugin_candidates(plugins: list[Plugin]) -> list[str]:
-    labels = {
-        _format_plugin_candidate(plugin)
-        for plugin in plugins
-    }
+    labels = {_format_plugin_candidate(plugin) for plugin in plugins}
     return sorted(labels, key=str.lower)
 
 

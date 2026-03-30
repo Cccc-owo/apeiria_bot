@@ -159,8 +159,7 @@ class PluginCatalogService:
         package_bindings = project_plugin_config["packages"]
         pending_uninstall_modules = get_pending_uninstall_plugin_modules()
         loaded_plugins = {
-            plugin.module_name: plugin
-            for plugin in nonebot.get_loaded_plugins()
+            plugin.module_name: plugin for plugin in nonebot.get_loaded_plugins()
         }
         loaded_modules = set(loaded_plugins)
 
@@ -283,8 +282,7 @@ class PluginCatalogService:
         package_bindings = project_plugin_config["packages"]
         pending_uninstall_modules = get_pending_uninstall_plugin_modules()
         loaded_plugins = {
-            plugin.module_name: plugin
-            for plugin in nonebot.get_loaded_plugins()
+            plugin.module_name: plugin for plugin in nonebot.get_loaded_plugins()
         }
         required_by_module: dict[str, list[str]] = {}
         display_name_by_module: dict[str, str] = {}
@@ -656,8 +654,7 @@ class PluginCatalogService:
 
         current_config = plugin_config_service.read_project_plugin_config()
         loaded_plugins = {
-            loaded.module_name: loaded
-            for loaded in nonebot.get_loaded_plugins()
+            loaded.module_name: loaded for loaded in nonebot.get_loaded_plugins()
         }
         required_by_module = {
             loaded.module_name: get_plugin_required_plugins(loaded)
@@ -699,10 +696,7 @@ class PluginCatalogService:
             get_plugin_declared_configs(plugin.module_name).section
             for plugin in loaded_plugins
         }
-        loaded_modules = {
-            plugin.module_name
-            for plugin in loaded_plugins
-        }
+        loaded_modules = {plugin.module_name for plugin in loaded_plugins}
         section_names = project_config_service.read_project_plugin_section_names()
         module_map = project_config_service.read_project_plugin_module_map()
 
@@ -714,8 +708,7 @@ class PluginCatalogService:
             if section in loaded_sections:
                 continue
             if mapped_module and (
-                mapped_module in loaded_modules
-                or is_module_importable(mapped_module)
+                mapped_module in loaded_modules or is_module_importable(mapped_module)
             ):
                 continue
             orphaned.append(
@@ -1178,9 +1171,7 @@ class PluginCatalogService:
         for dist in distributions():
             top_level_text = dist.read_text("top_level.txt") or ""
             top_levels = {
-                line.strip()
-                for line in top_level_text.splitlines()
-                if line.strip()
+                line.strip() for line in top_level_text.splitlines() if line.strip()
             }
             if top_level not in top_levels:
                 continue

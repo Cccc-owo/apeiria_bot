@@ -63,16 +63,12 @@ def recover(*, username: str, password: str) -> None:
 
     if created:
         click.echo(
-            _("created owner account: {username}").format(
-                username=normalized_username
-            )
+            _("created owner account: {username}").format(username=normalized_username)
         )
         return
 
     click.echo(
-        _("recovered owner account: {username}").format(
-            username=normalized_username
-        )
+        _("recovered owner account: {username}").format(username=normalized_username)
     )
 
 

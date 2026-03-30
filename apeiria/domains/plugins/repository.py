@@ -163,10 +163,7 @@ class PluginCatalogRepository:
                     record.access_mode = access_mode
                 if record.required_level == 0 and required_level > 0:
                     record.required_level = required_level
-                if (
-                    record.protection_mode == "normal"
-                    and protection_mode != "normal"
-                ):
+                if record.protection_mode == "normal" and protection_mode != "normal":
                     record.protection_mode = protection_mode
             await session.commit()
 

@@ -232,16 +232,20 @@ class JsonHttpStoreSource(StoreSourceAdapter):
             )
             if normalized_item is None:
                 continue
-            if keyword and keyword not in " ".join(
-                [
-                    normalized_item.name,
-                    normalized_item.module_name,
-                    normalized_item.package_requirement,
-                    normalized_item.desc or "",
-                    normalized_item.author or "",
-                    " ".join(normalized_item.tags),
-                ]
-            ).lower():
+            if (
+                keyword
+                and keyword
+                not in " ".join(
+                    [
+                        normalized_item.name,
+                        normalized_item.module_name,
+                        normalized_item.package_requirement,
+                        normalized_item.desc or "",
+                        normalized_item.author or "",
+                        " ".join(normalized_item.tags),
+                    ]
+                ).lower()
+            ):
                 continue
             normalized.append(normalized_item)
         return normalized

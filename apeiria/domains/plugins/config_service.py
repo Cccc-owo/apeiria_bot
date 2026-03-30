@@ -235,6 +235,7 @@ class PluginConfigViewService:
         value = getattr(exc, attr, None)
         return value if isinstance(value, int) and value > 0 else None
 
+
 plugin_config_view_service = PluginConfigViewService()
 
 __all__ = [

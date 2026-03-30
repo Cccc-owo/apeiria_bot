@@ -39,8 +39,7 @@ class PluginStoreService:
             return self._sources()
 
         previous = {
-            source.source_info().source_id: source
-            for source in self._sources()
+            source.source_info().source_id: source for source in self._sources()
         }
         reloaded = configured_store_sources()
         preserved: list[StoreSourceAdapter] = []
@@ -160,8 +159,7 @@ class PluginStoreService:
         return [
             item
             for item in (
-                _enrich_plugin_item_state(item, plugin_state)
-                for item in items
+                _enrich_plugin_item_state(item, plugin_state) for item in items
             )
             if _match_item(item, query)
         ]

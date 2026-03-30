@@ -279,9 +279,7 @@ class PluginRegistrationConfigService:
             for package_name, items in current["packages"].items()
         }
         packages = {
-            package_name: items
-            for package_name, items in packages.items()
-            if items
+            package_name: items for package_name, items in packages.items() if items
         }
         if key == "modules":
             return {

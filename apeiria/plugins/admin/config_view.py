@@ -63,9 +63,7 @@ async def handle_config(
     if plugin is None:
         await _config.finish(t("admin.plugin.not_found", name=target.result))
 
-    await _config.finish(
-        _render_plugin_settings(plugin.module_name, plugin.name)
-    )
+    await _config.finish(_render_plugin_settings(plugin.module_name, plugin.name))
 
 
 def _render_core_settings() -> str:

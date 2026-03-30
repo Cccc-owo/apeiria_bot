@@ -125,9 +125,8 @@ def declaration_from_runtime_annotation(
         normalized_annotation,
         default,
     )
-    if (
-        isinstance(normalized_annotation, type)
-        and issubclass(normalized_annotation, BaseModel)
+    if isinstance(normalized_annotation, type) and issubclass(
+        normalized_annotation, BaseModel
     ):
         if normalized_annotation in seen_models:
             return FieldDeclaration(

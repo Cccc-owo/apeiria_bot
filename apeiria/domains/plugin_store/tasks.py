@@ -217,10 +217,7 @@ class PluginStoreTaskService:
                     "module_name": result.module_name,
                     "restart_required": True,
                 },
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "install succeeded\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}install succeeded\n"),
             )
         except Exception as exc:  # noqa: BLE001
             error = _format_task_error(exc)
@@ -229,11 +226,7 @@ class PluginStoreTaskService:
                 status="failed",
                 finished_at=_now(),
                 error=error,
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "install failed\n"
-                    f"{error}\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}install failed\n{error}\n"),
             )
         finally:
             self._active_install_keys.discard(install_key)
@@ -276,10 +269,7 @@ class PluginStoreTaskService:
                     "module_name": result.module_name,
                     "restart_required": True,
                 },
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "install succeeded\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}install succeeded\n"),
             )
         except Exception as exc:  # noqa: BLE001
             error = _format_task_error(exc)
@@ -288,11 +278,7 @@ class PluginStoreTaskService:
                 status="failed",
                 finished_at=_now(),
                 error=error,
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "install failed\n"
-                    f"{error}\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}install failed\n{error}\n"),
             )
         finally:
             self._active_install_keys.discard(install_key)
@@ -329,7 +315,7 @@ class PluginStoreTaskService:
                     "module_name": result.module_name,
                     "restart_required": True,
                 },
-                logs=(f"{self._tasks[task_id].logs}" "update succeeded\n"),
+                logs=(f"{self._tasks[task_id].logs}update succeeded\n"),
             )
         except Exception as exc:  # noqa: BLE001
             error = _format_task_error(exc)
@@ -338,11 +324,7 @@ class PluginStoreTaskService:
                 status="failed",
                 finished_at=_now(),
                 error=error,
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "update failed\n"
-                    f"{error}\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}update failed\n{error}\n"),
             )
         finally:
             self._active_install_keys.discard(install_key)
@@ -380,10 +362,7 @@ class PluginStoreTaskService:
                     "module_name": result.module_name,
                     "restart_required": True,
                 },
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "update succeeded\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}update succeeded\n"),
             )
         except Exception as exc:  # noqa: BLE001
             error = _format_task_error(exc)
@@ -392,11 +371,7 @@ class PluginStoreTaskService:
                 status="failed",
                 finished_at=_now(),
                 error=error,
-                logs=(
-                    f"{self._tasks[task_id].logs}"
-                    "update failed\n"
-                    f"{error}\n"
-                ),
+                logs=(f"{self._tasks[task_id].logs}update failed\n{error}\n"),
             )
         finally:
             self._active_install_keys.discard(install_key)

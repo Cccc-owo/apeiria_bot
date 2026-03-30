@@ -51,10 +51,7 @@ async def handle_access(  # noqa: PLR0913
 
     if selected_action == "rule":
         if not (
-            arg1.available
-            and arg2.available
-            and arg3.available
-            and arg4.available
+            arg1.available and arg2.available and arg3.available and arg4.available
         ):
             await _access.finish(t("admin.access.rule_usage"))
         await _access.finish(
@@ -113,9 +110,7 @@ async def _render_plugin_access(plugin_query: str) -> str:
     ]
     groups = await group_service.list_groups()
     disabled_groups = [
-        group
-        for group in groups
-        if item.module_name in group.disabled_plugins
+        group for group in groups if item.module_name in group.disabled_plugins
     ]
 
     return render_block(

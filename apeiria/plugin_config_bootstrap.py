@@ -10,10 +10,7 @@ def _register_candidate(candidate: PluginScanCandidate) -> None:
     try:
         ensure_plugin_config_registration(candidate)
     except PluginConfigConflictError as exc:
-        msg = (
-            "failed to bootstrap plugin config for "
-            f"{candidate.module_name}: {exc}"
-        )
+        msg = f"failed to bootstrap plugin config for {candidate.module_name}: {exc}"
         raise RuntimeError(msg) from exc
 
 

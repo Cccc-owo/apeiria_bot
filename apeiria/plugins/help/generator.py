@@ -238,6 +238,8 @@ def _collect_matcher_commands(
         plugin_id: sorted(command_map.values(), key=lambda item: item.name)
         for plugin_id, command_map in commands_by_plugin.items()
     }
+
+
 def _extract_matcher_command(
     matcher: type[object],
     plugin: PluginHelpInfo,

@@ -258,9 +258,7 @@ def get_plugin_dependents(
     )
 
     pending_modules = (
-        set()
-        if include_pending
-        else get_pending_uninstall_plugin_modules()
+        set() if include_pending else get_pending_uninstall_plugin_modules()
     )
     disabled_modules = get_disabled_plugin_modules_sync()
     dependents = {

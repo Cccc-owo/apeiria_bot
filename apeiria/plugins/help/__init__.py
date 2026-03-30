@@ -59,6 +59,7 @@ def _cleanup_help_disk_cache() -> None:
     if removed > 0:
         logger.info("Removed {} stale help cache file(s)", removed)
 
+
 __plugin_meta__ = PluginMetadata(
     name="帮助系统",
     description="图像化帮助菜单与插件详情",

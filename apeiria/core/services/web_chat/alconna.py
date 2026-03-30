@@ -36,11 +36,7 @@ class WebChatMessageBuilder(MessageBuilder[WebChatMessageSegment]):
         if not isinstance(target, str) or not target:
             return None
         mention_type = data.get("mention_type")
-        flag = (
-            mention_type
-            if mention_type in {"user", "role", "channel"}
-            else "user"
-        )
+        flag = mention_type if mention_type in {"user", "role", "channel"} else "user"
         return At(
             flag=flag,
             target=target,

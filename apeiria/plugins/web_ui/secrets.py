@@ -287,16 +287,18 @@ def _upgrade_legacy_schema(data: dict[str, Any]) -> dict[str, Any]:
                 _new_registration_code(role=ROLE_OWNER, created_by="system")
             ]
 
-        return _ensure_bootstrap_registration_code({
-            "token_secret": str(data["token_secret"]),
-            "users": normalized_users,
-            "registration_codes": normalized_registration_codes,
-            "audit_events": [
-                item
-                for item in data.get("audit_events", [])
-                if isinstance(item, dict)
-            ],
-        })
+        return _ensure_bootstrap_registration_code(
+            {
+                "token_secret": str(data["token_secret"]),
+                "users": normalized_users,
+                "registration_codes": normalized_registration_codes,
+                "audit_events": [
+                    item
+                    for item in data.get("audit_events", [])
+                    if isinstance(item, dict)
+                ],
+            }
+        )
 
     upgraded = {
         "token_secret": str(data["token_secret"]),
