@@ -6,7 +6,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import Distribution, PackageNotFoundError
 from importlib.metadata import version as package_version
 from typing import TYPE_CHECKING
 from urllib.error import HTTPError, URLError
@@ -15,6 +15,8 @@ from urllib.request import Request, urlopen
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
+
+from apeiria.runtime_env import plugin_site_packages_paths
 
 if TYPE_CHECKING:
     from apeiria.domains.plugins.service import PluginCatalogItem
@@ -63,12 +65,14 @@ class PluginUpdateCheckService:
             for plugin in plugins
             if plugin.can_uninstall and plugin.installed_package
         ]
+        installed_versions = _discover_plugin_distribution_versions()
         results = await asyncio.gather(
             *[
                 self.check_plugin(
                     plugin.module_name,
                     plugin.installed_package or "",
                     force_refresh=force_refresh,
+                    installed_versions=installed_versions,
                 )
                 for plugin in candidates
             ]
@@ -81,6 +85,7 @@ class PluginUpdateCheckService:
         package_name: str,
         *,
         force_refresh: bool = False,
+        installed_versions: dict[str, str] | None = None,
     ) -> PluginUpdateCheckResult:
         requirement = package_name.strip()
         parsed_name = _parse_package_name(requirement)
@@ -108,7 +113,10 @@ class PluginUpdateCheckService:
                     }
                 )
 
-        current_version = _read_installed_package_version(parsed_name)
+        current_version = _read_installed_package_version(
+            parsed_name,
+            installed_versions=installed_versions,
+        )
         if not current_version:
             result = PluginUpdateCheckResult(
                 module_name=module_name,
@@ -197,7 +205,35 @@ def _parse_package_name(requirement: str) -> str | None:
         return None
 
 
-def _read_installed_package_version(package_name: str) -> str | None:
+def supports_plugin_update_check(requirement: str) -> bool:
+    """Return whether this requirement supports Web UI update checks."""
+
+    return _parse_package_name(requirement) is not None
+
+
+def _discover_plugin_distribution_versions() -> dict[str, str]:
+    plugin_paths = [str(path) for path in plugin_site_packages_paths()]
+    versions: dict[str, str] = {}
+    if not plugin_paths:
+        return versions
+    for dist in Distribution.discover(path=plugin_paths):
+        name = dist.metadata.get("Name")
+        if not isinstance(name, str):
+            continue
+        versions[canonicalize_name(name)] = dist.version
+    return versions
+
+
+def _read_installed_package_version(
+    package_name: str,
+    *,
+    installed_versions: dict[str, str] | None = None,
+) -> str | None:
+    normalized_target = canonicalize_name(package_name)
+    if installed_versions is not None:
+        version = installed_versions.get(normalized_target)
+        if version:
+            return version
     try:
         return package_version(package_name)
     except PackageNotFoundError:
