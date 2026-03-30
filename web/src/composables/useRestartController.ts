@@ -49,6 +49,7 @@ export function useRestartController () {
     try {
       const entries = [...restartStore.entries]
       for (const entry of entries) {
+        if (!entry.undo) continue
         await revertEntry(entry.undo)
       }
       restartStore.clearPending()

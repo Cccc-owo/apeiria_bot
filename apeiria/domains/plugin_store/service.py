@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime
 
 from apeiria.config.plugins import plugin_config_service
+from apeiria.package_ids import normalize_package_id
 
 from .models import (
     StoreCategoryCount,
@@ -184,6 +185,8 @@ def _enrich_plugin_item_state(
     )
     registered = item.module_name in plugin_state.registered_module_names
     installed_package = plugin_state.module_to_package.get(item.module_name)
+    normalized_installed = normalize_package_id(installed_package or "")
+    normalized_store = normalize_package_id(item.package_requirement)
     return replace(
         item,
         is_installed=installed,
@@ -192,6 +195,11 @@ def _enrich_plugin_item_state(
         installed_module_names=plugin_state.package_bindings.get(
             installed_package or "",
             [],
+        ),
+        can_update=(
+            registered
+            and bool(normalized_installed)
+            and normalized_installed == normalized_store
         ),
     )
 

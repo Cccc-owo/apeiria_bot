@@ -66,6 +66,7 @@ class StoreItem:
     is_registered: bool = False
     installed_package: str | None = None
     installed_module_names: list[str] = field(default_factory=list)
+    can_update: bool = False
 
     @property
     def source_name(self) -> str:

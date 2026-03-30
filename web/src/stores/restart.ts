@@ -14,7 +14,7 @@ export interface RestartPendingEntry {
   id: string
   scope: string
   summary: string
-  undo: RestartUndoAction
+  undo?: RestartUndoAction
   updated_at: string
 }
 

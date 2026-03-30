@@ -196,6 +196,24 @@ class PluginItem(BaseModel):
     installed_module_names: list[str] = []
 
 
+class PluginUpdateCheckRequest(BaseModel):
+    """Plugin update check request payload."""
+
+    force_refresh: bool = False
+
+
+class PluginUpdateCheckItem(BaseModel):
+    """One plugin update check result returned to the Web UI."""
+
+    module_name: str
+    package_name: str
+    current_version: str | None = None
+    latest_version: str | None = None
+    has_update: bool = False
+    checked: bool = False
+    error: str | None = None
+
+
 class PluginTogglePreviewResponse(BaseModel):
     module_name: str
     enabled: bool
@@ -283,6 +301,7 @@ class PluginStoreItem(BaseModel):
     is_registered: bool = False
     installed_package: str | None = None
     installed_module_names: list[str] = []
+    can_update: bool = False
 
 
 class PluginStoreCategoryItem(BaseModel):
@@ -323,6 +342,12 @@ class PluginManualInstallRequest(BaseModel):
 
     requirement: str = Field(min_length=1, max_length=512)
     module_name: str | None = Field(default=None, max_length=256)
+
+
+class PluginPackageUpdateRequest(BaseModel):
+    """Installed plugin package update request payload."""
+
+    package_name: str = Field(min_length=1, max_length=256)
 
 
 class PluginUninstallRequest(BaseModel):

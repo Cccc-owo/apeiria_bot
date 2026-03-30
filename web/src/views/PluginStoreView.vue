@@ -201,12 +201,12 @@
 
           <v-btn
             color="primary"
-            :disabled="item.is_installed || actionLocked"
+            :disabled="(!item.can_update && item.is_installed) || actionLocked"
             rounded="xl"
             variant="flat"
-            @click="openInstallDialog(item)"
+            @click="openActionDialog(item)"
           >
-            {{ item.is_installed ? t('pluginStore.installed') : t('pluginStore.install') }}
+            {{ actionLabel(item) }}
           </v-btn>
         </div>
       </article>
@@ -229,7 +229,7 @@
 
     <v-dialog v-model="installDialogVisible" max-width="640">
       <v-card rounded="xl">
-        <v-card-title>{{ t('pluginStore.installConfirmTitle') }}</v-card-title>
+        <v-card-title>{{ dialogTitle }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-4">
           <div v-if="selectedItem" class="d-flex flex-column ga-2">
             <div class="font-weight-medium">{{ selectedItem.name }}</div>
@@ -241,8 +241,8 @@
         <v-card-actions>
           <v-btn rounded="xl" variant="text" @click="installDialogVisible = false">{{ t('common.cancel') }}</v-btn>
           <v-spacer />
-          <v-btn color="primary" :loading="installPending" rounded="xl" @click="startInstall">
-            {{ t('pluginStore.install') }}
+          <v-btn color="primary" :loading="installPending" rounded="xl" @click="startAction">
+            {{ dialogActionLabel }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -250,7 +250,7 @@
 
     <v-dialog v-model="taskDialogVisible" max-width="840">
       <v-card rounded="xl">
-        <v-card-title>{{ activeTask?.title || t('pluginStore.installTaskTitle') }}</v-card-title>
+        <v-card-title>{{ activeTask?.title || taskDialogTitle }}</v-card-title>
         <v-card-text class="d-flex flex-column ga-4">
           <div class="text-body-2 text-medium-emphasis">
             {{ taskStatusLabel }}
@@ -261,7 +261,7 @@
             indeterminate
           />
           <div class="task-log-card">
-            <pre class="task-log-card__content">{{ activeTask?.logs || t('pluginStore.installWaiting') }}</pre>
+            <pre class="task-log-card__content">{{ activeTask?.logs || taskWaitingLabel }}</pre>
           </div>
         </v-card-text>
         <v-card-actions>
@@ -286,6 +286,7 @@
     type PluginStoreItem,
     type PluginStoreSource,
     type PluginStoreTask,
+    updatePluginStoreItem,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
@@ -311,6 +312,7 @@
   const selectedItem = ref<PluginStoreItem | null>(null)
   const activeInstallItem = ref<PluginStoreItem | null>(null)
   const activeTask = ref<PluginStoreTask | null>(null)
+  const activeTaskMode = ref<'install' | 'update'>('install')
   const installPending = ref(false)
   let taskPollTimer: number | null = null
   let searchTimer: number | null = null
@@ -328,12 +330,51 @@
   ])
   const taskStatusLabel = computed(() => {
     const status = activeTask.value?.status || ''
-    if (status === 'pending') return t('pluginStore.installPending')
-    if (status === 'running') return t('pluginStore.installRunning')
-    if (status === 'succeeded') return t('pluginStore.installSucceeded')
-    if (status === 'failed') return activeTask.value?.error || t('pluginStore.installFailed')
+    if (status === 'pending') {
+      return activeTaskMode.value === 'update'
+        ? t('pluginStore.updatePending')
+        : t('pluginStore.installPending')
+    }
+    if (status === 'running') {
+      return activeTaskMode.value === 'update'
+        ? t('pluginStore.updateRunning')
+        : t('pluginStore.installRunning')
+    }
+    if (status === 'succeeded') {
+      return activeTaskMode.value === 'update'
+        ? t('pluginStore.updateSucceeded')
+        : t('pluginStore.installSucceeded')
+    }
+    if (status === 'failed') {
+      return activeTask.value?.error
+        || (
+          activeTaskMode.value === 'update'
+            ? t('pluginStore.updateFailed')
+            : t('pluginStore.installFailed')
+        )
+    }
     return ''
   })
+  const dialogTitle = computed(() => (
+    selectedItem.value?.can_update
+      ? t('pluginStore.updateConfirmTitle')
+      : t('pluginStore.installConfirmTitle')
+  ))
+  const dialogActionLabel = computed(() => (
+    selectedItem.value?.can_update
+      ? t('pluginStore.update')
+      : t('pluginStore.install')
+  ))
+  const taskDialogTitle = computed(() => (
+    activeTaskMode.value === 'update'
+      ? t('pluginStore.updateTaskTitle')
+      : t('pluginStore.installTaskTitle')
+  ))
+  const taskWaitingLabel = computed(() => (
+    activeTaskMode.value === 'update'
+      ? t('pluginStore.updateWaiting')
+      : t('pluginStore.installWaiting')
+  ))
   const actionLocked = computed(() => (
     installPending.value
     || activeTask.value?.status === 'pending'
@@ -398,7 +439,13 @@
     }).format(date)
   }
 
-  async function openInstallDialog (item: PluginStoreItem) {
+  function actionLabel (item: PluginStoreItem) {
+    if (item.can_update) return t('pluginStore.update')
+    if (item.is_installed) return t('pluginStore.installed')
+    return t('pluginStore.install')
+  }
+
+  async function openActionDialog (item: PluginStoreItem) {
     if (actionLocked.value) return
     selectedItem.value = item
     installDialogVisible.value = true
@@ -410,24 +457,36 @@
     }
   }
 
-  async function startInstall () {
+  async function startAction () {
     if (!selectedItem.value) return
     activeInstallItem.value = { ...selectedItem.value }
+    activeTaskMode.value = selectedItem.value.can_update ? 'update' : 'install'
     installPending.value = true
     try {
-      const response = await installPluginStoreItem({
+      const payload = {
         source_id: selectedItem.value.source_id,
         plugin_id: selectedItem.value.plugin_id,
         package_name: selectedItem.value.package_name,
         module_name: selectedItem.value.module_name,
-      })
+      }
+      const response = selectedItem.value.can_update
+        ? await updatePluginStoreItem(payload)
+        : await installPluginStoreItem(payload)
       activeTask.value = response.data
       installDialogVisible.value = false
       taskDialogVisible.value = true
       startTaskPolling(response.data.task_id)
     } catch (error) {
       activeInstallItem.value = null
-      noticeStore.show(getErrorMessage(error, t('pluginStore.installFailed')), 'error')
+      noticeStore.show(
+        getErrorMessage(
+          error,
+          selectedItem.value.can_update
+            ? t('pluginStore.updateFailed')
+            : t('pluginStore.installFailed'),
+        ),
+        'error',
+      )
     } finally {
       installPending.value = false
     }
@@ -442,27 +501,55 @@
         if (response.data.status === 'succeeded' || response.data.status === 'failed') {
           stopTaskPolling()
           if (response.data.status === 'succeeded' && activeInstallItem.value) {
-            restartStore.markPending({
-              id: `plugin-store-install:${activeInstallItem.value.module_name}`,
-              scope: 'plugins',
-              summary: t('pluginStore.pendingInstall', { name: activeInstallItem.value.name }),
-              undo: {
-                kind: 'plugin-install',
-                packageName: activeInstallItem.value.package_name,
-                moduleName: activeInstallItem.value.module_name,
-              },
-            })
-            noticeStore.show(t('pluginStore.installSucceeded'), 'success')
+            if (activeTaskMode.value === 'install') {
+              restartStore.markPending({
+                id: `plugin-store-install:${activeInstallItem.value.module_name}`,
+                scope: 'plugins',
+                summary: t('pluginStore.pendingInstall', { name: activeInstallItem.value.name }),
+                undo: {
+                  kind: 'plugin-install',
+                  packageName: activeInstallItem.value.package_name,
+                  moduleName: activeInstallItem.value.module_name,
+                },
+              })
+            } else {
+              restartStore.markPending({
+                id: `plugin-store-update:${activeInstallItem.value.module_name}`,
+                scope: 'plugins',
+                summary: t('pluginStore.pendingUpdate', { name: activeInstallItem.value.name }),
+              })
+            }
+            noticeStore.show(
+              activeTaskMode.value === 'update'
+                ? t('pluginStore.updateSucceeded')
+                : t('pluginStore.installSucceeded'),
+              'success',
+            )
             void loadStore()
           } else if (response.data.status === 'failed') {
-            noticeStore.show(response.data.error || t('pluginStore.installFailed'), 'error')
+            noticeStore.show(
+              response.data.error || (
+                activeTaskMode.value === 'update'
+                  ? t('pluginStore.updateFailed')
+                  : t('pluginStore.installFailed')
+              ),
+              'error',
+            )
           }
           activeInstallItem.value = null
         }
       } catch (error) {
         stopTaskPolling()
         activeInstallItem.value = null
-        noticeStore.show(getErrorMessage(error, t('pluginStore.installFailed')), 'error')
+        noticeStore.show(
+          getErrorMessage(
+            error,
+            activeTaskMode.value === 'update'
+              ? t('pluginStore.updateFailed')
+              : t('pluginStore.installFailed'),
+          ),
+          'error',
+        )
       }
     }, 1000)
   }
