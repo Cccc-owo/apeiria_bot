@@ -7,11 +7,13 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.helpers import get_plugin_name
-from apeiria.domains.plugins import plugin_config_view_service
+from apeiria.domains.plugins import (
+    PluginSettingsNotConfigurableError,
+    plugin_config_view_service,
+)
 
 from .presenter import render_list_block, summarize_value
-from .utils import ensure_owner_message, resolve_plugin_query
+from .utils import ensure_owner_message, resolve_plugin_catalog_query
 
 _config = on_alconna(
     Alconna(
@@ -46,7 +48,10 @@ async def handle_config(
     if not target.available:
         await _config.finish(t("admin.config.plugin_usage"))
 
-    plugin, candidates = resolve_plugin_query(target.result, allow_fuzzy=True)
+    plugin, candidates = await resolve_plugin_catalog_query(
+        target.result,
+        allow_fuzzy=True,
+    )
     if candidates:
         await _config.finish(
             t(
@@ -59,7 +64,7 @@ async def handle_config(
         await _config.finish(t("admin.plugin.not_found", name=target.result))
 
     await _config.finish(
-        _render_plugin_settings(plugin.module_name, get_plugin_name(plugin))
+        _render_plugin_settings(plugin.module_name, plugin.name)
     )
 
 
@@ -79,7 +84,12 @@ def _render_core_settings() -> str:
 
 
 def _render_plugin_settings(module_name: str, plugin_name: str) -> str:
-    state = plugin_config_view_service.get_plugin_settings(module_name)
+    try:
+        state = plugin_config_view_service.get_plugin_settings(module_name)
+    except PluginSettingsNotConfigurableError:
+        return t("admin.config.plugin_not_configurable", name=plugin_name)
+    except ValueError:
+        return t("admin.config.plugin_not_configurable", name=plugin_name)
     if not state.has_config_model:
         return t("admin.config.plugin_not_configurable", name=plugin_name)
 

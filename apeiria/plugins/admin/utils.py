@@ -9,9 +9,12 @@ from nonebot.adapters import Event  # noqa: TC002
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.helpers import get_plugin_name
+from apeiria.domains.plugins import plugin_catalog_service
 
 if TYPE_CHECKING:
     from nonebot.plugin import Plugin
+
+    from apeiria.domains.plugins import PluginCatalogItem
 
 
 def resolve_plugin_query(
@@ -52,6 +55,44 @@ def resolve_plugin_query(
     return resolved, candidates
 
 
+async def resolve_plugin_catalog_query(
+    query: str,
+    *,
+    allow_fuzzy: bool,
+) -> tuple["PluginCatalogItem | None", list[str]]:
+    """Resolve one plugin query from the plugin catalog."""
+    normalized = query.strip().lower()
+    if not normalized:
+        return None, []
+
+    exact_matches: list[PluginCatalogItem] = []
+    fuzzy_matches: list[PluginCatalogItem] = []
+    for item in await plugin_catalog_service.list_plugins():
+        if item.plugin_type in {"hidden", "parent"}:
+            continue
+        candidates = {
+            item.module_name.lower(),
+            item.name.lower(),
+        }
+        if normalized in candidates:
+            exact_matches.append(item)
+            continue
+        if any(normalized in candidate for candidate in candidates):
+            fuzzy_matches.append(item)
+
+    resolved: PluginCatalogItem | None = None
+    candidates: list[str] = []
+    if len(exact_matches) == 1:
+        resolved = exact_matches[0]
+    elif exact_matches:
+        candidates = _format_catalog_candidates(exact_matches)
+    elif len(fuzzy_matches) == 1 and allow_fuzzy:
+        resolved = fuzzy_matches[0]
+    elif fuzzy_matches:
+        candidates = _format_catalog_candidates(fuzzy_matches)
+    return resolved, candidates
+
+
 def is_owner_event(event: Event) -> bool:
     """Return whether the current event user is a configured superuser."""
     try:
@@ -82,3 +123,15 @@ def _format_plugin_candidate(plugin: Plugin) -> str:
     if name == plugin.module_name:
         return plugin.module_name
     return f"{name} ({plugin.module_name})"
+
+
+def _format_catalog_candidates(plugins: list["PluginCatalogItem"]) -> list[str]:
+    labels = {
+        (
+            item.module_name
+            if item.name == item.module_name
+            else f"{item.name} ({item.module_name})"
+        )
+        for item in plugins
+    }
+    return sorted(labels, key=str.lower)

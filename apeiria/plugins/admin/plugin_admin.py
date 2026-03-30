@@ -7,13 +7,16 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.core.i18n import t
-from apeiria.core.utils.helpers import get_plugin_name
 from apeiria.domains.exceptions import ProtectedPluginError, ResourceNotFoundError
-from apeiria.domains.plugins import plugin_catalog_service, plugin_config_view_service
+from apeiria.domains.plugins import (
+    PluginSettingsNotConfigurableError,
+    plugin_catalog_service,
+    plugin_config_view_service,
+)
 
 from .config_view import render_plugin_settings_summary
 from .presenter import render_block, render_list_block
-from .utils import ensure_owner_message, resolve_plugin_query
+from .utils import ensure_owner_message, resolve_plugin_catalog_query
 
 _plugins = on_alconna(
     Alconna("plugins", meta=CommandMeta(description="查看系统插件总览")),
@@ -86,7 +89,7 @@ async def handle_plugin(
     if not plugin_name.available:
         await _plugin.finish(t("admin.plugin.usage"))
 
-    plugin, candidates = resolve_plugin_query(
+    item, candidates = await resolve_plugin_catalog_query(
         plugin_name.result,
         allow_fuzzy=selected_action in {"info", "configs"},
     )
@@ -98,20 +101,18 @@ async def handle_plugin(
                 candidates=", ".join(candidates),
             )
         )
-    if plugin is None:
+    if item is None:
         await _plugin.finish(t("admin.plugin.not_found", name=plugin_name.result))
 
-    module_name = plugin.module_name
+    module_name = item.module_name
     if selected_action == "info":
         await _plugin.finish(await _render_plugin_info(module_name))
     if selected_action == "configs":
-        await _plugin.finish(
-            render_plugin_settings_summary(module_name, get_plugin_name(plugin))
-        )
+        await _plugin.finish(render_plugin_settings_summary(module_name, item.name))
 
     await _plugin.finish(
         await _handle_plugin_toggle(
-            plugin,
+            item,
             selected_action=selected_action,
             raw_query=plugin_name.result,
         )
@@ -119,17 +120,31 @@ async def handle_plugin(
 
 
 async def _render_plugin_info(module_name: str) -> str:
-    items = await _list_visible_plugins()
-    item = next((entry for entry in items if entry.module_name == module_name), None)
+    item = await plugin_catalog_service.get_plugin(module_name)
     if item is None:
         return t("admin.plugin.not_found", name=module_name)
 
-    settings = plugin_config_view_service.get_plugin_settings(module_name)
+    try:
+        settings = plugin_config_view_service.get_plugin_settings(module_name)
+        configurable = (
+            t("admin.common.yes")
+            if settings.has_config_model
+            else t("admin.common.no")
+        )
+        section = settings.section
+    except PluginSettingsNotConfigurableError:
+        configurable = t("admin.common.no")
+        section = t("admin.common.none")
+    except ValueError:
+        configurable = t("admin.common.no")
+        section = t("admin.common.none")
+
     return render_block(
         t("admin.plugin.info_title"),
         [
             (t("admin.plugin.field_name"), item.name),
             (t("admin.plugin.field_module"), item.module_name),
+            (t("admin.plugin.field_kind"), item.kind),
             (t("admin.plugin.field_source"), item.source),
             (t("admin.plugin.field_type"), item.plugin_type),
             (t("admin.plugin.field_version"), item.version or t("admin.common.none")),
@@ -154,24 +169,22 @@ async def _render_plugin_info(module_name: str) -> str:
             ),
             (
                 t("admin.plugin.field_configurable"),
-                t("admin.common.yes")
-                if settings.has_config_model
-                else t("admin.common.no"),
+                configurable,
             ),
-            (t("admin.plugin.field_config_section"), settings.section),
+            (t("admin.plugin.field_config_section"), section),
         ],
         summary=item.description or t("admin.plugin.no_description"),
     )
 
 
 async def _handle_plugin_toggle(
-    plugin: object,
+    item: object,
     *,
     selected_action: str,
     raw_query: str,
 ) -> str:
-    module_name = plugin.module_name
-    plugin_name = get_plugin_name(plugin)
+    module_name = item.module_name
+    plugin_name = item.name
     try:
         changed = await plugin_catalog_service.set_plugin_enabled(
             module_name,

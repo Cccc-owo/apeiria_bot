@@ -6,6 +6,11 @@ from arclet.alconna import CommandMeta
 from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
+from apeiria.core.i18n import t
+
+from .presenter import render_block
+from .utils import ensure_owner_message
+
 _session = on_alconna(
     Alconna("sid", meta=CommandMeta(description="查看当前会话的 SID 与 UID 信息")),
     use_cmd_start=True,
@@ -16,19 +21,27 @@ _session = on_alconna(
 
 @_session.handle()
 async def handle_session(bot: Bot, event: Event) -> None:
+    owner_error = ensure_owner_message(event)
+    if owner_error:
+        await _session.finish(owner_error)
+
     session_id = _safe_get_session_id(event) or ""
     user_id = _safe_get_user_id(event) or ""
     message_type = _resolve_message_type(event)
     source_id = f"{bot.self_id}:{message_type}:{session_id}"
-    lines = [
-        f"SID: 「{source_id}」",
-        f"UID: 「{user_id}」",
-        "消息会话来源信息:",
-        f"  机器人 ID: 「{bot.self_id}」",
-        f"  消息类型: 「{message_type}」",
-        f"  会话 ID: 「{session_id}」",
-    ]
-    await _session.finish("\n".join(lines))
+    await _session.finish(
+        render_block(
+            t("admin.session.title"),
+            [
+                (t("admin.session.field_bot"), bot.self_id),
+                (t("admin.session.field_user"), user_id),
+                (t("admin.session.field_session"), session_id),
+                (t("admin.session.field_type"), message_type),
+                ("SID", source_id),
+            ],
+            summary=t("admin.session.summary"),
+        )
+    )
 
 
 def _safe_get_user_id(event: Event) -> str | None:
