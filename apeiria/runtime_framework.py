@@ -144,7 +144,13 @@ def _require_aliases(tree: ast.AST) -> set[str]:
 
 def load_framework() -> None:
     """Load framework plugins, builtins, and core side effects."""
+    from nonebot.log import logger
+
+    from apeiria.core.services.db_schema import ensure_database_ready_sync
     from apeiria.core.services.log import setup_logging
+    from apeiria.core.services.plugin_runtime_state import (
+        get_disabled_plugin_modules_sync,
+    )
 
     setup_logging()
 
@@ -152,9 +158,17 @@ def load_framework() -> None:
     for plugin in FRAMEWORK_PLUGIN_MODULES:
         nonebot.load_plugin(plugin)
 
+    import_module("apeiria.core.models")
+    ensure_database_ready_sync()
+
+    disabled_builtin_modules = get_disabled_plugin_modules_sync(
+        BUILTIN_APPLICATION_PLUGIN_MODULES
+    )
     for plugin in BUILTIN_APPLICATION_PLUGIN_MODULES:
+        if plugin in disabled_builtin_modules:
+            logger.info("Skip disabled builtin plugin {}", plugin)
+            continue
         nonebot.load_plugin(plugin)
 
-    import_module("apeiria.core.models")
     import_module("apeiria.core.hooks.schema")
     import_module("apeiria.core.hooks")

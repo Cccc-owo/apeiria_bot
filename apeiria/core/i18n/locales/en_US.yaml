@@ -5,6 +5,8 @@ common:
   framework_required: "Required by the framework runtime"
   control_panel_required: "Required by the control panel"
   required_by_plugins: "Required by plugins: {plugins}"
+  enable_required_plugins: "The following dependency plugins will also be enabled: {plugins}"
+  missing_required_plugins: "Missing required plugins: {plugins}"
 
 auth:
   banned: "You have been banned and cannot use this feature"

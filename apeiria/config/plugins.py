@@ -4,6 +4,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
+import nonebot
+
+from apeiria.core.services.plugin_runtime_state import (
+    get_disabled_plugin_modules_sync,
+)
 from apeiria.core.utils.files import atomic_write_text, load_toml_dict
 from apeiria.core.utils.package_config import (
     add_unique_sorted_item,
@@ -110,14 +115,14 @@ class PluginConfigService:
         modules = config["modules"]
         directories = self._resolve_dirs(target, config["dirs"])
 
-        import nonebot
-
         loaded_modules = {
             plugin.module_name
             for plugin in nonebot.get_loaded_plugins()
             if getattr(plugin, "module_name", None)
         }
         modules = [module for module in modules if module not in loaded_modules]
+        disabled_modules = get_disabled_plugin_modules_sync(modules)
+        modules = [module for module in modules if module not in disabled_modules]
 
         existing_dirs: list[str] = []
         for directory in directories:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -121,6 +122,11 @@ async def ensure_database_ready() -> None:
             raise SchemaBootstrapError(msg)
         if schema_version < CURRENT_SCHEMA_VERSION:
             await _apply_migrations(session, schema_version, CURRENT_SCHEMA_VERSION)
+
+
+def ensure_database_ready_sync() -> None:
+    """Synchronous wrapper for startup-time schema readiness checks."""
+    asyncio.run(ensure_database_ready())
 
 
 async def _inspect_schema_status(conn: AsyncConnection) -> SchemaStatus:

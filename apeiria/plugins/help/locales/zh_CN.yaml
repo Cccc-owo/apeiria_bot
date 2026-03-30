@@ -6,7 +6,7 @@ help:
   no_commands: "无"
   no_usage: "暂无使用说明"
   no_description: "暂无描述"
-  not_found: "未找到插件: {name}"
+  not_found: "未找到插件：{name}"
   detail_type: "类型"
   detail_permission: "权限"
   detail_source: "来源"

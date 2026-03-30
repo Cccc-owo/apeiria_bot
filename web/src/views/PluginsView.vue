@@ -549,15 +549,15 @@
                 <span class="font-weight-medium">{{ toggleConfirmItem.name || toggleConfirmItem.module_name }}</span>
                 <span class="text-caption text-medium-emphasis">{{ toggleConfirmItem.module_name }}</span>
               </div>
-              <div v-if="toggleConfirmItem.dependent_plugins.length > 0" class="confirm-plugin-item__relations">
+              <div v-if="toggleConfirmDependencies.length > 0" class="confirm-plugin-item__relations">
                 <v-chip
-                  v-for="dependent in toggleConfirmItem.dependent_plugins"
-                  :key="`confirm-dependent:${toggleConfirmItem.module_name}:${dependent}`"
-                  color="warning"
+                  v-for="dependency in toggleConfirmDependencies"
+                  :key="`confirm-dependent:${toggleConfirmItem.module_name}:${dependency}`"
+                  :color="toggleConfirmNextValue ? 'info' : 'warning'"
                   size="x-small"
                   variant="tonal"
                 >
-                  {{ t('plugins.requiredBy', { name: dependent }) }}
+                  {{ toggleConfirmNextValue ? t('plugins.requires', { name: getPluginLabel(dependency) }) : t('plugins.requiredBy', { name: getPluginLabel(dependency) }) }}
                 </v-chip>
               </div>
             </div>
@@ -566,8 +566,8 @@
         <v-card-actions>
           <v-btn variant="text" @click="closeToggleConfirm">{{ t('common.cancel') }}</v-btn>
           <v-spacer />
-          <v-btn color="warning" :loading="toggleConfirmLoading" @click="confirmToggleAction">
-            {{ t('plugins.confirmDisable') }}
+          <v-btn :color="toggleConfirmNextValue ? 'primary' : 'warning'" :loading="toggleConfirmLoading" @click="confirmToggleAction">
+            {{ toggleConfirmNextValue ? t('plugins.confirmEnable') : t('plugins.confirmDisable') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -750,6 +750,7 @@
     getPlugins,
     getPluginSettings,
     getPluginSettingsRaw,
+    getPluginTogglePreview,
     installManualPlugin,
     type OrphanPluginConfigItem,
     type PluginItem,
@@ -808,6 +809,9 @@
   const toggleConfirmVisible = ref(false)
   const toggleConfirmLoading = ref(false)
   const toggleConfirmItem = ref<PluginItem | null>(null)
+  const toggleConfirmNextValue = ref(false)
+  const toggleConfirmSummaryText = ref('')
+  const toggleConfirmDependencies = ref<string[]>([])
   const uninstallingModule = ref('')
   const uninstallConfirmVisible = ref(false)
   const uninstallConfirmItem = ref<PluginItem | null>(null)
@@ -887,15 +891,15 @@
       return (await validatePluginSettingsRaw(settingsPlugin.value.module_name, { text })).data
     },
   })
-  const toggleConfirmTitle = computed(() => t('plugins.disableConfirmTitle'))
-  const toggleConfirmSummary = computed(() => {
-    if (!toggleConfirmItem.value) return ''
-    const riskCount = toggleConfirmItem.value.dependent_plugins.length
-    if (riskCount > 0) {
-      return t('plugins.disableConfirmRiskSummary', { count: 1, riskCount })
-    }
-    return t('plugins.disableConfirmSummary', { count: 1 })
-  })
+  const toggleConfirmTitle = computed(() =>
+    toggleConfirmNextValue.value ? t('plugins.enableConfirmTitle') : t('plugins.disableConfirmTitle'),
+  )
+  const toggleConfirmSummary = computed(() => toggleConfirmSummaryText.value)
+  const pluginNameMap = computed(() =>
+    new Map(
+      plugins.value.map(item => [item.module_name, item.name || item.module_name]),
+    ),
+  )
   const uninstallConfirmSummary = computed(() => {
     if (!uninstallConfirmItem.value) return ''
     const pluginName = uninstallConfirmItem.value.name || uninstallConfirmItem.value.module_name
@@ -1057,10 +1061,17 @@
     return `${normalized.slice(0, 4).join(' / ')} +${normalized.length - 4}`
   }
 
+  function getPluginLabel (moduleName: string) {
+    return pluginNameMap.value.get(moduleName) || moduleName
+  }
+
   function closeToggleConfirm () {
     toggleConfirmVisible.value = false
     toggleConfirmLoading.value = false
     toggleConfirmItem.value = null
+    toggleConfirmNextValue.value = false
+    toggleConfirmSummaryText.value = ''
+    toggleConfirmDependencies.value = []
   }
 
   function closeUninstallConfirm () {
@@ -1082,12 +1093,16 @@
     }
   }
 
-  function shouldConfirmToggle (item: PluginItem, enabled: boolean) {
-    return !enabled && item.dependent_plugins.length > 0
-  }
-
-  function openToggleConfirm (item: PluginItem) {
+  function openToggleConfirm (
+    item: PluginItem,
+    enabled: boolean,
+    summary: string,
+    dependencies: string[],
+  ) {
     toggleConfirmItem.value = item
+    toggleConfirmNextValue.value = enabled
+    toggleConfirmSummaryText.value = summary
+    toggleConfirmDependencies.value = dependencies
     toggleConfirmVisible.value = true
   }
 
@@ -1358,21 +1373,43 @@
       return
     }
     const enabled = Boolean(nextValue)
-    if (shouldConfirmToggle(item, enabled)) {
-      item.is_global_enabled = !enabled
-      openToggleConfirm(item)
-      return
+    item.is_global_enabled = !enabled
+    pendingModule.value = item.module_name
+    errorMessage.value = ''
+    try {
+      const preview = (await getPluginTogglePreview(item.module_name, enabled)).data
+      if (!preview.allowed) {
+        const message = preview.blocked_reason || t('plugins.cannotDisable')
+        errorMessage.value = message
+        noticeStore.show(message, 'warning')
+        return
+      }
+      const dependencies = enabled ? preview.requires_enable : preview.requires_disable
+      if (dependencies.length > 0) {
+        openToggleConfirm(item, enabled, preview.summary, dependencies)
+        return
+      }
+      await executeToggle(item, enabled, false)
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('plugins.updateFailed'))
+      noticeStore.show(errorMessage.value, 'error')
+    } finally {
+      pendingModule.value = ''
     }
-    await executeToggle(item, enabled)
   }
 
-  async function executeToggle (item: PluginItem, enabled: boolean) {
+  async function executeToggle (
+    item: PluginItem,
+    enabled: boolean,
+    cascade: boolean,
+  ) {
     const previous = item.is_global_enabled
     item.is_global_enabled = enabled
     pendingModule.value = item.module_name
     errorMessage.value = ''
     try {
-      await updatePlugin(item.module_name, enabled)
+      const response = await updatePlugin(item.module_name, enabled, cascade)
+      const affectedModules = response.data.affected_modules
       restartStore.markPending({
         id: `plugin:toggle:${item.module_name}`,
         scope: 'plugins',
@@ -1385,11 +1422,21 @@
           enabled: previous,
         },
       })
+      await loadPluginManagement()
+      if (settingsPlugin.value) {
+        settingsPlugin.value = plugins.value.find(
+          candidate => candidate.module_name === settingsPlugin.value?.module_name,
+        ) || settingsPlugin.value
+      }
+      const linkedModules = affectedModules.filter(moduleName => moduleName !== item.module_name)
+      const affectedSummary = linkedModules.length > 0
+        ? ` (${linkedModules.map(getPluginLabel).join(', ')})`
+        : ''
       noticeStore.show(
         t('plugins.toggled', {
           name: item.name || item.module_name,
           action: enabled ? t('plugins.enabledAction') : t('plugins.disabledAction'),
-        }),
+        }) + affectedSummary,
         'success',
       )
     } catch (error) {
@@ -1405,7 +1452,7 @@
     if (!toggleConfirmItem.value) return
     toggleConfirmLoading.value = true
     try {
-      await executeToggle(toggleConfirmItem.value, false)
+      await executeToggle(toggleConfirmItem.value, toggleConfirmNextValue.value, true)
       closeToggleConfirm()
     } finally {
       toggleConfirmLoading.value = false

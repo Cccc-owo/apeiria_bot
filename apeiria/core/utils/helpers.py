@@ -253,15 +253,21 @@ def get_plugin_dependents(
     include_pending: bool = False,
 ) -> list[str]:
     """Get loaded plugins that depend on the target plugin."""
+    from apeiria.core.services.plugin_runtime_state import (
+        get_disabled_plugin_modules_sync,
+    )
+
     pending_modules = (
         set()
         if include_pending
         else get_pending_uninstall_plugin_modules()
     )
+    disabled_modules = get_disabled_plugin_modules_sync()
     dependents = {
         get_plugin_name(plugin)
         for plugin in nonebot.get_loaded_plugins()
         if plugin.module_name not in pending_modules
+        if plugin.module_name not in disabled_modules
         if module_name in get_plugin_required_plugins(plugin)
     }
     return sorted(dependents)

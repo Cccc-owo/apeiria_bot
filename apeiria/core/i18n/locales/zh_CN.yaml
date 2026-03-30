@@ -1,10 +1,12 @@
 common:
   group_only: "该命令仅在群聊中可用"
   error: "出错了，请稍后重试"
-  plugin_not_found: "未找到插件: {name}"
+  plugin_not_found: "未找到插件：{name}"
   framework_required: "系统运行依赖"
   control_panel_required: "管理面板依赖"
   required_by_plugins: "被以下插件依赖：{plugins}"
+  enable_required_plugins: "将同时启用以下依赖插件：{plugins}"
+  missing_required_plugins: "缺少以下依赖插件：{plugins}"
 
 auth:
   banned: "你已被封禁，无法使用此功能"

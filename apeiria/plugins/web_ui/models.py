@@ -208,6 +208,24 @@ class PluginItem(BaseModel):
     installed_module_names: list[str] = []
 
 
+class PluginTogglePreviewResponse(BaseModel):
+    module_name: str
+    enabled: bool
+    allowed: bool = True
+    summary: str = ""
+    blocked_reason: str | None = None
+    requires_enable: list[str] = []
+    requires_disable: list[str] = []
+    protected_dependents: list[str] = []
+    missing_dependencies: list[str] = []
+
+
+class PluginToggleResponse(BaseModel):
+    module_name: str
+    enabled: bool
+    affected_modules: list[str] = []
+
+
 class PluginStoreSourceItem(BaseModel):
     """Plugin store source returned to the Web UI."""
 
