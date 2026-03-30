@@ -346,7 +346,7 @@ def _startup_check_hint(error_text: str) -> str | None:
         (
             "web_ui auth storage is corrupted",
             (
-                "fix or restore `data/apeiria.plugins.web_ui/secret.json`, "
+                "fix or restore `data/web_ui/secret.json`, "
                 "then rerun check"
             ),
         ),

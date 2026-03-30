@@ -6,6 +6,68 @@ import os
 MESSAGES_ZH_CN = {
     "Apeiria project tools.": "Apeiria 项目工具。",
     "Inspect and migrate Apeiria environments.": "查看并迁移 Apeiria 环境。",
+    "Manage Web UI accounts and recovery.": "管理 Web UI 账号与恢复。",
+    "Manage Web UI accounts from the host.": "在宿主机侧管理 Web UI 账号。",
+    "Manage Web UI registration codes from the host.": (
+        "在宿主机侧管理 Web UI 注册码。"
+    ),
+    "Create or recover one owner account from the host.": (
+        "在宿主机侧创建或恢复一个 Owner 账号。"
+    ),
+    "List Web UI accounts.": "列出 Web UI 账号。",
+    "Create one Web UI account from the host.": "在宿主机侧创建一个 Web UI 账号。",
+    "Reset one Web UI account password from the host.": (
+        "在宿主机侧重置一个 Web UI 账号密码。"
+    ),
+    "Disable one Web UI account from the host.": "在宿主机侧禁用一个 Web UI 账号。",
+    "Enable one Web UI account from the host.": "在宿主机侧启用一个 Web UI 账号。",
+    "Delete one Web UI account from the host.": "在宿主机侧删除一个 Web UI 账号。",
+    "List Web UI registration codes.": "列出 Web UI 注册码。",
+    "Create one Web UI registration code from the host.": (
+        "在宿主机侧创建一个 Web UI 注册码。"
+    ),
+    "Revoke one Web UI registration code from the host.": (
+        "在宿主机侧撤销一个 Web UI 注册码。"
+    ),
+    "Owner username to create or recover.": "要创建或恢复的 Owner 用户名。",
+    "Account username.": "账号用户名。",
+    "Account password.": "账号密码。",
+    "Account role.": "账号角色。",
+    "Registration code.": "注册码。",
+    "New password for the owner account.": "Owner 账号的新密码。",
+    "created owner account: {username}": "已创建 Owner 账号：{username}",
+    "recovered owner account: {username}": "已恢复 Owner 账号：{username}",
+    "created account: {username}": "已创建账号：{username}",
+    "updated password: {username}": "已更新密码：{username}",
+    "disabled account: {username}": "已禁用账号：{username}",
+    "enabled account: {username}": "已启用账号：{username}",
+    "deleted account: {username}": "已删除账号：{username}",
+    "created registration code: {code}": "已创建注册码：{code}",
+    "revoked registration code: {code}": "已撤销注册码：{code}",
+    (
+        "account: {username} role={role} status={status} "
+        "last_login={last_login} password_changed={password_changed}"
+    ): (
+        "账号：{username} role={role} status={status} "
+        "last_login={last_login} password_changed={password_changed}"
+    ),
+    (
+        "code: {code} role={role} created_by={created_by} "
+        "created_at={created_at}"
+    ): (
+        "注册码：{code} role={role} created_by={created_by} created_at={created_at}"
+    ),
+    "no webui accounts": "没有 Web UI 账号",
+    "no registration codes": "没有注册码",
+    "account not found": "账号不存在",
+    "username already exists": "用户名已存在",
+    "invalid role": "角色无效",
+    "registration code not found": "注册码不存在",
+    "cannot remove last enabled owner": "不能移除最后一个已启用的 Owner",
+    "password must be 8-128 characters": "密码长度必须为 8 到 128 个字符",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "username is required": "用户名不能为空",
     "Initialize Apeiria user environment with uv.": "使用 uv 初始化 Apeiria 用户环境。",
     "Repair Apeiria user environment with uv.": "使用 uv 修复 Apeiria 用户环境。",
     "Sync the main project environment without development dependencies.": (
@@ -33,8 +95,8 @@ MESSAGES_ZH_CN = {
     "check plugin config conflicts in project plugins and rerun check": (
         "检查项目插件配置冲突后，重新执行校验"
     ),
-    "fix or restore `data/apeiria.plugins.web_ui/secret.json`, then rerun check": (
-        "修复或恢复 `data/apeiria.plugins.web_ui/secret.json` 后，重新执行校验"
+    "fix or restore `data/web_ui/secret.json`, then rerun check": (
+        "修复或恢复 `data/web_ui/secret.json` 后，重新执行校验"
     ),
     "Export local runtime state for migration.": "导出本地运行态以便迁移。",
     "Import local runtime state from a migration bundle.": ("从迁移包导入本地运行态。"),

@@ -54,21 +54,6 @@ class WebUIAccountItem(BaseModel):
     password_changed_at: str | None = None
 
 
-class RegistrationCodeItem(BaseModel):
-    """Registration code returned to account managers."""
-
-    code: str
-    role: str
-    created_at: str
-    created_by: str
-
-
-class RegistrationCodeCreateRequest(BaseModel):
-    """Request payload used to create a registration code."""
-
-    role: str = Field(default="owner", min_length=1, max_length=32)
-
-
 class PasswordChangeRequest(BaseModel):
     """Request payload used to rotate a password."""
 

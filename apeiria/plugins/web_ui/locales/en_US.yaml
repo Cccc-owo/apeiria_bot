@@ -4,6 +4,7 @@ web_ui:
     token_invalid: "Invalid login state. Please sign in again."
     permission_denied: "Your account cannot perform this action"
     invalid_credentials: "Incorrect username or password"
+    login_temporarily_locked: "Too many login attempts. Please try again later."
     registration_code_invalid: "Registration code is invalid or already used"
     registration_code_not_found: "Registration code not found"
     registration_code_revoked: "Registration code revoked"
