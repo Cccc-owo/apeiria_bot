@@ -63,6 +63,7 @@ def _mount_routes() -> None:
     import logging
 
     app = nonebot.get_app()
+    from nonebot_plugin_localstore import get_plugin_data_dir
 
     from .routes import router
 
@@ -72,7 +73,7 @@ def _mount_routes() -> None:
     access_logger = logging.getLogger("uvicorn.access")
     access_logger.handlers.clear()
     access_logger.propagate = False
-    log_dir = Path("data/logs")
+    log_dir = get_plugin_data_dir() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(log_dir / "access.log", encoding="utf-8")
     file_handler.setFormatter(

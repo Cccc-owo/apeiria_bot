@@ -13,7 +13,7 @@ from .session import ChatSession
 
 class WebChatStore:
     def __init__(self) -> None:
-        self._root = Path("data/webui_chat")
+        self._root = Path("data/web_ui/chat")
         self._root.mkdir(parents=True, exist_ok=True)
         self._state_file = self._root / "state.json"
 

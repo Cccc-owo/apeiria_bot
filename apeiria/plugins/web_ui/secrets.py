@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from nonebot.log import logger
-from nonebot_plugin_localstore import get_data_file
 
 from apeiria.core.i18n import t
 from apeiria.core.utils.files import atomic_write_text
@@ -83,6 +82,8 @@ def _apply_secret_permissions(secret_file: "Path") -> None:
 
 
 def _get_secret_file() -> "Path":
+    from nonebot_plugin_localstore import get_data_file
+
     return get_data_file("web_ui", "secret.json")
 
 
