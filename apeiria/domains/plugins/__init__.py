@@ -17,6 +17,7 @@ from .config_service import (
     PluginSettingsState,
     plugin_config_view_service,
 )
+from .policy_service import PluginPolicyService, plugin_policy_service
 from .service import (
     OrphanPluginConfigItem,
     PluginCatalogItem,
@@ -34,6 +35,7 @@ __all__ = [
     "PluginConfigConflictError",
     "PluginConfigState",
     "PluginConfigViewService",
+    "PluginPolicyService",
     "PluginRawSettingsState",
     "PluginRawValidationState",
     "PluginSettingsNotConfigurableError",
@@ -41,4 +43,5 @@ __all__ = [
     "UnknownPluginSettingFieldError",
     "plugin_catalog_service",
     "plugin_config_view_service",
+    "plugin_policy_service",
 ]

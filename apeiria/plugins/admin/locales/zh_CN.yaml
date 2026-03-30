@@ -19,7 +19,7 @@ admin:
     field_disabled_plugins: "全局禁用插件"
     field_groups: "群记录"
     field_disabled_groups: "已关闭群"
-    field_bans: "封禁记录"
+    field_access_rules: "访问规则"
     field_adapters: "适配器"
   session:
     title: "主人管理 · 会话信息"

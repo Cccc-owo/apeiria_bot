@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import nonebot
 
+from apeiria.core.models.access_policy import AccessPolicyEntry
 from apeiria.core.utils.webui_build import (
     read_frontend_build_status,
     web_dir,
@@ -34,7 +35,7 @@ class DashboardStatusSnapshot:
     disabled_plugins_count: int
     groups_count: int
     disabled_groups_count: int
-    bans_count: int
+    access_rules_count: int
     adapters: list[str]
 
 
@@ -96,7 +97,6 @@ class DashboardService:
         from nonebot_plugin_orm import get_session
         from sqlalchemy import func, select
 
-        from apeiria.core.models.ban import BanConsole
         from apeiria.core.models.group import GroupConsole
         from apeiria.core.models.plugin_info import PluginInfo
 
@@ -126,8 +126,11 @@ class DashboardService:
                 )
                 or 0
             )
-            bans_count = (
-                await session.scalar(select(func.count()).select_from(BanConsole)) or 0
+            access_rules_count = (
+                await session.scalar(
+                    select(func.count()).select_from(AccessPolicyEntry)
+                )
+                or 0
             )
 
         return DashboardStatusSnapshot(
@@ -137,7 +140,7 @@ class DashboardService:
             disabled_plugins_count=disabled_plugins_count,
             groups_count=groups_count,
             disabled_groups_count=disabled_groups_count,
-            bans_count=bans_count,
+            access_rules_count=access_rules_count,
             adapters=adapters,
         )
 

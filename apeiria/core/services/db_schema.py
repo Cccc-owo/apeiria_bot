@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from nonebot.log import logger
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 4
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -20,6 +20,17 @@ MIGRATIONS: dict[int, MigrationFunc] = {}
 CORE_TABLE_NAMES = frozenset(
     {
         "apeiria_schema_meta",
+        "access_policy_entry",
+        "command_statistics",
+        "group_console",
+        "level_user",
+        "plugin_info",
+        "plugin_policy_entry",
+        "user_console",
+    }
+)
+LEGACY_CORE_TABLE_NAMES = frozenset(
+    {
         "ban_console",
         "command_statistics",
         "group_console",
@@ -28,7 +39,9 @@ CORE_TABLE_NAMES = frozenset(
         "user_console",
     }
 )
-LEGACY_CORE_TABLE_NAMES = CORE_TABLE_NAMES - {"apeiria_schema_meta"}
+ADOPTABLE_CORE_TABLE_NAMES = frozenset(
+    (CORE_TABLE_NAMES - {"apeiria_schema_meta"}) | {"ban_console"}
+)
 
 
 class SchemaBootstrapError(RuntimeError):
@@ -60,7 +73,8 @@ class SchemaStatus:
 
     @property
     def can_adopt_legacy_schema(self) -> bool:
-        return self.apeiria_tables == LEGACY_CORE_TABLE_NAMES
+        managed_tables = self.existing_tables & ADOPTABLE_CORE_TABLE_NAMES
+        return LEGACY_CORE_TABLE_NAMES <= managed_tables <= ADOPTABLE_CORE_TABLE_NAMES
 
 
 async def ensure_database_ready() -> None:
@@ -190,3 +204,39 @@ async def _apply_migrations(
         from_version,
         current_version,
     )
+
+
+async def _migrate_v1_to_v2(session: AsyncSession) -> None:
+    from nonebot_plugin_orm import Model
+
+    conn = await session.connection()
+    await conn.run_sync(Model.metadata.create_all)
+
+
+MIGRATIONS[1] = _migrate_v1_to_v2
+
+
+async def _migrate_v2_to_v3(session: AsyncSession) -> None:
+    from sqlalchemy import text
+
+    await session.execute(text("DROP TABLE IF EXISTS ban_console"))
+    await session.commit()
+
+
+MIGRATIONS[2] = _migrate_v2_to_v3
+
+
+async def _migrate_v3_to_v4(session: AsyncSession) -> None:
+    from sqlalchemy import text
+
+    await session.execute(
+        text(
+            "ALTER TABLE plugin_policy_entry "
+            "ADD COLUMN access_mode VARCHAR(16) "
+            "NOT NULL DEFAULT 'default_allow'"
+        )
+    )
+    await session.commit()
+
+
+MIGRATIONS[3] = _migrate_v3_to_v4

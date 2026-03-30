@@ -53,7 +53,7 @@ async def handle_status(event: Event) -> None:
                     t("admin.status.field_disabled_groups"),
                     snapshot.disabled_groups_count,
                 ),
-                (t("admin.status.field_bans"), snapshot.bans_count),
+                (t("admin.status.field_access_rules"), snapshot.access_rules_count),
                 (t("admin.status.field_adapters"), adapters),
             ],
         )

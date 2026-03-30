@@ -33,16 +33,20 @@ web_ui:
     fields_not_editable: "以下字段不可编辑：{fields}"
     table_users: "用户"
     table_groups: "群组"
-    table_levels: "权限"
-    table_bans: "封禁"
+    table_levels: "用户等级"
+    table_access_rules: "访问规则"
     table_plugins: "插件"
+    table_plugin_policies: "插件策略"
     table_statistics: "统计"
   groups:
     not_found: "群组不存在"
     protected_plugins: "以下插件不可禁用：{plugins}"
   permissions:
     group_id_required: "必须提供 group_id"
-    ban_not_found: "封禁记录不存在"
+    invalid_subject: "访问规则主体类型无效"
+    invalid_effect: "访问规则效果无效"
+    invalid_access_mode: "插件访问模式无效"
+    rule_not_found: "访问规则不存在"
   plugins:
     not_found: "插件不存在"
     protected: "该插件不可禁用：{reason}"

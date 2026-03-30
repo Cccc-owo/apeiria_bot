@@ -117,7 +117,7 @@ export interface DashboardStatus {
   disabled_plugins_count: number
   groups_count: number
   disabled_groups_count: number
-  bans_count: number
+  access_rules_count: number
   adapters: string[]
 }
 
@@ -181,6 +181,8 @@ export interface WebUIBuildStreamEvent {
 
 export interface PluginItem {
   module_name: string
+  kind: string
+  access_mode: string
   name: string | null
   description: string | null
   homepage: string | null
@@ -295,12 +297,12 @@ export interface PluginStoreTask {
   finished_at: string | null
 }
 
-export interface BanItem {
-  id: number
-  user_id: string | null
-  group_id: string | null
-  duration: number
-  reason: string | null
+export interface AccessRuleItem {
+  subject_type: string
+  subject_id: string
+  plugin_module: string
+  effect: string
+  note: string | null
 }
 
 export interface GroupItem {
@@ -603,19 +605,32 @@ export const uninstallPlugin = (
     payload || {},
   )
 
-export const getBans = () =>
-  client.get<BanItem[]>('/permissions/bans')
+export const getAccessRules = () =>
+  client.get<AccessRuleItem[]>('/permissions/rules')
 
-export const createBan = (payload: {
-  user_id: string
-  group_id?: string | null
-  duration?: number
-  reason?: string | null
+export const createAccessRule = (payload: {
+  subject_type: string
+  subject_id: string
+  plugin_module: string
+  effect: string
+  note?: string | null
 }) =>
-  client.post('/permissions/bans', payload)
+  client.post<AccessRuleItem>('/permissions/rules', payload)
 
-export const deleteBan = (banId: number) =>
-  client.delete(`/permissions/bans/${banId}`)
+export const deleteAccessRule = (payload: {
+  subject_type: string
+  subject_id: string
+  plugin_module: string
+}) =>
+  client.post('/permissions/rules/delete', payload)
+
+export const updatePluginAccessMode = (
+  moduleName: string,
+  accessMode: string,
+) =>
+  client.patch('/permissions/plugins/' + encodeURIComponent(moduleName) + '/access-mode', {
+    access_mode: accessMode,
+  })
 
 export const getGroups = () =>
   client.get<GroupItem[]>('/groups/')

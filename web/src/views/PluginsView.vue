@@ -914,11 +914,11 @@
     })
   })
   const systemPlugins = computed(() =>
-    plugins.value.filter(item => item.source === 'framework'),
+    plugins.value.filter(item => item.kind === 'core'),
   )
 
   const nonSystemPlugins = computed(() =>
-    plugins.value.filter(item => !systemPlugins.value.some(systemItem => systemItem.module_name === item.module_name)),
+    plugins.value.filter(item => item.kind !== 'core'),
   )
 
   const scopedPlugins = computed(() =>

@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from apeiria.core.configs.models import PluginExtraData
 from apeiria.core.models.plugin_info import PluginInfo
+from apeiria.core.models.plugin_policy import PluginPolicyEntry
 from apeiria.domains.exceptions import ResourceNotFoundError
 
 if TYPE_CHECKING:
@@ -25,6 +26,16 @@ class PluginCatalogRepository:
             )
             rows = result.all()
         return {row[0]: row[1] for row in rows}
+
+    async def get_plugin_enabled(self, module_name: str) -> bool:
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginInfo.is_global_enabled).where(
+                    PluginInfo.module_name == module_name
+                )
+            )
+            value = result.scalar_one_or_none()
+        return True if value is None else bool(value)
 
     async def get_plugin_info_map(self) -> dict[str, PluginInfo]:
         """Return persisted plugin info indexed by module name."""
@@ -100,6 +111,89 @@ class PluginCatalogRepository:
             record.admin_level = extra.admin_level if extra else 0
             record.author = extra.author if extra else None
             record.version = extra.version if extra else None
+            await session.commit()
+
+    async def get_plugin_policy_map(self) -> dict[str, PluginPolicyEntry]:
+        async with get_session() as session:
+            result = await session.execute(select(PluginPolicyEntry))
+            rows = result.scalars().all()
+        return {row.plugin_module: row for row in rows}
+
+    async def get_plugin_policy(
+        self,
+        module_name: str,
+    ) -> PluginPolicyEntry | None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginPolicyEntry).where(
+                    PluginPolicyEntry.plugin_module == module_name
+                )
+            )
+            return result.scalar_one_or_none()
+
+    async def ensure_plugin_policy(
+        self,
+        module_name: str,
+        *,
+        access_mode: str = "default_allow",
+        required_level: int = 0,
+        protection_mode: str = "normal",
+    ) -> None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginPolicyEntry).where(
+                    PluginPolicyEntry.plugin_module == module_name
+                )
+            )
+            record = result.scalar_one_or_none()
+            if record is None:
+                session.add(
+                    PluginPolicyEntry(
+                        plugin_module=module_name,
+                        access_mode=access_mode,
+                        required_level=required_level,
+                        protection_mode=protection_mode,
+                    )
+                )
+            else:
+                if (
+                    record.access_mode == "default_allow"
+                    and access_mode != "default_allow"
+                ):
+                    record.access_mode = access_mode
+                if record.required_level == 0 and required_level > 0:
+                    record.required_level = required_level
+                if (
+                    record.protection_mode == "normal"
+                    and protection_mode != "normal"
+                ):
+                    record.protection_mode = protection_mode
+            await session.commit()
+
+    async def update_plugin_policy(
+        self,
+        module_name: str,
+        *,
+        access_mode: str | None = None,
+        required_level: int | None = None,
+        protection_mode: str | None = None,
+    ) -> None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(PluginPolicyEntry).where(
+                    PluginPolicyEntry.plugin_module == module_name
+                )
+            )
+            record = result.scalar_one_or_none()
+            if record is None:
+                record = PluginPolicyEntry(plugin_module=module_name)
+                session.add(record)
+            if access_mode is not None:
+                record.access_mode = access_mode
+            if required_level is not None:
+                record.required_level = required_level
+            if protection_mode is not None:
+                record.protection_mode = protection_mode
             await session.commit()
 
 

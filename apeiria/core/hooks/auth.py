@@ -4,7 +4,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.matcher import Matcher
 from nonebot.message import run_preprocessor
 
-from apeiria.domains.permissions import permission_service
+from apeiria.core.guard import plugin_guard_service
 
 
 @run_preprocessor
@@ -14,4 +14,4 @@ async def auth_hook(matcher: Matcher, event: Event, bot: Bot) -> None:
     if not plugin:
         return
 
-    await permission_service.assert_can_run_plugin(bot, event, plugin)
+    await plugin_guard_service.assert_allowed(bot, event, plugin)

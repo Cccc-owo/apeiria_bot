@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from nonebot.log import logger
 
-from apeiria.domains.permissions import permission_service
+from apeiria.domains.access.runtime import extract_group_id
 
 if TYPE_CHECKING:
     from nonebot.adapters import Event
@@ -70,7 +70,7 @@ class StatisticsService:
         group_id = getattr(event, "group_id", None)
         if group_id is None:
             try:
-                group_id = permission_service.extract_group_id(
+                group_id = extract_group_id(
                     event.get_session_id(),
                     user_id,
                 )

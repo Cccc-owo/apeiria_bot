@@ -19,7 +19,7 @@ admin:
     field_disabled_plugins: "Globally disabled plugins"
     field_groups: "Group records"
     field_disabled_groups: "Disabled groups"
-    field_bans: "Ban records"
+    field_access_rules: "Access rules"
     field_adapters: "Adapters"
   session:
     title: "Owner Admin · Session Info"

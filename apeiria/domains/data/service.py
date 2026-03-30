@@ -122,11 +122,12 @@ class DataBrowserService:
 
     def _table_registry(self) -> dict[str, DataTableDefinition]:
         from apeiria.core.models import (
-            BanConsole,
+            AccessPolicyEntry,
             CommandStatistics,
             GroupConsole,
             LevelUser,
             PluginInfo,
+            PluginPolicyEntry,
             UserConsole,
         )
 
@@ -134,8 +135,12 @@ class DataBrowserService:
             "users": (UserConsole, t("web_ui.data.table_users")),
             "groups": (GroupConsole, t("web_ui.data.table_groups")),
             "levels": (LevelUser, t("web_ui.data.table_levels")),
-            "bans": (BanConsole, t("web_ui.data.table_bans")),
+            "access_rules": (AccessPolicyEntry, t("web_ui.data.table_access_rules")),
             "plugins": (PluginInfo, t("web_ui.data.table_plugins")),
+            "plugin_policies": (
+                PluginPolicyEntry,
+                t("web_ui.data.table_plugin_policies"),
+            ),
             "statistics": (CommandStatistics, t("web_ui.data.table_statistics")),
         }
         return {
