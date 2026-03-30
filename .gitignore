@@ -141,9 +141,12 @@ dmypy.json
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 .claude/
+.playwright-cli/
+.ruff_cache/
 .vscode/
 
 # Bot runtime data
+cache/
 /data/
 user_bot.py
 apeiria.config.toml
