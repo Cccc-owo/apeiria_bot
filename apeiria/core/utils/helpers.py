@@ -4,20 +4,34 @@ from __future__ import annotations
 
 import ast
 from functools import lru_cache
+from importlib.metadata import packages_distributions
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from importlib.machinery import ModuleSpec
+
     from nonebot.plugin import Plugin
 
 import nonebot
 
+from apeiria.config.plugins import plugin_config_service
 from apeiria.core.configs.models import PluginExtraData
 from apeiria.core.i18n import t
-from apeiria.core.plugin_policy import is_framework_protected_plugin_module
+from apeiria.core.plugin_policy import (
+    is_framework_dependency_plugin_module,
+    is_protected_plugin_module,
+)
+from apeiria.package_ids import normalize_package_id
+from apeiria.runtime_env import (
+    pending_plugin_module_uninstalls,
+    pending_plugin_requirement_removals,
+)
 
 OFFICIAL_PLUGIN_ROOT = (Path(__file__).resolve().parents[2] / "plugins").resolve()
 CUSTOM_PLUGIN_ROOT = (Path(__file__).resolve().parents[3] / "local_plugins").resolve()
+_USER_MANAGED_SOURCES = {"custom", "external"}
 
 
 def get_plugin_extra(plugin: Plugin) -> PluginExtraData | None:
@@ -52,6 +66,71 @@ def get_plugin_required_plugins(plugin: Plugin) -> list[str]:
     return _scan_required_plugins_from_source(_plugin_source_paths(Path(module_file)))
 
 
+def get_module_required_plugins(module_name: str) -> list[str]:
+    """Get declared dependencies for an importable module name."""
+    source_paths = _module_source_paths(module_name)
+    if not source_paths:
+        return []
+    return _scan_required_plugins_from_source(source_paths)
+
+
+def prewarm_plugin_module_caches(module_names: set[str]) -> None:
+    """Warm module resolution and dependency caches for plugin management."""
+    pending = [module_name for module_name in module_names if module_name]
+    seen: set[str] = set()
+
+    while pending:
+        module_name = pending.pop()
+        if not module_name or module_name in seen:
+            continue
+        seen.add(module_name)
+
+        spec = resolve_module_spec(module_name)
+        if spec is None:
+            continue
+
+        get_plugin_source_by_module_name(module_name)
+        dependencies = get_module_required_plugins(module_name)
+        pending.extend(
+            dependency
+            for dependency in dependencies
+            if dependency and dependency not in seen
+        )
+
+
+def invalidate_plugin_management_caches() -> None:
+    """Clear module discovery caches used by plugin management views."""
+    resolve_module_spec.cache_clear()
+    is_module_importable.cache_clear()
+    _scan_required_plugins_from_source.cache_clear()
+
+
+@lru_cache(maxsize=512)
+def resolve_module_spec(module_name: str | None) -> ModuleSpec | None:
+    """Resolve module spec with fallback to builtin nonebot plugins."""
+    if not module_name:
+        return None
+
+    try:
+        spec = find_spec(module_name)
+    except (ImportError, ModuleNotFoundError, ValueError):
+        spec = None
+
+    if (spec is None or spec.origin is None) and "." not in module_name:
+        try:
+            spec = find_spec(f"nonebot.plugins.{module_name}")
+        except (ImportError, ModuleNotFoundError, ValueError):
+            spec = None
+    return spec
+
+
+@lru_cache(maxsize=512)
+def is_module_importable(module_name: str | None) -> bool:
+    """Return whether a module can be imported via standard discovery."""
+    spec = resolve_module_spec(module_name)
+    return spec is not None
+
+
 def _plugin_source_paths(origin: Path) -> tuple[str, ...]:
     try:
         resolved = origin.resolve()
@@ -68,6 +147,13 @@ def _plugin_source_paths(origin: Path) -> tuple[str, ...]:
         except OSError:
             return ()
     return (str(resolved),)
+
+
+def _module_source_paths(module_name: str) -> tuple[str, ...]:
+    spec = resolve_module_spec(module_name)
+    if spec is None or spec.origin is None:
+        return ()
+    return _plugin_source_paths(Path(spec.origin))
 
 
 @lru_cache(maxsize=256)
@@ -130,14 +216,73 @@ def find_loaded_plugin(name: str) -> Plugin | None:
     return None
 
 
-def get_plugin_dependents(module_name: str) -> list[str]:
+def get_pending_uninstall_plugin_modules() -> set[str]:
+    """Return loaded plugins explicitly scheduled for deferred removal."""
+    pending_modules = set(pending_plugin_module_uninstalls())
+    pending_requirements = {
+        normalize_package_id(item) or item
+        for item in pending_plugin_requirement_removals()
+    }
+    if not pending_requirements:
+        return pending_modules
+
+    top_level_packages = packages_distributions()
+    package_bindings = plugin_config_service.read_project_plugin_config()["packages"]
+    for plugin in nonebot.get_loaded_plugins():
+        if get_plugin_source(plugin) not in _USER_MANAGED_SOURCES:
+            continue
+        package_name = _get_plugin_distribution_name(
+            plugin,
+            top_level_packages,
+            package_bindings,
+        )
+        normalized = normalize_package_id(package_name) if package_name else None
+        if normalized and normalized in pending_requirements:
+            pending_modules.add(plugin.module_name)
+    return pending_modules
+
+
+def is_plugin_pending_uninstall(module_name: str) -> bool:
+    """Return whether the plugin is loaded now but already scheduled for removal."""
+    return module_name in get_pending_uninstall_plugin_modules()
+
+
+def get_plugin_dependents(
+    module_name: str,
+    *,
+    include_pending: bool = False,
+) -> list[str]:
     """Get loaded plugins that depend on the target plugin."""
+    pending_modules = (
+        set()
+        if include_pending
+        else get_pending_uninstall_plugin_modules()
+    )
     dependents = {
         get_plugin_name(plugin)
         for plugin in nonebot.get_loaded_plugins()
+        if plugin.module_name not in pending_modules
         if module_name in get_plugin_required_plugins(plugin)
     }
     return sorted(dependents)
+
+
+def _get_plugin_distribution_name(
+    plugin: Plugin,
+    top_level_packages: dict[str, list[str]],
+    package_bindings: dict[str, list[str]] | None = None,
+) -> str | None:
+    package_bindings = (
+        package_bindings
+        if package_bindings is not None
+        else plugin_config_service.read_project_plugin_config()["packages"]
+    )
+    for package_name, module_names in package_bindings.items():
+        if plugin.module_name in module_names:
+            return package_name
+    top_level = plugin.module_name.split(".", 1)[0]
+    inferred = top_level_packages.get(top_level, [])
+    return inferred[0] if inferred else None
 
 
 def get_plugin_source(plugin: Plugin) -> str:
@@ -151,22 +296,47 @@ def get_plugin_source(plugin: Plugin) -> str:
             resolved = None
         if resolved:
             if OFFICIAL_PLUGIN_ROOT in resolved.parents:
-                return "official"
+                return "builtin"
             if CUSTOM_PLUGIN_ROOT in resolved.parents:
                 return "custom"
 
-    if is_framework_protected_plugin_module(plugin.module_name):
-        return "framework"
     if plugin.module_name in {"echo", "nonebot.plugins.echo"}:
         return "builtin"
+    if is_framework_dependency_plugin_module(plugin.module_name):
+        return "framework"
+    return "external"
+
+
+def get_plugin_source_by_module_name(module_name: str) -> str:
+    """Classify plugin source using module name when no loaded plugin exists."""
+    if module_name in {"echo", "nonebot.plugins.echo"}:
+        return "builtin"
+
+    spec = resolve_module_spec(module_name)
+    origin = getattr(spec, "origin", None)
+    if isinstance(origin, str) and origin:
+        try:
+            resolved = Path(origin).resolve()
+        except OSError:
+            resolved = None
+        if resolved:
+            if OFFICIAL_PLUGIN_ROOT in resolved.parents:
+                return "builtin"
+            if CUSTOM_PLUGIN_ROOT in resolved.parents:
+                return "custom"
+
+    if is_framework_dependency_plugin_module(module_name):
+        return "framework"
     return "external"
 
 
 def get_plugin_protection_reason(module_name: str) -> str | None:
     """Return human-readable reason when a plugin should not be disabled."""
     reasons: list[str] = []
-    if is_framework_protected_plugin_module(module_name):
+    if is_framework_dependency_plugin_module(module_name):
         reasons.append(t("common.framework_required"))
+    if module_name == "apeiria.plugins.web_ui":
+        reasons.append(t("common.control_panel_required"))
 
     dependents = get_plugin_dependents(module_name)
     if dependents:
@@ -177,7 +347,9 @@ def get_plugin_protection_reason(module_name: str) -> str | None:
 
 def is_plugin_protected(module_name: str) -> bool:
     """Check whether a plugin is protected from being disabled."""
-    return get_plugin_protection_reason(module_name) is not None
+    return is_protected_plugin_module(module_name) or (
+        get_plugin_protection_reason(module_name) is not None
+    )
 
 
 def format_duration(seconds: int) -> str:

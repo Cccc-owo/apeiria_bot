@@ -54,13 +54,28 @@
             </v-btn>
           </div>
           <div class="section-heading__actions">
-            <v-switch
-              v-model="hideSystemPlugins"
-              color="primary"
-              hide-details
-              inset
-              :label="t('plugins.hideSystemDependencies')"
-            />
+            <div :aria-label="t('plugins.scopeTabs')" class="plugin-scope-tabs" role="tablist">
+              <button
+                :aria-selected="pluginScopeTab === 'managed'"
+                class="plugin-scope-tab"
+                :class="{ 'plugin-scope-tab--active': pluginScopeTab === 'managed' }"
+                role="tab"
+                type="button"
+                @click="pluginScopeTab = 'managed'"
+              >
+                {{ t('plugins.tabManaged') }}
+              </button>
+              <button
+                :aria-selected="pluginScopeTab === 'framework'"
+                class="plugin-scope-tab"
+                :class="{ 'plugin-scope-tab--active': pluginScopeTab === 'framework' }"
+                role="tab"
+                type="button"
+                @click="pluginScopeTab = 'framework'"
+              >
+                {{ t('plugins.tabFramework') }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -90,6 +105,29 @@
                     {{ item.plugin_type }}
                   </v-chip>
                   <v-chip
+                    :color="item.is_loaded ? 'success' : 'default'"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ item.is_loaded ? t('plugins.loaded') : t('plugins.notLoaded') }}
+                  </v-chip>
+                  <v-chip
+                    v-if="item.is_explicit"
+                    color="primary"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ t('plugins.explicit') }}
+                  </v-chip>
+                  <v-chip
+                    v-if="item.is_dependency"
+                    color="info"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ t('plugins.dependency') }}
+                  </v-chip>
+                  <v-chip
                     v-if="item.is_protected"
                     color="warning"
                     size="x-small"
@@ -100,12 +138,29 @@
                       {{ pluginToggleHint(item) }}
                     </v-tooltip>
                   </v-chip>
+                  <v-chip
+                    v-if="item.is_pending_uninstall"
+                    color="warning"
+                    size="x-small"
+                    variant="flat"
+                  >
+                    {{ t('plugins.pendingUninstall') }}
+                    <v-tooltip activator="parent" location="top">
+                      {{ t('plugins.pendingUninstallHint') }}
+                    </v-tooltip>
+                  </v-chip>
                 </div>
                 <div class="plugin-card__subline text-caption text-medium-emphasis">
                   {{ item.module_name }}
                 </div>
                 <div v-if="pluginMetaSummary(item)" class="plugin-card__subline text-caption text-medium-emphasis">
                   {{ pluginMetaSummary(item) }}
+                </div>
+                <div
+                  v-if="item.child_plugins.length > 0"
+                  class="plugin-card__subline text-caption text-medium-emphasis"
+                >
+                  {{ t('plugins.childPluginCount', { count: item.child_plugins.length }) }}
                 </div>
               </div>
 
@@ -119,9 +174,18 @@
             </p>
 
             <div
-              v-if="item.required_plugins.length > 0 || item.dependent_plugins.length > 0"
+              v-if="item.child_plugins.length > 0 || item.required_plugins.length > 0 || item.dependent_plugins.length > 0"
               class="plugin-card__relations"
             >
+              <v-chip
+                v-for="childPlugin in item.child_plugins"
+                :key="`child:${item.module_name}:${childPlugin}`"
+                color="secondary"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ t('plugins.childPlugins') }}: {{ childPlugin }}
+              </v-chip>
               <v-chip
                 v-for="dependency in item.required_plugins"
                 :key="`req:${item.module_name}:${dependency}`"
@@ -167,6 +231,7 @@
                     {{ t('plugins.projectPage') }}
                   </v-btn>
                   <v-btn
+                    v-if="item.can_edit_config"
                     color="primary"
                     :loading="settingsLoadingModule === item.module_name"
                     size="small"
@@ -178,9 +243,10 @@
                 </div>
                 <div class="plugin-card__switch-wrap">
                   <v-switch
+                    v-if="item.can_enable_disable || item.is_protected || item.is_pending_uninstall"
                     class="plugin-card__switch"
                     color="success"
-                    :disabled="item.is_protected"
+                    :disabled="!item.can_enable_disable || item.is_protected || item.is_pending_uninstall"
                     hide-details
                     inset
                     :loading="pendingModule === item.module_name"
@@ -255,9 +321,21 @@
             </div>
 
             <div
-              v-if="settingsPlugin && (settingsPlugin.required_plugins.length > 0 || settingsPlugin.dependent_plugins.length > 0)"
+              v-if="settingsPlugin && (settingsPlugin.child_plugins.length > 0 || settingsPlugin.required_plugins.length > 0 || settingsPlugin.dependent_plugins.length > 0)"
               class="settings-dialog-header__relations"
             >
+              <div v-if="settingsPlugin.child_plugins.length > 0" class="plugin-detail-tags">
+                <span class="text-caption text-medium-emphasis">{{ t('plugins.childPlugins') }}</span>
+                <v-chip
+                  v-for="childPlugin in settingsPlugin.child_plugins"
+                  :key="`detail-child:${childPlugin}`"
+                  color="secondary"
+                  size="x-small"
+                  variant="tonal"
+                >
+                  {{ childPlugin }}
+                </v-chip>
+              </div>
               <div v-if="settingsPlugin.required_plugins.length > 0" class="plugin-detail-tags">
                 <span class="text-caption text-medium-emphasis">{{ t('plugins.requiredPlugins') }}</span>
                 <v-chip
@@ -283,6 +361,16 @@
                 </v-chip>
               </div>
             </div>
+
+            <v-alert
+              v-if="settingsPlugin?.is_pending_uninstall"
+              class="mt-3"
+              density="comfortable"
+              type="warning"
+              variant="tonal"
+            >
+              {{ t('plugins.pendingUninstallDetail') }}
+            </v-alert>
           </div>
 
         </v-card-title>
@@ -694,7 +782,7 @@
   const loading = ref(false)
   const pendingModule = ref('')
   const errorMessage = ref('')
-  const hideSystemPlugins = ref(true)
+  const pluginScopeTab = ref<'managed' | 'framework'>('managed')
   const pluginSearch = ref('')
   const manualInstallDialogVisible = ref(false)
   const manualInstallTaskDialogVisible = ref(false)
@@ -829,8 +917,12 @@
     plugins.value.filter(item => !systemPlugins.value.some(systemItem => systemItem.module_name === item.module_name)),
   )
 
+  const scopedPlugins = computed(() =>
+    pluginScopeTab.value === 'framework' ? systemPlugins.value : nonSystemPlugins.value,
+  )
+
   const visiblePlugins = computed(() =>
-    (hideSystemPlugins.value ? nonSystemPlugins.value : plugins.value)
+    scopedPlugins.value
       .filter(item => {
         if (route.query.enabled === 'disabled' && item.is_global_enabled) {
           return false
@@ -843,7 +935,6 @@
 
   const SOURCE_COLORS: Record<string, string> = {
     framework: 'error',
-    official: 'primary',
     custom: 'success',
     builtin: 'secondary',
     external: 'warning',
@@ -906,7 +997,6 @@
   function sourceLabel (source: string) {
     return labelFromMap(source, {
       framework: t('plugins.framework'),
-      official: t('plugins.official'),
       custom: t('plugins.custom'),
       builtin: t('plugins.builtin'),
       external: t('plugins.external'),
@@ -923,6 +1013,7 @@
   }
 
   function pluginToggleHint (item: PluginItem) {
+    if (item.is_pending_uninstall) return t('plugins.pendingUninstallHint')
     if (item.is_protected && item.protected_reason) return item.protected_reason
     return ''
   }
@@ -1105,6 +1196,7 @@
   }
 
   async function openSettings (item: PluginItem) {
+    if (!item.can_edit_config) return
     settingsPlugin.value = item
     settingsDialogVisible.value = true
     settingsEditorMode.value = 'basic'
@@ -1132,9 +1224,7 @@
   }
 
   function canUninstallPlugin (item: PluginItem) {
-    return authStore.role === 'owner'
-      && !item.is_protected
-      && (item.source === 'custom' || item.source === 'external')
+    return authStore.role === 'owner' && item.can_uninstall
   }
 
   async function uninstallPluginItem (item: PluginItem) {
@@ -1259,6 +1349,10 @@
   }
 
   async function togglePlugin (item: PluginItem, nextValue: boolean | null) {
+    if (item.is_pending_uninstall) {
+      noticeStore.show(t('plugins.pendingUninstallHint'), 'warning')
+      return
+    }
     if (item.is_protected) {
       noticeStore.show(item.protected_reason || t('plugins.cannotDisable'), 'warning')
       return
@@ -1528,6 +1622,49 @@
   flex-wrap: wrap;
 }
 
+.plugin-scope-tabs {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  width: min(420px, 100%);
+  min-width: 0;
+  padding: 4px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgba(var(--v-theme-surface-variant), 0.22);
+}
+
+.plugin-scope-tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 40px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.plugin-scope-tab:hover {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.plugin-scope-tab--active {
+  background: rgba(var(--v-theme-primary), 0.18);
+  color: rgb(var(--v-theme-primary));
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.14);
+}
+
 .plugin-search {
   width: 240px;
 }
@@ -1721,6 +1858,10 @@
 @media (max-width: 640px) {
   .plugins-grid {
     grid-template-columns: 1fr;
+  }
+
+  .plugin-scope-tabs {
+    width: 100%;
   }
 }
 </style>

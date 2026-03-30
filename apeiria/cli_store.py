@@ -10,10 +10,13 @@ from typing import Literal
 from apeiria.config.adapters import adapter_config_service
 from apeiria.config.drivers import driver_config_service
 from apeiria.config.plugins import plugin_config_service
+from apeiria.core.utils.helpers import invalidate_plugin_management_caches
 from apeiria.package_ids import normalize_package_id
 from apeiria.runtime_env import (
     add_plugin_requirement,
     declared_plugin_requirements,
+    discard_plugin_module_uninstall,
+    discard_plugin_requirement_removal,
     plugin_site_packages_paths,
     remove_plugin_requirement,
 )
@@ -154,6 +157,9 @@ def install_plugin_package(
     except Exception as exc:
         _rollback_plugin_install(target, extra_args, exc)
         raise AssertionError("unreachable") from exc
+    discard_plugin_requirement_removal(target)
+    discard_plugin_module_uninstall(resolved_module)
+    invalidate_plugin_management_caches()
 
     return PluginInstallResult(
         requirement=target,
@@ -192,6 +198,9 @@ def install_plugin_requirement_with_auto_module(
     except Exception as exc:
         _rollback_plugin_install(declared_requirement, extra_args, exc)
         raise AssertionError("unreachable") from exc
+    discard_plugin_requirement_removal(declared_requirement)
+    discard_plugin_module_uninstall(resolved_module)
+    invalidate_plugin_management_caches()
 
     return PluginInstallResult(
         requirement=declared_requirement,
@@ -243,6 +252,7 @@ def uninstall_plugin_package(
             ),
         )
         raise AssertionError("unreachable") from exc
+    invalidate_plugin_management_caches()
 
     return PluginUninstallResult(
         requirement=target,

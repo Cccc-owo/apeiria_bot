@@ -1,11 +1,15 @@
 """Web UI plugin — management dashboard API + static file serving."""
 from pathlib import Path
 
+import nonebot
 from nonebot import require
+from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 
+from apeiria.config.plugins import plugin_config_service
 from apeiria.core.configs.models import PluginExtraData, PluginType, RegisterConfig
 from apeiria.core.i18n import load_locales, t
+from apeiria.core.utils.helpers import prewarm_plugin_module_caches
 
 from .config import WebUIConfig
 
@@ -57,9 +61,6 @@ def _web_ui_url() -> str:
 def _mount_routes() -> None:
     """Mount API routes + static frontend into nonebot's ASGI app."""
     import logging
-
-    import nonebot
-    from nonebot.log import logger
 
     app = nonebot.get_app()
 
@@ -113,6 +114,28 @@ def _mount_routes() -> None:
         logger.debug("Web UI frontend assets not found in {}", _DIST_DIR)
 
 
+def _warm_plugin_management_caches() -> None:
+    """Warm plugin-management caches during Web UI startup."""
+    configured_modules = set(
+        plugin_config_service.read_project_plugin_config()["modules"]
+    )
+    loaded_modules = {
+        plugin.module_name
+        for plugin in nonebot.get_loaded_plugins()
+        if getattr(plugin, "module_name", None)
+    }
+    candidate_modules = configured_modules | loaded_modules
+    if not candidate_modules:
+        return
+
+    prewarm_plugin_module_caches(candidate_modules)
+    logger.debug(
+        "Plugin management caches warmed for {} modules",
+        len(candidate_modules),
+    )
+
+
 from nonebot import get_driver
 
 get_driver().on_startup(_mount_routes)
+get_driver().on_startup(_warm_plugin_management_caches)
