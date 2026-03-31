@@ -26,6 +26,7 @@ export interface SecurityAuditEventItem {
 
 export interface SettingsFieldItem {
   key: string
+  label: string
   type: string
   editor: string
   item_type: string | null
@@ -33,7 +34,7 @@ export interface SettingsFieldItem {
   schema: SettingsFieldSchemaItem | null
   default: unknown
   help: string
-  choices: unknown[]
+  choices: SettingsChoiceItem[]
   base_value: unknown
   current_value: unknown
   local_value: unknown
@@ -43,20 +44,28 @@ export interface SettingsFieldItem {
   allows_null: boolean
   editable: boolean
   type_category: string
+  order: number
+  secret: boolean
 }
 
 export interface SettingsFieldSchemaFieldItem {
   key: string
+  label: string
   help: string
   default: unknown
   schema: SettingsFieldSchemaItem
+}
+
+export interface SettingsChoiceItem {
+  title: string
+  value: unknown
 }
 
 export interface SettingsFieldSchemaItem {
   type: string
   item_type: string | null
   key_type: string | null
-  choices: unknown[]
+  choices: SettingsChoiceItem[]
   allows_null: boolean
   fields: SettingsFieldSchemaFieldItem[]
   item_schema: SettingsFieldSchemaFieldItem | null

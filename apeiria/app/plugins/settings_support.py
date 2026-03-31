@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from nonebot.config import Config, Env
+from pydantic import BaseModel
 
 from apeiria.app.plugins.config_capabilities import coerce_config_value
 from apeiria.infra.config.bot_config import BotConfig
-from apeiria.infra.plugin_metadata import configs_from_model
+from apeiria.infra.plugin_metadata.registry import configs_from_model
 from apeiria.infra.plugin_metadata.resolver import resolve_plugin_declared_config
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ _CORE_SETTINGS_EXCLUDED_KEYS = {
     "driver",
     "environment",
 }
+_STRIP = object()
 
 
 class UnknownPluginSettingFieldError(ValueError):
@@ -73,12 +75,99 @@ def validate_and_coerce_updates(
         config = allowed_fields.get(key)
         if config is None:
             raise UnknownPluginSettingFieldError(key)
-        updates[key] = coerce_config_value(config, value)
+        coerced = coerce_config_value(config, value)
+        stripped = _strip_default_value(config, coerced)
+        updates[key] = None if stripped is _STRIP else stripped
     for key in clear:
         if key not in allowed_fields:
             raise UnknownPluginSettingFieldError(key)
         updates[key] = None
     return updates
+
+
+def _strip_default_value(
+    config: RegisterConfig,
+    value: object | None,
+) -> object | None:
+    if value is None:
+        return _STRIP
+
+    if config.fields:
+        return _strip_object_default_value(config, value)
+
+    if config.type in {list, set}:
+        return _strip_sequence_default_value(config, value)
+
+    if config.type is dict:
+        return _strip_mapping_default_value(config, value)
+
+    return _STRIP if value == _normalized_default_value(config) else value
+
+
+def _normalized_default_value(config: RegisterConfig) -> object | None:
+    if isinstance(config.default, BaseModel):
+        return config.default.model_dump(mode="python")
+    return config.default
+
+
+def _strip_object_default_value(
+    config: RegisterConfig,
+    value: object,
+) -> object | None:
+    default_value = _normalized_default_value(config)
+    if not isinstance(value, dict):
+        return _STRIP if value == default_value else value
+
+    stripped_object: dict[str, object | None] = {}
+    field_map = {field.key: field for field in config.fields}
+    for key, item in value.items():
+        field = field_map.get(key)
+        if field is None:
+            stripped_object[key] = item
+            continue
+        stripped_item = _strip_default_value(field, item)
+        if stripped_item is _STRIP:
+            continue
+        stripped_object[key] = stripped_item
+    return stripped_object or _STRIP
+
+
+def _strip_sequence_default_value(
+    config: RegisterConfig,
+    value: object,
+) -> object | None:
+    default_value = _normalized_default_value(config)
+    if not isinstance(value, list):
+        return _STRIP if value == default_value else value
+    if config.item_schema is None:
+        return _STRIP if value == default_value else value
+
+    stripped_list = [
+        stripped_item
+        for item in value
+        if (stripped_item := _strip_default_value(config.item_schema, item))
+        is not _STRIP
+    ]
+    return _STRIP if stripped_list == default_value else stripped_list
+
+
+def _strip_mapping_default_value(
+    config: RegisterConfig,
+    value: object,
+) -> object | None:
+    default_value = _normalized_default_value(config)
+    if not isinstance(value, dict):
+        return _STRIP if value == default_value else value
+    if config.value_schema is None:
+        return _STRIP if value == default_value else value
+
+    stripped_mapping = {
+        key: stripped_item
+        for key, item in value.items()
+        if (stripped_item := _strip_default_value(config.value_schema, item))
+        is not _STRIP
+    }
+    return _STRIP if stripped_mapping == default_value else stripped_mapping
 
 
 __all__ = [

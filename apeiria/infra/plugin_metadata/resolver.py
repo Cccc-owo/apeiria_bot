@@ -28,6 +28,7 @@ from apeiria.shared.plugin_metadata import PluginExtraData, RegisterConfig
 read_project_plugin_module_map = project_config_service.read_project_plugin_module_map
 read_pyproject_nonebot_config = project_config_service.read_pyproject_nonebot_config
 read_project_plugin_config = plugin_config_service.read_project_plugin_config
+_DEFAULT_CONFIG_ORDER = 99
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,64 @@ class ResolvedPluginConfig:
     source: str
     has_config_model: bool
     configs: list[RegisterConfig]
+
+
+def _merge_declared_configs(
+    base: list[RegisterConfig],
+    enhancements: list[RegisterConfig],
+) -> list[RegisterConfig]:
+    if not base:
+        return list(enhancements)
+    if not enhancements:
+        return list(base)
+
+    merged = {config.key: config for config in base}
+    for enhancement in enhancements:
+        existing = merged.get(enhancement.key)
+        if existing is None:
+            continue
+        merged[enhancement.key] = _merge_declared_config(existing, enhancement)
+    return list(merged.values())
+
+
+def _merge_declared_config(
+    base: RegisterConfig,
+    enhancement: RegisterConfig,
+) -> RegisterConfig:
+    return RegisterConfig(
+        key=base.key,
+        default=base.default,
+        help=enhancement.help or base.help,
+        type=base.type,
+        choices=list(enhancement.choices or base.choices),
+        choice_labels=dict(enhancement.choice_labels or base.choice_labels),
+        item_type=base.item_type,
+        key_type=base.key_type,
+        allows_null=base.allows_null,
+        fields=_merge_declared_configs(base.fields, enhancement.fields),
+        item_schema=_merge_nested_schema(base.item_schema, enhancement.item_schema),
+        key_schema=_merge_nested_schema(base.key_schema, enhancement.key_schema),
+        value_schema=_merge_nested_schema(base.value_schema, enhancement.value_schema),
+        label=enhancement.label or base.label,
+        order=(
+            enhancement.order
+            if enhancement.order != _DEFAULT_CONFIG_ORDER
+            else base.order
+        ),
+        secret=enhancement.secret or base.secret,
+        legacy_key=enhancement.legacy_key or base.legacy_key,
+    )
+
+
+def _merge_nested_schema(
+    base: RegisterConfig | None,
+    enhancement: RegisterConfig | None,
+) -> RegisterConfig | None:
+    if base is None:
+        return enhancement
+    if enhancement is None:
+        return base
+    return _merge_declared_config(base, enhancement)
 
 
 def _project_root() -> Path:
@@ -186,12 +245,20 @@ def resolve_plugin_declared_config(module_name: str) -> ResolvedPluginConfig:
     if plugin and plugin.metadata:
         config_model = getattr(plugin.metadata, "config", None)
         if isinstance(config_model, type) and issubclass(config_model, BaseModel):
+            extra = (
+                PluginExtraData.from_extra(plugin.metadata.extra)
+                if plugin.metadata.extra
+                else None
+            )
+            configs = configs_from_model(config_model)
+            if extra is not None:
+                configs = _merge_declared_configs(configs, extra.configs)
             return ResolvedPluginConfig(
                 section=module_name.rsplit(".", maxsplit=1)[-1],
                 legacy_flatten=False,
                 source="plugin_metadata",
                 has_config_model=True,
-                configs=configs_from_model(config_model),
+                configs=configs,
             )
 
     if plugin and plugin.metadata and plugin.metadata.extra:

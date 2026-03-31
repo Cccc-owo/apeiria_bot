@@ -57,6 +57,22 @@ def normalize_choices_for_response(values: list[object]) -> list[object]:
     return [_normalize_scalar_value(value) for value in values]
 
 
+def normalize_choice_items_for_response(
+    config: RegisterConfig,
+) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    for value in config.choices:
+        normalized = _normalize_scalar_value(value)
+        key = str(normalized)
+        items.append(
+            {
+                "title": config.choice_labels.get(key, key),
+                "value": normalized,
+            }
+        )
+    return items
+
+
 def coerce_config_value(config: RegisterConfig, value: object) -> object:
     capability = get_field_capability(config)
     if not capability.editable:

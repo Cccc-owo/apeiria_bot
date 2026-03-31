@@ -1,5 +1,11 @@
+export interface PluginSettingChoice {
+  title: string
+  value: unknown
+}
+
 export interface PluginSettingSchemaField {
   key: string
+  label: string
   help: string
   default: unknown
   schema: PluginSettingSchema
@@ -9,7 +15,7 @@ export interface PluginSettingSchema {
   type: string
   item_type: string | null
   key_type: string | null
-  choices: unknown[]
+  choices: PluginSettingChoice[]
   allows_null: boolean
   fields: PluginSettingSchemaField[]
   item_schema: PluginSettingSchemaField | null
@@ -19,6 +25,7 @@ export interface PluginSettingSchema {
 
 export interface PluginSettingField {
   key: string
+  label: string
   type: string
   editor: string
   item_type: string | null
@@ -26,7 +33,7 @@ export interface PluginSettingField {
   schema: PluginSettingSchema | null
   default: unknown
   help: string
-  choices: unknown[]
+  choices: PluginSettingChoice[]
   base_value: unknown
   current_value: unknown
   local_value: unknown
@@ -36,6 +43,8 @@ export interface PluginSettingField {
   allows_null: boolean
   editable: boolean
   type_category: string
+  order: number
+  secret: boolean
 }
 
 export interface PluginSettingsState {
@@ -68,6 +77,10 @@ export function displayFieldValue (value: unknown) {
   }
 }
 
+export function displayChoiceTitle (choice: PluginSettingChoice) {
+  return choice.title || displayFieldValue(choice.value)
+}
+
 export function isSequenceChipField (field: PluginSettingField) {
   return field.editor === 'chips'
 }
@@ -83,6 +96,7 @@ export function isNestedEditorField (field: PluginSettingField) {
 }
 
 export function textInputType (field: PluginSettingField) {
+  if (field.secret) return 'password'
   return field.type === 'int' || field.type === 'float' ? 'number' : 'text'
 }
 
@@ -246,7 +260,7 @@ function normalizeBySchema (
 
   if (schema.choices.length > 0) {
     const normalized = normalizeScalarLike(schema.type, rawValue)
-    if (!schema.choices.some(choice => JSON.stringify(choice) === JSON.stringify(normalized))) {
+    if (!schema.choices.some(choice => JSON.stringify(choice.value) === JSON.stringify(normalized))) {
       throw new Error('invalid choice')
     }
     return normalized

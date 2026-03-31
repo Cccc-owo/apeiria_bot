@@ -502,6 +502,10 @@ def _register_config_from_declaration(
             if declaration.value_declaration is not None
             else None
         ),
+        label="",
+        order=99,
+        secret=False,
+        legacy_key="",
     )
 
 

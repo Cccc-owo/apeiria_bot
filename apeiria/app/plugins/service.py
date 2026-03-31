@@ -41,20 +41,22 @@ from apeiria.shared.plugin_introspection import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from nonebot.plugin import Plugin
 
     from apeiria.app.plugins.models import PluginUninstallResult
+    from apeiria.infra.db.models.plugin_info import PluginInfo
 
 
 @dataclass(frozen=True)
 class _PluginListContext:
     enabled_map: dict[str, bool]
-    info_map: dict[str, object]
+    info_map: "Mapping[str, PluginInfo]"
     package_bindings: dict[str, list[str]]
     pending_uninstall_modules: set[str]
-    top_level_packages: dict[str, list[str]]
+    top_level_packages: "Mapping[str, list[str]]"
 
 
 @dataclass(frozen=True)
@@ -96,12 +98,13 @@ class PluginCatalogItem:
     dependent_plugins: list[str]
     installed_package: str | None
     installed_module_names: list[str]
+    ui_order: int = 99
 
 
 class PluginCatalogService:
     """List and mutate plugin registry state."""
 
-    async def list_plugins(self) -> list[PluginCatalogItem]:
+    async def list_plugins(self) -> list[PluginCatalogItem]:  # noqa: C901, PLR0915
         enabled_map = await plugin_catalog_repository.get_enabled_map()
         info_map = await plugin_catalog_repository.get_plugin_info_map()
         policy_map = await plugin_catalog_repository.get_plugin_policy_map()
@@ -196,32 +199,26 @@ class PluginCatalogService:
             )
 
             if is_loaded:
-                items.append(
-                    self._build_loaded_plugin_item(
-                        plugin=loaded_plugins[module_name],
-                        context=build_context,
-                        facts=facts,
-                        access_mode=(
-                            policy_map.get(module_name).access_mode
-                            if module_name in policy_map
-                            else "default_allow"
-                        ),
-                    )
-                )
-                continue
-
-            items.append(
-                self._build_unloaded_plugin_item(
-                    module_name=module_name,
+                policy = policy_map.get(module_name)
+                plugin_item = self._build_loaded_plugin_item(
+                    plugin=loaded_plugins[module_name],
                     context=build_context,
                     facts=facts,
-                    access_mode=(
-                        policy_map.get(module_name).access_mode
-                        if module_name in policy_map
-                        else "default_allow"
-                    ),
+                    access_mode=policy.access_mode if policy else "default_allow",
                 )
+                if plugin_item is not None:
+                    items.append(plugin_item)
+                continue
+
+            policy = policy_map.get(module_name)
+            plugin_item = self._build_unloaded_plugin_item(
+                module_name=module_name,
+                context=build_context,
+                facts=facts,
+                access_mode=policy.access_mode if policy else "default_allow",
             )
+            if plugin_item is not None:
+                items.append(plugin_item)
         return self._collapse_child_plugins(items)
 
     async def get_plugin(self, module_name: str) -> PluginCatalogItem | None:
@@ -443,7 +440,7 @@ class PluginCatalogService:
         self,
         module_name: str,
         package_bindings: dict[str, list[str]],
-        top_level_packages: dict[str, list[str]],
+        top_level_packages: "Mapping[str, list[str]]",
     ) -> str | None:
         for package_name, module_names in package_bindings.items():
             if module_name in module_names:
@@ -459,9 +456,11 @@ class PluginCatalogService:
         context: _PluginListContext,
         facts: _PluginItemFacts,
         access_mode: str,
-    ) -> PluginCatalogItem:
+    ) -> PluginCatalogItem | None:
         meta = plugin.metadata
         extra = get_plugin_extra(plugin)
+        if extra and extra.ui.hidden:
+            return None
         plugin_source = get_plugin_source(plugin)
         installed_package = self._resolve_listed_installed_package(
             plugin.module_name,
@@ -487,7 +486,11 @@ class PluginCatalogService:
             module_name=plugin.module_name,
             kind=plugin_policy_service.get_kind(plugin.module_name),
             access_mode=access_mode,
-            name=get_plugin_name(plugin),
+            name=(
+                extra.ui.label
+                if extra and extra.ui.label
+                else get_plugin_name(plugin)
+            ),
             description=meta.description if meta else None,
             homepage=meta.homepage if meta else None,
             source=plugin_source,
@@ -523,6 +526,7 @@ class PluginCatalogService:
             else [plugin.module_name]
             if installed_package
             else [],
+            ui_order=extra.ui.order if extra else 99,
         )
 
     def _build_unloaded_plugin_item(
@@ -532,8 +536,14 @@ class PluginCatalogService:
         context: _PluginListContext,
         facts: _PluginItemFacts,
         access_mode: str,
-    ) -> PluginCatalogItem:
+    ) -> PluginCatalogItem | None:
         persisted = context.info_map.get(module_name)
+        if (
+            persisted is not None
+            and persisted.name
+            and persisted.plugin_type == "hidden"
+        ):
+            return None
         installed_package = self._resolve_listed_installed_package(
             module_name,
             context.package_bindings,
@@ -586,6 +596,7 @@ class PluginCatalogService:
             else [module_name]
             if installed_package
             else [],
+            ui_order=99,
         )
 
     def _compose_protection_reason(
@@ -673,6 +684,12 @@ class PluginCatalogService:
             if child_plugins:
                 next_item = replace(item, child_plugins=child_plugins)
             collapsed.append(next_item)
+        collapsed.sort(
+            key=lambda item: (
+                item.ui_order,
+                item.name.lower() if item.name else item.module_name.lower(),
+            )
+        )
         return collapsed
 
     def _resolve_parent_plugin_module(

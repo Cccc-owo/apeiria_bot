@@ -6,7 +6,7 @@ from nonebot import require
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
 from apeiria.shared.i18n import load_locales
-from apeiria.shared.plugin_metadata import PluginExtraData, PluginType
+from apeiria.shared.plugin_metadata import PluginExtraData, PluginType, UiExtra
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_orm")
@@ -36,6 +36,7 @@ __plugin_meta__ = PluginMetadata(
         version="0.1.0",
         plugin_type=PluginType.SUPERUSER,
         admin_level=6,
+        ui=UiExtra(order=10),
         commands=[
             "admin",
             "status",

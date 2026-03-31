@@ -32,7 +32,11 @@ async def sync_plugins() -> None:
             if meta and meta.extra:
                 extra = PluginExtraData.from_extra(meta.extra)
 
-            name = meta.name if meta else plugin.name
+            name = (
+                extra.ui.label
+                if extra is not None and extra.ui.label
+                else meta.name if meta else plugin.name
+            )
             description = meta.description if meta else None
             usage = meta.usage if meta else None
             plugin_type = extra.plugin_type.value if extra else "normal"
