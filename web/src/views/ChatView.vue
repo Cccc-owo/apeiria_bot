@@ -6,6 +6,14 @@
       </div>
       <div class="page-actions">
         <v-btn
+          :loading="reconnecting"
+          prepend-icon="mdi-refresh"
+          variant="text"
+          @click="reconnect"
+        >
+          {{ t('chat.reconnect') }}
+        </v-btn>
+        <v-btn
           :disabled="!authenticated"
           prepend-icon="mdi-plus"
           variant="tonal"
@@ -23,7 +31,7 @@
             <v-list-item
               v-for="recent in recentSessions"
               :key="recent.session.session_id"
-              :active="session?.session_id === recent.session.session_id"
+              :active="activeSessionId === recent.session.session_id"
               class="chat-session-list__item"
               :disabled="!authenticated"
               rounded="lg"
@@ -51,6 +59,25 @@
 
           <div v-else class="chat-sidebar__empty">
             {{ t('chat.noMessages') }}
+          </div>
+        </div>
+
+        <div class="chat-sidebar__footer">
+          <div class="chat-session-info">
+            <div class="chat-session-info__label">{{ t('chat.sessionInfo') }}</div>
+            <template v-if="activeSessionInfo">
+              <div class="chat-session-info__item">
+                <span class="chat-session-info__key">{{ t('chat.sidLabel') }}</span>
+                <code class="chat-session-info__value">{{ activeSessionInfo.session_id }}</code>
+              </div>
+              <div class="chat-session-info__item">
+                <span class="chat-session-info__key">{{ t('chat.targetLabel') }}</span>
+                <span class="chat-session-info__value">{{ activeSessionInfo.target_user_id }}</span>
+              </div>
+            </template>
+            <div v-else class="chat-session-info__empty">
+              {{ t('chat.noActiveSessionInfo') }}
+            </div>
           </div>
         </div>
       </aside>
@@ -363,6 +390,8 @@
   const dragOriginX = ref(0)
   const dragOriginY = ref(0)
   const autoCreatingSession = ref(false)
+  const draftSession = ref(false)
+  const reconnecting = ref(false)
   const pendingSessionMessage = ref<{
     message_id: string
     segments: ChatSegment[]
@@ -371,9 +400,14 @@
   const composerImages = new Map<string, PendingImage>()
   const composerMentions = new Map<string, PendingMention>()
   const loadingProtectedAssets = new Set<string>()
+  let reconnectTimer: number | null = null
+  let reconnectAttempts = 0
+  let shouldReconnect = true
 
   const connected = computed(() => socketConnected.value && authenticated.value)
   const chatReady = computed(() => connected.value)
+  const activeSessionInfo = computed(() => (draftSession.value ? null : session.value))
+  const activeSessionId = computed(() => activeSessionInfo.value?.session_id || '')
 
   function appendMessage (message: MessageReceivePayload) {
     messages.value.push(message)
@@ -406,6 +440,7 @@
 
   function resetActiveSessionState () {
     session.value = null
+    draftSession.value = false
     messages.value = []
     clearPendingReply()
     closeImagePreview()
@@ -424,6 +459,7 @@
   }
 
   function startNewSession () {
+    draftSession.value = true
     autoCreatingSession.value = false
     pendingSessionMessage.value = null
     if (connected.value && session.value) {
@@ -434,7 +470,8 @@
 
   function switchToSession (target: SessionListItem) {
     if (!authenticated.value) return
-    if (session.value?.session_id === target.session.session_id) return
+    if (activeSessionId.value === target.session.session_id) return
+    draftSession.value = false
     client.updateSession({
       session_id: target.session.session_id,
       target_user_id: target.session.target_user_id,
@@ -1166,7 +1203,7 @@
         recentSessions.value = recentSessions.value.filter(
           item => item.session.session_id !== payload.session_id,
         )
-        if (session.value?.session_id === payload.session_id) {
+        if (activeSessionId.value === payload.session_id) {
           resetActiveSessionState()
         }
         break
@@ -1174,6 +1211,7 @@
       case 'session.state': {
         const payload = event.payload as SessionStatePayload
         autoCreatingSession.value = false
+        draftSession.value = false
         session.value = payload.session
         messages.value = payload.history
         scrollToBottom()
@@ -1213,12 +1251,43 @@
     }
   }
 
+  function clearReconnectTimer () {
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+  }
+
+  function scheduleReconnect () {
+    if (!shouldReconnect || reconnectTimer !== null) return
+    reconnecting.value = true
+    const delay = Math.min(1000 * 2 ** reconnectAttempts, 5000)
+    reconnectAttempts += 1
+    reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = null
+      connect()
+    }, delay)
+  }
+
   function connect () {
+    clearReconnectTimer()
+    if (client.isConnected()) {
+      return
+    }
     client.connect()
+  }
+
+  function reconnect () {
+    reconnecting.value = true
+    reconnectAttempts = 0
+    clearReconnectTimer()
+    client.disconnect()
+    connect()
   }
 
   function saveSession () {
     if (!authenticated.value) return
+    draftSession.value = true
     const payload: SessionCreatePayload = {
       target_user_id: createSessionKey(),
     }
@@ -1280,6 +1349,9 @@
 
   const unsubscribeMessage = client.onMessage(handleEnvelope)
   const unsubscribeOpen = client.onOpen(() => {
+    clearReconnectTimer()
+    reconnectAttempts = 0
+    reconnecting.value = false
     socketConnected.value = true
     const token = localStorage.getItem('token')
     if (!token) {
@@ -1289,14 +1361,18 @@
   })
   const unsubscribeClose = client.onClose(() => {
     resetConnectionState()
+    scheduleReconnect()
   })
 
   onMounted(() => {
+    shouldReconnect = true
     connect()
     window.addEventListener('keydown', handleWindowKeydown)
   })
 
   onUnmounted(() => {
+    shouldReconnect = false
+    clearReconnectTimer()
     if (connected.value && session.value) {
       client.closeSession()
     }
@@ -1350,6 +1426,53 @@
   flex: 1;
   overflow: auto;
   padding: 8px 8px 10px;
+}
+
+.chat-sidebar__footer {
+  border-top: 1px solid rgba(var(--v-theme-outline-variant), 0.5);
+  padding: 10px;
+  background: rgb(var(--v-theme-surface-container-low));
+}
+
+.chat-session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 152px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgb(var(--v-theme-surface-container));
+}
+
+.chat-session-info__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(var(--v-theme-on-surface), 0.64);
+}
+
+.chat-session-info__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chat-session-info__key {
+  font-size: 0.72rem;
+  color: rgba(var(--v-theme-on-surface), 0.52);
+}
+
+.chat-session-info__value {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: rgb(var(--v-theme-on-surface));
+  word-break: break-all;
+}
+
+.chat-session-info__empty {
+  margin: auto 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(var(--v-theme-on-surface), 0.54);
 }
 
 .chat-sidebar__empty {
