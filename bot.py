@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import nonebot
+"""Compatibility wrapper for the bot runtime entrypoint."""
 
-from apeiria.runtime_bootstrap import initialize_nonebot
-
-initialize_nonebot()
+from apeiria.interfaces.bot.main import run
 
 if __name__ == "__main__":
-    nonebot.run()
+    run()
