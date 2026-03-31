@@ -238,8 +238,9 @@ class ChatGatewayService:
     ) -> str | None:
         if active_session_id is None:
             return None
+        principal = self._require_principal(connection)
         web_chat_service.close_session(active_session_id)
-        await web_chat_service.emit_session_deleted(connection, active_session_id)
+        await web_chat_service.emit_session_list(connection, principal)
         return None
 
     async def _handle_session_clear_history(
