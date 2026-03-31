@@ -400,6 +400,7 @@ class PluginSettingFieldItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     key: str
+    label: str
     type: str
     editor: str = "readonly"
     item_type: str | None = None
@@ -417,6 +418,8 @@ class PluginSettingFieldItem(BaseModel):
     allows_null: bool = False
     editable: bool = False
     type_category: str = "unsupported"
+    order: int = 99
+    secret: bool = False
 
 
 class PluginSettingsResponse(BaseModel):

@@ -37,6 +37,7 @@ class PluginSettingsNotConfigurableError(ValueError):
 @dataclass(frozen=True)
 class PluginSettingFieldState:
     key: str
+    label: str
     type: str
     editor: str
     item_type: str | None
@@ -44,7 +45,7 @@ class PluginSettingFieldState:
     schema: object | None
     default: object | None
     help: str
-    choices: list[object]
+    choices: list[dict[str, object]]
     base_value: object | None
     current_value: object | None
     local_value: object | None
@@ -54,6 +55,8 @@ class PluginSettingFieldState:
     allows_null: bool
     editable: bool
     type_category: str
+    order: int
+    secret: bool
 
 
 @dataclass(frozen=True)

@@ -82,6 +82,11 @@ class PluginCatalogRepository:
         extra: PluginExtraData | None = None
         if meta and meta.extra:
             extra = PluginExtraData.from_extra(meta.extra)
+        name = (
+            extra.ui.label
+            if extra is not None and extra.ui.label
+            else meta.name if meta else plugin.name
+        )
 
         async with get_session() as session:
             result = await session.execute(
@@ -92,7 +97,7 @@ class PluginCatalogRepository:
                 session.add(
                     PluginInfo(
                         module_name=plugin.module_name,
-                        name=meta.name if meta else plugin.name,
+                        name=name,
                         description=meta.description if meta else None,
                         usage=meta.usage if meta else None,
                         plugin_type=extra.plugin_type.value if extra else "normal",
@@ -104,7 +109,7 @@ class PluginCatalogRepository:
                 await session.commit()
                 return
 
-            record.name = meta.name if meta else plugin.name
+            record.name = name
             record.description = meta.description if meta else None
             record.usage = meta.usage if meta else None
             record.plugin_type = extra.plugin_type.value if extra else "normal"

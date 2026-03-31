@@ -8,7 +8,13 @@ from markdown_it import MarkdownIt
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
 
-from apeiria.shared.plugin_metadata import PluginExtraData, PluginType, RegisterConfig
+from apeiria.shared.plugin_metadata import (
+    ConfigExtra,
+    PluginExtraData,
+    PluginType,
+    RegisterConfig,
+    UiExtra,
+)
 
 from .config import RenderConfig, get_render_config
 from .service import (
@@ -41,81 +47,84 @@ __plugin_meta__ = PluginMetadata(
         version="0.1.0",
         plugin_type=PluginType.HIDDEN,
         admin_level=0,
-        configs=[
-            RegisterConfig(
-                key="headless",
-                default=True,
-                help="Launch Playwright Chromium in headless mode",
-                type=bool,
-            ),
-            RegisterConfig(
-                key="channel",
-                default="",
-                help="Browser channel name such as chrome or msedge",
-                type=str,
-            ),
-            RegisterConfig(
-                key="executable_path",
-                default="",
-                help="Custom browser executable path",
-                type=str,
-            ),
-            RegisterConfig(
-                key="launch_args",
-                default=[],
-                help="Extra browser launch arguments",
-                type=list,
-                item_type=str,
-            ),
-            RegisterConfig(
-                key="browser_locale",
-                default="zh-CN",
-                help="Default browser locale for rendered pages",
-                type=str,
-            ),
-            RegisterConfig(
-                key="user_agent",
-                default="",
-                help="Optional shared user agent for rendering contexts",
-                type=str,
-            ),
-            RegisterConfig(
-                key="default_width",
-                default=960,
-                help="Default viewport width",
-                type=int,
-            ),
-            RegisterConfig(
-                key="default_height",
-                default=540,
-                help="Default viewport height",
-                type=int,
-            ),
-            RegisterConfig(
-                key="default_device_scale_factor",
-                default=2.0,
-                help="Default device scale factor",
-                type=float,
-            ),
-            RegisterConfig(
-                key="default_timeout_ms",
-                default=15000,
-                help="Default render timeout in milliseconds",
-                type=int,
-            ),
-            RegisterConfig(
-                key="max_concurrency",
-                default=2,
-                help="Maximum concurrent render tasks",
-                type=int,
-            ),
-            RegisterConfig(
-                key="startup_warmup",
-                default=True,
-                help="Start browser warmup asynchronously during startup",
-                type=bool,
-            ),
-        ],
+        ui=UiExtra(order=20, hidden=True),
+        config=ConfigExtra(
+            fields=[
+                RegisterConfig(
+                    key="headless",
+                    default=True,
+                    help="Launch Playwright Chromium in headless mode",
+                    type=bool,
+                ),
+                RegisterConfig(
+                    key="channel",
+                    default="",
+                    help="Browser channel name such as chrome or msedge",
+                    type=str,
+                ),
+                RegisterConfig(
+                    key="executable_path",
+                    default="",
+                    help="Custom browser executable path",
+                    type=str,
+                ),
+                RegisterConfig(
+                    key="launch_args",
+                    default=[],
+                    help="Extra browser launch arguments",
+                    type=list,
+                    item_type=str,
+                ),
+                RegisterConfig(
+                    key="browser_locale",
+                    default="zh-CN",
+                    help="Default browser locale for rendered pages",
+                    type=str,
+                ),
+                RegisterConfig(
+                    key="user_agent",
+                    default="",
+                    help="Optional shared user agent for rendering contexts",
+                    type=str,
+                ),
+                RegisterConfig(
+                    key="default_width",
+                    default=960,
+                    help="Default viewport width",
+                    type=int,
+                ),
+                RegisterConfig(
+                    key="default_height",
+                    default=540,
+                    help="Default viewport height",
+                    type=int,
+                ),
+                RegisterConfig(
+                    key="default_device_scale_factor",
+                    default=2.0,
+                    help="Default device scale factor",
+                    type=float,
+                ),
+                RegisterConfig(
+                    key="default_timeout_ms",
+                    default=15000,
+                    help="Default render timeout in milliseconds",
+                    type=int,
+                ),
+                RegisterConfig(
+                    key="max_concurrency",
+                    default=2,
+                    help="Maximum concurrent render tasks",
+                    type=int,
+                ),
+                RegisterConfig(
+                    key="startup_warmup",
+                    default=True,
+                    help="Start browser warmup asynchronously during startup",
+                    type=bool,
+                ),
+            ]
+        ),
     ).to_dict(),
 )
 

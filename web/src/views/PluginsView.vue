@@ -466,7 +466,7 @@
                   <div class="settings-list-row__main">
                     <div class="settings-list-row__info">
                       <div class="settings-list-row__label text-subtitle-2 font-weight-medium">
-                        {{ field.key }}
+                        {{ field.label || field.key }}
                       </div>
                       <div v-if="field.help" class="settings-list-row__description text-caption text-medium-emphasis">
                         {{ field.help }}
@@ -884,6 +884,7 @@
   import {
     buildRevertValues,
     buildSettingsPreviewItems,
+    displayChoiceTitle,
     displayFieldValue,
     type PluginSettingField,
   } from '@/views/plugins/settingsEditor'
@@ -1317,9 +1318,9 @@
     })
   }
 
-  function formatFieldChoices (choices: unknown[]) {
+  function formatFieldChoices (choices: Array<{ title: string, value: unknown }>) {
     const normalized = choices
-      .map(choice => displayFieldValue(choice))
+      .map(choice => displayChoiceTitle(choice))
       .filter(Boolean)
 
     if (normalized.length <= 4) {

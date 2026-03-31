@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException
 
 from apeiria.app.plugins import (
@@ -113,11 +115,12 @@ def to_plugin_settings_response(state: PluginSettingsState) -> PluginSettingsRes
         fields=[
             PluginSettingFieldItem(
                 key=item.key,
+                label=item.label,
                 type=item.type,
                 editor=item.editor,
                 item_type=item.item_type,
                 key_type=item.key_type,
-                schema_=item.schema,
+                schema=item.schema,
                 default=item.default,
                 help=item.help,
                 choices=item.choices,
@@ -130,6 +133,8 @@ def to_plugin_settings_response(state: PluginSettingsState) -> PluginSettingsRes
                 allows_null=item.allows_null,
                 editable=item.editable,
                 type_category=item.type_category,
+                order=item.order,
+                secret=item.secret,
             )
             for item in state.fields
         ],
@@ -179,7 +184,7 @@ def raise_settings_error(exc: Exception) -> None:
 
 
 def to_plugin_item_response(
-    plugin: object,
+    plugin: Any,
     *,
     can_package_update: bool,
 ) -> PluginItem:
@@ -215,7 +220,7 @@ def to_plugin_item_response(
     )
 
 
-def to_plugin_update_check_item(item: object) -> PluginUpdateCheckItem:
+def to_plugin_update_check_item(item: Any) -> PluginUpdateCheckItem:
     return PluginUpdateCheckItem(
         module_name=item.module_name,
         package_name=item.package_name,
@@ -227,7 +232,7 @@ def to_plugin_update_check_item(item: object) -> PluginUpdateCheckItem:
     )
 
 
-def to_plugin_toggle_response(result: object) -> PluginToggleResponse:
+def to_plugin_toggle_response(result: Any) -> PluginToggleResponse:
     return PluginToggleResponse(
         module_name=result.module_name,
         enabled=result.enabled,
@@ -235,7 +240,7 @@ def to_plugin_toggle_response(result: object) -> PluginToggleResponse:
     )
 
 
-def to_plugin_toggle_preview_response(preview: object) -> PluginTogglePreviewResponse:
+def to_plugin_toggle_preview_response(preview: Any) -> PluginTogglePreviewResponse:
     return PluginTogglePreviewResponse(
         module_name=preview.module_name,
         enabled=preview.enabled,
@@ -249,7 +254,7 @@ def to_plugin_toggle_preview_response(preview: object) -> PluginTogglePreviewRes
     )
 
 
-def to_plugin_store_task_item(task: object) -> PluginStoreTaskItem:
+def to_plugin_store_task_item(task: Any) -> PluginStoreTaskItem:
     return PluginStoreTaskItem(
         task_id=task.task_id,
         title=task.title,

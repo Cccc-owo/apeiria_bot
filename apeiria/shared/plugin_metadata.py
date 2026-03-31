@@ -26,6 +26,7 @@ class RegisterConfig:
     help: str = ""
     type: object = str
     choices: list[Any] = field(default_factory=list)
+    choice_labels: dict[str, str] = field(default_factory=dict)
     item_type: object | None = None
     key_type: object | None = None
     allows_null: bool = False
@@ -33,6 +34,10 @@ class RegisterConfig:
     item_schema: "RegisterConfig | None" = None
     key_schema: "RegisterConfig | None" = None
     value_schema: "RegisterConfig | None" = None
+    label: str = ""
+    order: int = 99
+    secret: bool = False
+    legacy_key: str = ""
 
 
 @dataclass
@@ -47,6 +52,33 @@ class CommandDeclaration:
 
 
 @dataclass
+class HelpExtra:
+    """Help-specific plugin metadata."""
+
+    category: str = ""
+    introduction: str = ""
+    precautions: list[str] = field(default_factory=list)
+    owner_help: str = ""
+
+
+@dataclass
+class UiExtra:
+    """Plugin list and card UI metadata."""
+
+    label: str = ""
+    icon: str = ""
+    order: int = 99
+    hidden: bool = False
+
+
+@dataclass
+class ConfigExtra:
+    """Apeiria-specific config metadata enhancements."""
+
+    fields: list[RegisterConfig] = field(default_factory=list)
+
+
+@dataclass
 class PluginExtraData:
     """Extended metadata for apeiria plugins."""
 
@@ -54,9 +86,31 @@ class PluginExtraData:
     version: str = "0.1.0"
     plugin_type: PluginType = PluginType.NORMAL
     admin_level: int = 0
+    help: HelpExtra = field(default_factory=HelpExtra)
+    ui: UiExtra = field(default_factory=UiExtra)
+    config: ConfigExtra = field(default_factory=ConfigExtra)
     commands: list[str | CommandDeclaration] = field(default_factory=list)
-    configs: list[RegisterConfig] = field(default_factory=list)
     required_plugins: list[str] = field(default_factory=list)
+
+    @property
+    def menu_category(self) -> str:
+        return self.help.category
+
+    @property
+    def introduction(self) -> str:
+        return self.help.introduction
+
+    @property
+    def precautions(self) -> list[str]:
+        return self.help.precautions
+
+    @property
+    def owner_help(self) -> str:
+        return self.help.owner_help
+
+    @property
+    def configs(self) -> list[RegisterConfig]:
+        return self.config.fields
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -73,7 +127,17 @@ class PluginExtraData:
             if isinstance(plugin_type, str):
                 plugin_type = PluginType(plugin_type)
 
-            configs_raw = extra.get("configs", [])
+            help_raw = extra.get("help")
+            if not isinstance(help_raw, dict):
+                help_raw = {}
+            ui_raw = extra.get("ui")
+            if not isinstance(ui_raw, dict):
+                ui_raw = {}
+            config_raw = extra.get("config")
+            if not isinstance(config_raw, dict):
+                config_raw = {}
+
+            configs_raw = config_raw.get("fields", extra.get("configs", []))
             configs = [
                 _coerce_register_config(item) if isinstance(item, dict) else item
                 for item in configs_raw
@@ -89,8 +153,33 @@ class PluginExtraData:
                 version=extra.get("version", "0.0.0"),
                 plugin_type=plugin_type,
                 admin_level=extra.get("admin_level", 0),
+                help=HelpExtra(
+                    category=str(
+                        help_raw.get("category", extra.get("menu_category", ""))
+                    ),
+                    introduction=str(
+                        help_raw.get("introduction", extra.get("introduction", ""))
+                    ),
+                    precautions=[
+                        str(item)
+                        for item in help_raw.get(
+                            "precautions",
+                            extra.get("precautions", []),
+                        )
+                        if isinstance(item, str) and item.strip()
+                    ],
+                    owner_help=str(
+                        help_raw.get("owner_help", extra.get("owner_help", ""))
+                    ),
+                ),
+                ui=UiExtra(
+                    label=str(ui_raw.get("label", "")),
+                    icon=str(ui_raw.get("icon", "")),
+                    order=int(ui_raw.get("order", 99) or 99),
+                    hidden=bool(ui_raw.get("hidden", False)),
+                ),
+                config=ConfigExtra(fields=configs),
                 commands=commands,
-                configs=configs,
                 required_plugins=extra.get("required_plugins", []),
             )
         except (ValueError, TypeError, KeyError):
@@ -112,6 +201,11 @@ def _coerce_register_config(raw: dict[str, Any]) -> RegisterConfig:
         help=str(raw.get("help", "")),
         type=raw.get("type", str),
         choices=list(raw.get("choices", [])),
+        choice_labels={
+            str(key): str(value)
+            for key, value in raw.get("choice_labels", {}).items()
+            if isinstance(key, str) and isinstance(value, str)
+        },
         item_type=raw.get("item_type"),
         key_type=raw.get("key_type"),
         allows_null=bool(raw.get("allows_null", False)),
@@ -131,6 +225,10 @@ def _coerce_register_config(raw: dict[str, Any]) -> RegisterConfig:
             if isinstance(value_schema, dict)
             else None
         ),
+        label=str(raw.get("label", "")),
+        order=int(raw.get("order", 99) or 99),
+        secret=bool(raw.get("secret", False)),
+        legacy_key=str(raw.get("legacy_key", "")),
     )
 
 

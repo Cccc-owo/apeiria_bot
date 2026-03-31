@@ -11,7 +11,13 @@ from apeiria.infra.config.plugins import plugin_config_service
 from apeiria.infra.config.webui_config import WebUIConfig
 from apeiria.shared.i18n import load_locales, t
 from apeiria.shared.plugin_introspection import prewarm_plugin_module_caches
-from apeiria.shared.plugin_metadata import PluginExtraData, PluginType, RegisterConfig
+from apeiria.shared.plugin_metadata import (
+    ConfigExtra,
+    PluginExtraData,
+    PluginType,
+    RegisterConfig,
+    UiExtra,
+)
 
 require("nonebot_plugin_localstore")
 require("nonebot_plugin_orm")
@@ -30,14 +36,17 @@ __plugin_meta__ = PluginMetadata(
         version="0.1.0",
         plugin_type=PluginType.HIDDEN,
         admin_level=0,
-        configs=[
-            RegisterConfig(
-                key="token_expire_days",
-                default=7,
-                help="JWT token expiration days for the Web UI",
-                type=int,
-            )
-        ],
+        ui=UiExtra(order=0, hidden=True),
+        config=ConfigExtra(
+            fields=[
+                RegisterConfig(
+                    key="token_expire_days",
+                    default=7,
+                    help="JWT token expiration days for the Web UI",
+                    type=int,
+                )
+            ]
+        ),
         required_plugins=["nonebot_plugin_localstore", "nonebot_plugin_orm"],
     ).to_dict(),
 )

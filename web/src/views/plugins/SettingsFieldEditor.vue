@@ -25,6 +25,8 @@
       v-else-if="editing && field.editable && field.editor === 'select'"
       density="comfortable"
       hide-details
+      item-title="title"
+      item-value="value"
       :items="field.choices"
       :model-value="modelValue"
       variant="outlined"
@@ -36,7 +38,7 @@
       density="comfortable"
       hide-details
       :model-value="modelValue"
-      :placeholder="displayFieldValue(field.current_value)"
+      :placeholder="field.secret ? '' : displayFieldValue(field.current_value)"
       :type="textInputType(field)"
       variant="outlined"
       @update:model-value="emit('update:modelValue', $event)"

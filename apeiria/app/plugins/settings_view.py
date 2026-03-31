@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from apeiria.app.plugins.config_capabilities import (
     format_type_name,
     get_field_capability,
-    normalize_choices_for_response,
+    normalize_choice_items_for_response,
     normalize_value_for_response,
 )
 from apeiria.app.plugins.settings_support import build_core_declared_configs
@@ -95,9 +95,11 @@ def build_plugin_field_state(
     base_value: object | None = config.default
     local_value: object | None = None
     value_source = "default"
-    global_key = ctx.key_map.get(config.key, config.key) if ctx.legacy_flatten else None
+    global_key = config.legacy_key or (
+        ctx.key_map.get(config.key, config.key) if ctx.legacy_flatten else None
+    )
 
-    if ctx.legacy_flatten and global_key:
+    if global_key:
         if global_key in ctx.nonebot_section:
             base_value = ctx.nonebot_section[global_key]
             current_value = base_value
@@ -172,6 +174,7 @@ def build_setting_field_item(
     capability = get_field_capability(config)
     return PluginSettingFieldState(
         key=config.key,
+        label=config.label or config.key,
         type=format_type_name(config.type) or "unknown",
         editor=capability.editor,
         item_type=format_type_name(config.item_type),
@@ -179,7 +182,7 @@ def build_setting_field_item(
         schema=build_setting_schema(config),
         default=normalize_value_for_response(config, config.default),
         help=config.help,
-        choices=normalize_choices_for_response(list(config.choices)),
+        choices=normalize_choice_items_for_response(config),
         base_value=normalize_value_for_response(config, state.base_value),
         current_value=normalize_value_for_response(config, state.current_value),
         local_value=normalize_value_for_response(config, state.local_value),
@@ -189,6 +192,8 @@ def build_setting_field_item(
         allows_null=config.allows_null,
         editable=capability.editable,
         type_category=capability.category,
+        order=config.order,
+        secret=config.secret,
     )
 
 
@@ -197,11 +202,12 @@ def build_setting_schema(config: "RegisterConfig") -> dict[str, object]:
         "type": format_type_name(config.type) or "unknown",
         "item_type": format_type_name(config.item_type),
         "key_type": format_type_name(config.key_type),
-        "choices": normalize_choices_for_response(list(config.choices)),
+        "choices": normalize_choice_items_for_response(config),
         "allows_null": config.allows_null,
         "fields": [
             {
                 "key": field.key,
+                "label": field.label or field.key,
                 "help": field.help,
                 "default": normalize_value_for_response(field, field.default),
                 "schema": build_setting_schema(field),
@@ -211,6 +217,7 @@ def build_setting_schema(config: "RegisterConfig") -> dict[str, object]:
         "item_schema": (
             {
                 "key": config.item_schema.key,
+                "label": config.item_schema.label or config.item_schema.key,
                 "help": config.item_schema.help,
                 "default": normalize_value_for_response(
                     config.item_schema,
@@ -224,6 +231,7 @@ def build_setting_schema(config: "RegisterConfig") -> dict[str, object]:
         "key_schema": (
             {
                 "key": config.key_schema.key,
+                "label": config.key_schema.label or config.key_schema.key,
                 "help": config.key_schema.help,
                 "default": normalize_value_for_response(
                     config.key_schema,
@@ -237,6 +245,7 @@ def build_setting_schema(config: "RegisterConfig") -> dict[str, object]:
         "value_schema": (
             {
                 "key": config.value_schema.key,
+                "label": config.value_schema.label or config.value_schema.key,
                 "help": config.value_schema.help,
                 "default": normalize_value_for_response(
                     config.value_schema,

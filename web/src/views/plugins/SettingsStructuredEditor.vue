@@ -54,7 +54,7 @@
         class="structured-object__row"
       >
         <div class="structured-object__meta">
-          <div class="structured-object__label">{{ field.key }}</div>
+          <div class="structured-object__label">{{ field.label || field.key }}</div>
           <div v-if="field.help" class="structured-object__help text-caption text-medium-emphasis">
             {{ field.help }}
           </div>
@@ -169,6 +169,7 @@
   import {
     buildSchemaFieldDefaultValue,
     cloneSettingValue,
+    displayChoiceTitle,
     displayFieldValue,
     type PluginSettingSchema,
   } from './settingsEditor'
@@ -198,8 +199,8 @@
 
   const choiceItems = computed(() =>
     props.schema.choices.map(choice => ({
-      title: displayFieldValue(choice),
-      value: choice,
+      title: displayChoiceTitle(choice),
+      value: choice.value,
     })),
   )
 

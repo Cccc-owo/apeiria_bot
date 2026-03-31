@@ -49,7 +49,13 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
   const draftOverrides = ref<Record<string, boolean>>({})
   const draftClears = ref<Record<string, boolean>>({})
 
-  const fields = computed(() => state.value?.fields ?? [])
+  const fields = computed(() =>
+    [...(state.value?.fields ?? [])]
+      .sort((left, right) => {
+        if (left.order !== right.order) return left.order - right.order
+        return left.key.localeCompare(right.key)
+      }),
+  )
   const hasPendingChangesState = computed(() =>
     hasPendingChanges(
       fields.value.filter(field => isFieldEditing(field)),
