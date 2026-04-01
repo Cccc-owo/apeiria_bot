@@ -27,6 +27,7 @@ load_locales(Path(__file__).parent / "locales")
 __plugin_meta__ = PluginMetadata(
     name="Web管理面板",
     description="Web UI 管理面板 API",
+    homepage="https://github.com/Cccc-owo/apeiria_bot",
     usage="访问 http://host:port/ 打开管理面板",
     type="application",
     config=WebUIConfig,

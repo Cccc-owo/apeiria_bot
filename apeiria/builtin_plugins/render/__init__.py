@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 __plugin_meta__ = PluginMetadata(
     name="统一渲染服务",
     description="基于 Playwright 的统一 HTML 截图渲染服务",
+    homepage="https://github.com/Cccc-owo/apeiria_bot",
     usage=(
         "供官方插件调用的基础设施插件。\n"
         "默认无聊天命令，提供 render_html / render_template / render_url API，"
