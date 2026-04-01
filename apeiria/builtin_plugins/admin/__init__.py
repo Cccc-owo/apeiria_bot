@@ -18,6 +18,7 @@ load_locales(Path(__file__).parent / "locales")
 __plugin_meta__ = PluginMetadata(
     name="主人管理",
     description="主人专用的管理命令集：状态、群、插件、访问、任务、重启",
+    homepage="https://github.com/Cccc-owo/apeiria_bot",
     usage=(
         "/admin - 查看总览\n"
         "/status | /sid - 查看运行与会话状态\n"

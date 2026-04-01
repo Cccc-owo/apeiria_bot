@@ -112,6 +112,7 @@ def _cleanup_help_disk_cache() -> None:
 __plugin_meta__ = PluginMetadata(
     name="帮助系统",
     description="图像化帮助菜单与插件详情",
+    homepage="https://github.com/Cccc-owo/apeiria_bot",
     usage=(
         "/help - 查看帮助菜单\n"
         "/help <插件名> - 查看插件详情\n"
