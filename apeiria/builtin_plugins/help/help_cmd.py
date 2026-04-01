@@ -9,8 +9,10 @@ from nonebot.log import logger
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 from nonebot_plugin_alconna.uniseg import UniMessage
 
+from apeiria.app.access import access_service
 from apeiria.builtin_plugins.help.config import HelpConfig, get_help_config
 from apeiria.builtin_plugins.help.generator import (
+    HelpViewRole,
     PluginHelpInfo,
     find_plugin_by_name,
     generate_help_list,
@@ -22,6 +24,7 @@ _help = on_alconna(
     Alconna(
         "help",
         Args["plugin_name?", MultiVar(str, "*")],
+        Option("--admin"),
         Option("--all"),
         meta=CommandMeta(description="查看帮助菜单或指定插件详情"),
     ),
@@ -42,19 +45,54 @@ def _is_superuser(event: Event) -> bool:
     return user_id in superusers
 
 
+async def _resolve_help_role(
+    bot: Bot,
+    event: Event,
+    *,
+    config: HelpConfig,
+    force_admin: bool,
+    force_owner: bool,
+) -> HelpViewRole:
+    context = await access_service.build_context(bot, event)
+    is_owner = _is_superuser(event) or bool(context and context.is_superuser)
+    effective_level = (
+        await access_service.get_effective_level(context) if context else 0
+    )
+    is_admin = effective_level > 0
+
+    if force_owner:
+        if not is_owner:
+            await _help.finish(t("help.owner_forbidden"))
+        return "owner"
+    if force_admin:
+        if not (is_admin or is_owner):
+            await _help.finish(t("help.admin_forbidden"))
+        return "admin"
+    if not config.enable_role_views or config.role_view_mode == "manual_only":
+        return "owner" if is_owner and config.admin_show_all else "user"
+    if is_owner:
+        return "owner"
+    if is_admin:
+        return "admin"
+    return "user"
+
+
 def _format_help_list_text(
     plugins: Sequence[PluginHelpInfo],
     *,
     prefix: str,
     expanded: bool,
+    role: HelpViewRole,
 ) -> str:
-    lines = [t("help.list_title"), ""]
+    lines = [t("help.list_title"), t(f"help.view_{role}"), ""]
     for plugin in plugins:
         level = f" [Lv.{plugin.admin_level}]" if plugin.admin_level > 0 else ""
         lines.append(
             f"【{plugin.display_name}】{level} "
             f"{plugin.description or t('help.no_description')}"
         )
+        if plugin.menu_category:
+            lines.append(f"  {t('help.detail_category')}: {plugin.menu_category}")
         if expanded:
             lines.extend(
                 [
@@ -75,13 +113,15 @@ def _format_help_list_text(
     return "\n".join(lines)
 
 
-def _format_plugin_detail_text(
+def _format_plugin_detail_text(  # noqa: C901
     plugin_info: PluginHelpInfo,
     *,
     prefix: str,
+    role: HelpViewRole,
 ) -> str:
     lines = [
         f"【{plugin_info.display_name}】 v{plugin_info.version or 'unknown'}",
+        f"{t('help.detail_view')}: {t(f'help.view_{role}')}",
         f"{t('help.detail_type')}: {plugin_info.plugin_type}",
         f"{t('help.detail_permission')}: Lv.{plugin_info.admin_level}",
         f"{t('help.detail_source')}: {plugin_info.source}",
@@ -90,6 +130,10 @@ def _format_plugin_detail_text(
         "",
         t("help.commands_label") + ":",
     ]
+    if plugin_info.menu_category:
+        lines.insert(5, f"{t('help.detail_category')}: {plugin_info.menu_category}")
+    if plugin_info.introduction:
+        lines.extend(["", t("help.detail_introduction"), plugin_info.introduction])
 
     if not plugin_info.commands:
         lines.append(f"- {t('help.no_commands')}")
@@ -110,6 +154,11 @@ def _format_plugin_detail_text(
 
     if plugin_info.usage:
         lines.extend(["", t("help.detail_usage"), plugin_info.usage])
+    if plugin_info.precautions:
+        lines.extend(["", t("help.detail_precautions")])
+        lines.extend(f"- {item}" for item in plugin_info.precautions)
+    if role == "owner" and plugin_info.owner_help:
+        lines.extend(["", t("help.detail_owner_help"), plugin_info.owner_help])
     return "\n".join(lines)
 
 
@@ -118,11 +167,19 @@ async def handle_help(
     bot: Bot,
     event: Event,
     plugin_name: Match[tuple[str, ...]],
+    show_admin_flag: Match[object],
     show_all_flag: Match[object],
 ) -> None:
     config = get_help_config()
     prefix = get_command_prefix()
-    show_all = _is_superuser(event) and (
+    role = await _resolve_help_role(
+        bot,
+        event,
+        config=config,
+        force_admin=show_admin_flag.available,
+        force_owner=show_all_flag.available,
+    )
+    show_all = role == "owner" and _is_superuser(event) and (
         config.admin_show_all or show_all_flag.available
     )
     target_name = _merge_plugin_name(plugin_name)
@@ -133,6 +190,7 @@ async def handle_help(
             target_name,
             prefix=prefix,
             config=config,
+            role=role,
             show_all=show_all,
         )
     else:
@@ -140,6 +198,7 @@ async def handle_help(
             bot,
             prefix=prefix,
             config=config,
+            role=role,
             show_all=show_all,
         )
 
@@ -149,9 +208,10 @@ async def _show_help_list(
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
     show_all: bool,
 ) -> None:
-    plugins = generate_help_list(config, show_all=show_all)
+    plugins = generate_help_list(config, role=role, show_all=show_all)
 
     if _is_console(bot):
         await _help.finish(
@@ -159,13 +219,19 @@ async def _show_help_list(
                 plugins,
                 prefix=prefix,
                 expanded=config.expand_commands,
+                role=role,
             )
         )
 
     from .renderer import render_help_menu
 
     try:
-        img_bytes = await render_help_menu(plugins, prefix=prefix, config=config)
+        img_bytes = await render_help_menu(
+            plugins,
+            prefix=prefix,
+            config=config,
+            role=role,
+        )
     except Exception as exc:  # noqa: BLE001
         logger.opt(exception=exc).warning(
             "Help menu image render failed, fallback to text."
@@ -175,26 +241,30 @@ async def _show_help_list(
                 plugins,
                 prefix=prefix,
                 expanded=config.expand_commands,
+                role=role,
             )
         )
 
     await UniMessage.image(raw=img_bytes).send()
 
 
-async def _show_plugin_detail(
+async def _show_plugin_detail(  # noqa: PLR0913
     bot: Bot,
     name: str,
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
     show_all: bool,
 ) -> None:
-    plugin_info = find_plugin_by_name(name, config, show_all=show_all)
+    plugin_info = find_plugin_by_name(name, config, role=role, show_all=show_all)
     if not plugin_info:
         await _help.finish(t("help.not_found", name=name))
 
     if _is_console(bot):
-        await _help.finish(_format_plugin_detail_text(plugin_info, prefix=prefix))
+        await _help.finish(
+            _format_plugin_detail_text(plugin_info, prefix=prefix, role=role)
+        )
 
     from .renderer import render_plugin_detail
 
@@ -203,12 +273,15 @@ async def _show_plugin_detail(
             plugin_info,
             prefix=prefix,
             config=config,
+            role=role,
         )
     except Exception as exc:  # noqa: BLE001
         logger.opt(exception=exc).warning(
             "Help detail image render failed, fallback to text."
         )
-        await _help.finish(_format_plugin_detail_text(plugin_info, prefix=prefix))
+        await _help.finish(
+            _format_plugin_detail_text(plugin_info, prefix=prefix, role=role)
+        )
 
     await UniMessage.image(raw=img_bytes).send()
 

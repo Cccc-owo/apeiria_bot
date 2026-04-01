@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from hashlib import md5
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import nonebot
 from nonebot.matcher import matchers
@@ -21,7 +21,6 @@ from apeiria.shared.plugin_metadata import CommandDeclaration, PluginType
 
 if TYPE_CHECKING:
     from apeiria.builtin_plugins.help.config import (
-        CustomCategory,
         HelpConfig,
         PluginOverride,
     )
@@ -33,6 +32,8 @@ _ARG_DISPLAY_NAMES = {
     "target": "目标",
     "task_id": "任务ID",
 }
+
+HelpViewRole = Literal["user", "admin", "owner"]
 
 
 @dataclass(slots=True)
@@ -66,7 +67,11 @@ class PluginHelpInfo:
     version: str
     source: str
     icon_url: str
-    commands: list[CommandHelpInfo]
+    menu_category: str = ""
+    introduction: str = ""
+    precautions: list[str] = field(default_factory=list)
+    owner_help: str = ""
+    commands: list[CommandHelpInfo] = field(default_factory=list)
     order: int = 99
 
     @property
@@ -96,17 +101,19 @@ class PluginHelpInfo:
         command_key = ",".join(command.cache_key for command in self.commands)
         return (
             f"{self.plugin_id}|{self.display_name}|{self.description}|"
-            f"{self.icon_url}|{command_key}|{self.order}"
+            f"{self.icon_url}|{self.menu_category}|{self.introduction}|"
+            f"{','.join(self.precautions)}|{self.owner_help}|{command_key}|{self.order}"
         )
 
 
 def generate_help_list(
     config: HelpConfig,
     *,
+    role: HelpViewRole = "user",
     show_all: bool = False,
 ) -> list[PluginHelpInfo]:
     """Generate help list from loaded plugins and registered matchers."""
-    plugins = _discover_plugins(config, show_all=show_all)
+    plugins = _discover_plugins(config, role=role, show_all=show_all)
     command_index = _collect_matcher_commands(plugins)
 
     result: list[PluginHelpInfo] = []
@@ -121,7 +128,6 @@ def generate_help_list(
         result.append(plugin)
 
     _apply_overrides(result, config.plugin_overrides)
-    result.extend(_build_custom_categories(config.custom_categories))
     for plugin in result:
         plugin.commands = _normalize_commands(plugin.commands)
 
@@ -140,10 +146,11 @@ def find_plugin_by_name(
     name: str,
     config: HelpConfig,
     *,
+    role: HelpViewRole = "user",
     show_all: bool = False,
 ) -> PluginHelpInfo | None:
     """Find a plugin by display name or module name."""
-    all_plugins = generate_help_list(config, show_all=show_all)
+    all_plugins = generate_help_list(config, role=role, show_all=show_all)
     name_lower = name.lower()
     for plugin in all_plugins:
         if (
@@ -179,6 +186,7 @@ def get_command_prefix() -> str:
 def _discover_plugins(
     config: HelpConfig,
     *,
+    role: HelpViewRole,
     show_all: bool,
 ) -> dict[str, PluginHelpInfo]:
     """Discover loaded plugins and build the base help model."""
@@ -192,6 +200,12 @@ def _discover_plugins(
 
         extra = get_plugin_extra(plugin)
         if extra and extra.plugin_type in (PluginType.HIDDEN, PluginType.PARENT):
+            continue
+        if extra and not _plugin_visible_in_role(
+            extra.plugin_type,
+            extra.admin_level,
+            role,
+        ):
             continue
 
         source = get_plugin_source(plugin)
@@ -214,7 +228,10 @@ def _discover_plugins(
             version=extra.version if extra else "",
             source=source,
             icon_url=icon_url,
-            commands=[],
+            menu_category=extra.menu_category.strip() if extra else "",
+            introduction=extra.introduction.strip() if extra else "",
+            precautions=[item.strip() for item in extra.precautions] if extra else [],
+            owner_help=extra.owner_help.strip() if extra else "",
         )
 
     return result
@@ -280,7 +297,8 @@ def _extract_alconna_matcher_command(
         if isinstance(alias, str) and alias and alias != display_name
     )
 
-    description = getattr(alconna_command.meta, "description", "") or ""
+    meta = getattr(alconna_command, "meta", None)
+    description = getattr(meta, "description", "") or ""
     if description == "Unknown":
         description = ""
     usage = _build_usage_text(alconna_command, display_name)
@@ -431,7 +449,10 @@ def _apply_overrides(
                 version="",
                 source="custom",
                 icon_url=find_plugin_icon(None, seed=module_name),
-                commands=[],
+                menu_category="",
+                introduction="",
+                precautions=[],
+                owner_help="",
                 order=override.order,
             )
             plugins.append(target)
@@ -443,6 +464,8 @@ def _apply_overrides(
             target.display_name = override.display_name
         if override.description:
             target.description = override.description
+        if override.category:
+            target.menu_category = override.category
         target.order = override.order
 
         for raw_command in override.extra_commands:
@@ -453,41 +476,16 @@ def _apply_overrides(
                 item for item in target.commands if item.name != command.name
             ]
             target.commands.append(command)
-
-
-def _build_custom_categories(
-    categories: list[CustomCategory],
-) -> list[PluginHelpInfo]:
-    """Build custom non-plugin categories."""
-    result: list[PluginHelpInfo] = []
-    for category in categories:
-        commands: list[CommandHelpInfo] = []
-        for raw_command in category.commands:
-            command = _parse_pipe_command(raw_command)
-            if command is not None:
-                commands.append(command)
-        if not category.name or not commands:
-            continue
-
-        module_name = f"custom.{category.name}"
-        result.append(
-            PluginHelpInfo(
-                plugin_id=module_name,
-                module_name=module_name,
-                name=category.name,
-                display_name=category.name,
-                description=category.description,
-                usage="",
-                plugin_type="custom",
-                admin_level=0,
-                version="",
-                source="custom",
-                icon_url=find_plugin_icon(None, seed=module_name),
-                commands=commands,
-                order=category.order,
-            )
-        )
-    return result
+def _plugin_visible_in_role(
+    plugin_type: PluginType,
+    admin_level: int,
+    role: HelpViewRole,
+) -> bool:
+    if role == "owner":
+        return True
+    if role == "admin":
+        return plugin_type in {PluginType.NORMAL, PluginType.ADMIN}
+    return plugin_type == PluginType.NORMAL and admin_level <= 0
 
 
 def _parse_pipe_command(raw: str) -> CommandHelpInfo | None:
@@ -631,7 +629,11 @@ def _extract_shortcut_aliases(
         return []
 
     try:
-        help_text = str(command_factory().get_help()).strip()
+        command = command_factory()
+        get_help = getattr(command, "get_help", None)
+        if not callable(get_help):
+            return []
+        help_text = str(get_help()).strip()
     except Exception:  # noqa: BLE001
         return []
 

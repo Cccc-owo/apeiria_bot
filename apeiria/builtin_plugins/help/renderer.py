@@ -16,10 +16,11 @@ from apeiria.builtin_plugins.help.utils import (
     resolve_data_file,
 )
 from apeiria.builtin_plugins.render import template_to_pic
+from apeiria.shared.i18n import t
 
 if TYPE_CHECKING:
     from .config import HelpConfig
-    from .generator import CommandHelpInfo, PluginHelpInfo
+    from .generator import CommandHelpInfo, HelpViewRole, PluginHelpInfo
 
 _MEMORY_CACHE: dict[str, bytes] = {}
 _RENDER_LOCKS: dict[str, asyncio.Lock] = {}
@@ -30,10 +31,11 @@ async def render_help_menu(
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
 ) -> bytes:
     """Render the main help menu to a PNG image."""
     template_name = "expanded_menu.html" if config.expand_commands else "main_menu.html"
-    data = _build_main_menu_data(plugins, prefix=prefix, config=config)
+    data = _build_main_menu_data(plugins, prefix=prefix, config=config, role=role)
     return await _render_with_cache(
         template_name,
         data,
@@ -47,9 +49,10 @@ async def render_plugin_detail(
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
 ) -> bytes:
     """Render one plugin detail page to a PNG image."""
-    data = _build_sub_menu_data(plugin, prefix=prefix, config=config)
+    data = _build_sub_menu_data(plugin, prefix=prefix, config=config, role=role)
     return await _render_with_cache(
         "sub_menu.html",
         data,
@@ -63,8 +66,9 @@ def _build_main_menu_data(
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
 ) -> dict[str, object]:
-    title = config.title or "帮助菜单"
+    title = _resolve_title(config, role)
     subtitle = config.subtitle or f"发送 {prefix}help <插件名> 查看详细命令"
 
     if config.expand_commands:
@@ -75,6 +79,7 @@ def _build_main_menu_data(
                 "description": plugin.description,
                 "icon_url": plugin.icon_url,
                 "cmd_count": plugin.command_count,
+                "menu_category": plugin.menu_category,
                 "commands": [
                     {
                         "display_name": _display_command_name(command, prefix),
@@ -94,6 +99,7 @@ def _build_main_menu_data(
                 "description": plugin.description,
                 "icon_url": plugin.icon_url,
                 "cmd_count": plugin.command_count,
+                "menu_category": plugin.menu_category,
             }
             for plugin in plugins
         ]
@@ -101,6 +107,7 @@ def _build_main_menu_data(
     return {
         "title": title,
         "subtitle": subtitle,
+        "view_label": _resolve_view_label(role),
         "prefix": prefix,
         "plugin_total": len(plugins),
         "accent_color": _normalized_accent_color(config.accent_color),
@@ -120,6 +127,7 @@ def _build_sub_menu_data(
     *,
     prefix: str,
     config: HelpConfig,
+    role: HelpViewRole,
 ) -> dict[str, object]:
     return {
         "plugin": {
@@ -129,6 +137,11 @@ def _build_sub_menu_data(
             "display_name": plugin.display_name,
             "description": plugin.description,
             "icon_url": plugin.icon_url,
+            "menu_category": plugin.menu_category,
+            "introduction": plugin.introduction or plugin.description,
+            "precautions": plugin.precautions,
+            "owner_help": plugin.owner_help if role == "owner" else "",
+            "view_label": _resolve_view_label(role),
         },
         "commands": [
             {
@@ -151,7 +164,28 @@ def _build_sub_menu_data(
         "latin_font_family": config.latin_font_family.strip(),
         "mono_font_family": config.mono_font_family.strip(),
         "footer": _footer_text(config),
+        "labels": {
+            "introduction": t("help.detail_introduction"),
+            "precautions": t("help.detail_precautions"),
+            "owner_help": t("help.detail_owner_help"),
+        },
     }
+
+
+def _resolve_title(config: HelpConfig, role: HelpViewRole) -> str:
+    if role == "owner":
+        return (config.owner_title or config.title or "帮助菜单").strip()
+    if role == "admin":
+        return (config.admin_title or config.title or "帮助菜单").strip()
+    return (config.user_title or config.title or "帮助菜单").strip()
+
+
+def _resolve_view_label(role: HelpViewRole) -> str:
+    if role == "owner":
+        return t("help.view_owner")
+    if role == "admin":
+        return t("help.view_admin")
+    return t("help.view_user")
 
 
 async def _render_with_cache(
@@ -188,14 +222,18 @@ async def _render_with_cache(
             if cached is not None:
                 return cached
 
+        width = render_options.get("width")
+        timeout_ms = render_options.get("timeout_ms")
+        wait_until = str(render_options.get("wait_until", "networkidle"))
+        selector = render_options.get("selector")
         rendered = await template_to_pic(
             template_name,
             context=data,
             template_dir=template_dir,
-            width=render_options["width"],
-            timeout_ms=render_options["timeout_ms"],
-            wait_until=render_options["wait_until"],
-            selector=render_options["selector"],
+            width=width if isinstance(width, int) else None,
+            timeout_ms=timeout_ms if isinstance(timeout_ms, int) else None,
+            wait_until=wait_until,
+            selector=selector if isinstance(selector, str) else None,
         )
 
         if use_disk_cache:
