@@ -112,6 +112,20 @@
     font-weight: 600;
   }
 
+  .banner-view {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: rgba(78, 150, 247, 0.08);
+    border: 1px solid rgba(78, 150, 247, 0.18);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
   .content {
     padding: 8px var(--content-padding) 0;
   }
@@ -301,6 +315,7 @@
       <h1>{{ title }}</h1>
       <div class="banner-subtitle">{{ subtitle }}</div>
       <div class="banner-meta">共 {{ plugin_total }} 个插件</div>
+      <div class="banner-view">{{ view_label }}</div>
     </div>
 
     <div class="content">
@@ -317,6 +332,9 @@
             </div>
             {% if plugin.description %}
             <div class="section-desc">{{ plugin.description }}</div>
+            {% endif %}
+            {% if plugin.menu_category %}
+            <div class="section-desc">{{ plugin.menu_category }}</div>
             {% endif %}
           </div>
         </div>

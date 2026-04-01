@@ -113,6 +113,28 @@
     color: var(--text-secondary);
   }
 
+  .plugin-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .plugin-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(220, 228, 240, 0.74);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
   .back-hint {
     margin: 0 0 10px 2px;
     color: var(--text-secondary);
@@ -135,6 +157,42 @@
     flex-direction: column;
     gap: 8px;
     margin-bottom: 12px;
+  }
+
+  .info-section {
+    margin-bottom: 10px;
+    padding: 9px 12px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(24, 28, 38, 0.96), rgba(20, 24, 34, 0.94));
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+  }
+
+  .info-title {
+    margin-bottom: 5px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: var(--accent);
+  }
+
+  .info-text {
+    font-size: 10px;
+    line-height: 1.5;
+    color: rgba(238, 244, 251, 0.78);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .info-list {
+    padding-left: 15px;
+    color: rgba(238, 244, 251, 0.78);
+  }
+
+  .info-list li {
+    margin: 3px 0;
+    font-size: 10px;
+    line-height: 1.45;
   }
 
   .cmd-item {
@@ -265,10 +323,41 @@
       {% if plugin.description %}
       <div class="plugin-desc">{{ plugin.description }}</div>
       {% endif %}
+      <div class="plugin-tags">
+        <span class="plugin-tag">{{ plugin.view_label }}</span>
+        {% if plugin.menu_category %}
+        <span class="plugin-tag">{{ plugin.menu_category }}</span>
+        {% endif %}
+      </div>
     </div>
   </div>
 
   <div class="back-hint">发送 <code>{{ prefix }}help</code> 返回主菜单</div>
+
+  {% if plugin.introduction %}
+  <div class="info-section">
+    <div class="info-title">{{ labels.introduction }}</div>
+    <div class="info-text">{{ plugin.introduction }}</div>
+  </div>
+  {% endif %}
+
+  {% if plugin.precautions %}
+  <div class="info-section">
+    <div class="info-title">{{ labels.precautions }}</div>
+    <ul class="info-list">
+      {% for item in plugin.precautions %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if plugin.owner_help %}
+  <div class="info-section">
+    <div class="info-title">{{ labels.owner_help }}</div>
+    <div class="info-text">{{ plugin.owner_help }}</div>
+  </div>
+  {% endif %}
 
   {% if commands %}
   <div class="commands">
