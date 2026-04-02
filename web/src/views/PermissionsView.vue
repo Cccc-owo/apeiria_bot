@@ -117,7 +117,7 @@
               <v-card-text class="permission-rule-columns">
                 <div>
                   <div class="permission-section-title">{{ t('permissions.allow') }}</div>
-                  <div v-if="selectedPluginUserAllowRules.length" class="permission-rule-list">
+                  <div v-if="selectedPluginUserAllowRules.length > 0" class="permission-rule-list">
                     <div
                       v-for="rule in selectedPluginUserAllowRules"
                       :key="ruleKey(rule)"
@@ -134,7 +134,7 @@
                 </div>
                 <div>
                   <div class="permission-section-title">{{ t('permissions.deny') }}</div>
-                  <div v-if="selectedPluginUserDenyRules.length" class="permission-rule-list">
+                  <div v-if="selectedPluginUserDenyRules.length > 0" class="permission-rule-list">
                     <div
                       v-for="rule in selectedPluginUserDenyRules"
                       :key="ruleKey(rule)"
@@ -157,7 +157,7 @@
               <v-card-text class="permission-rule-columns">
                 <div>
                   <div class="permission-section-title">{{ t('permissions.allow') }}</div>
-                  <div v-if="selectedPluginGroupAllowRules.length" class="permission-rule-list">
+                  <div v-if="selectedPluginGroupAllowRules.length > 0" class="permission-rule-list">
                     <div
                       v-for="rule in selectedPluginGroupAllowRules"
                       :key="ruleKey(rule)"
@@ -174,7 +174,7 @@
                 </div>
                 <div>
                   <div class="permission-section-title">{{ t('permissions.deny') }}</div>
-                  <div v-if="selectedPluginGroupDenyRules.length" class="permission-rule-list">
+                  <div v-if="selectedPluginGroupDenyRules.length > 0" class="permission-rule-list">
                     <div
                       v-for="rule in selectedPluginGroupDenyRules"
                       :key="ruleKey(rule)"
@@ -344,7 +344,7 @@
                   </div>
                   <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                 </div>
-                <div v-if="!selectedUserRules.length" class="permission-empty">{{ t('permissions.noRules') }}</div>
+                <div v-if="selectedUserRules.length === 0" class="permission-empty">{{ t('permissions.noRules') }}</div>
               </v-card-text>
             </v-card>
           </div>
@@ -369,7 +369,7 @@
                   @update:model-value="updateLevel(entry, $event)"
                 />
               </div>
-              <div v-if="!selectedUserLevels.length" class="permission-empty">{{ t('permissions.noUsers') }}</div>
+              <div v-if="selectedUserLevels.length === 0" class="permission-empty">{{ t('permissions.noUsers') }}</div>
             </v-card-text>
           </v-card>
         </section>
@@ -481,7 +481,7 @@
   const levelOptions = [0, 1, 2, 3, 4, 5, 6]
 
   const perspectiveItems = computed<
-    Array<{ value: Perspective; title: string; meta: string }>
+    Array<{ value: Perspective, title: string, meta: string }>
   >(() => [
     { value: 'plugins', title: t('permissions.pluginsTab'), meta: String(plugins.value.length) },
     { value: 'users', title: t('permissions.usersTab'), meta: String(userEntries.value.length) },
@@ -611,7 +611,7 @@
   }
 
   function ensureSelections (): void {
-    if (!selectedPluginModule.value && manageablePlugins.value.length) {
+    if (!selectedPluginModule.value && manageablePlugins.value.length > 0) {
       selectedPluginModule.value = manageablePlugins.value[0].module_name
     }
     if (
@@ -620,7 +620,7 @@
     ) {
       selectedPluginModule.value = manageablePlugins.value[0]?.module_name || ''
     }
-    if (!selectedUserId.value && userEntries.value.length) {
+    if (!selectedUserId.value && userEntries.value.length > 0) {
       selectedUserId.value = userEntries.value[0].user_id
     }
   }

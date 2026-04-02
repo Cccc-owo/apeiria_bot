@@ -847,10 +847,10 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import DOMPurify from 'dompurify'
   import MarkdownIt from 'markdown-it'
   import markdownItTaskLists from 'markdown-it-task-lists'
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute } from 'vue-router'
   import {
@@ -878,21 +878,21 @@
     validatePluginSettingsRaw,
   } from '@/api'
   import { getErrorMessage } from '@/api/client'
+  import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
   import { useAuthStore } from '@/stores/auth'
   import { useNoticeStore } from '@/stores/notice'
   import { useRestartStore } from '@/stores/restart'
+  import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import {
     buildRevertValues,
     buildSettingsPreviewItems,
     displayChoiceTitle,
     type PluginSettingField,
   } from '@/views/plugins/settingsEditor'
-  import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
   import SettingsModeBar from '@/views/plugins/SettingsModeBar.vue'
   import SettingsPreviewDialog from '@/views/plugins/SettingsPreviewDialog.vue'
   import { useSettingsEditor } from '@/views/plugins/useSettingsEditor'
-  import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
 
   const markdown = new MarkdownIt({
     html: true,
@@ -1257,12 +1257,12 @@
     }
 
     const hashIndex = normalized.indexOf('#')
-    const hash = hashIndex >= 0 ? normalized.slice(hashIndex) : ''
-    const pathWithQuery = hashIndex >= 0 ? normalized.slice(0, hashIndex) : normalized
+    const hash = hashIndex === -1 ? '' : normalized.slice(hashIndex)
+    const pathWithQuery = hashIndex === -1 ? normalized : normalized.slice(0, hashIndex)
     const queryIndex = pathWithQuery.indexOf('?')
-    const relativePath = queryIndex >= 0
-      ? pathWithQuery.slice(0, queryIndex)
-      : pathWithQuery
+    const relativePath = queryIndex === -1
+      ? pathWithQuery
+      : pathWithQuery.slice(0, queryIndex)
 
     if (!relativePath) {
       return normalized
@@ -1281,19 +1281,19 @@
 
     const document = new DOMParser().parseFromString(sanitized, 'text/html')
 
-    document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach(element => {
+    for (const element of document.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const href = element.getAttribute('href')
-      if (!href) return
+      if (!href) continue
       element.setAttribute('href', resolveReadmeRelativeUrl(href))
       element.setAttribute('target', '_blank')
       element.setAttribute('rel', 'noopener noreferrer')
-    })
+    }
 
-    document.querySelectorAll<HTMLImageElement>('img[src]').forEach(element => {
+    for (const element of document.querySelectorAll<HTMLImageElement>('img[src]')) {
       const src = element.getAttribute('src')
-      if (!src) return
+      if (!src) continue
       element.setAttribute('src', resolveReadmeRelativeUrl(src))
-    })
+    }
 
     return document.body.innerHTML
   }
@@ -1725,11 +1725,7 @@
   }
 
   async function confirmPreviewSave () {
-    if (previewAction.value === 'plugin-basic') {
-      await saveSettings()
-    } else {
-      await savePluginRawSettings()
-    }
+    await (previewAction.value === 'plugin-basic' ? saveSettings() : savePluginRawSettings())
 
     if (!settingsErrorMessage.value && !settingsRawErrorMessage.value) {
       previewDialogVisible.value = false
@@ -1803,7 +1799,7 @@
       }
       const linkedModules = affectedModules.filter(moduleName => moduleName !== item.module_name)
       const affectedSummary = linkedModules.length > 0
-        ? ` (${linkedModules.map(getPluginLabel).join(', ')})`
+        ? ` (${linkedModules.map(moduleName => getPluginLabel(moduleName)).join(', ')})`
         : ''
       noticeStore.show(
         t('plugins.toggled', {

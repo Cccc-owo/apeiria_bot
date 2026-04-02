@@ -1,6 +1,6 @@
+import type { RestartUndoAction } from '@/stores/restart'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-
 import {
   getStatus,
   restartBot,
@@ -14,7 +14,6 @@ import {
 } from '@/api'
 import { getErrorMessage } from '@/api/client'
 import { useNoticeStore } from '@/stores/notice'
-import type { RestartUndoAction } from '@/stores/restart'
 import { useRestartStore } from '@/stores/restart'
 
 export function useRestartController () {
@@ -25,7 +24,9 @@ export function useRestartController () {
   const { t } = useI18n()
 
   async function restartAndReload () {
-    if (restarting.value) return false
+    if (restarting.value) {
+      return false
+    }
     restarting.value = true
     try {
       const res = await restartBot()
@@ -44,12 +45,16 @@ export function useRestartController () {
   }
 
   async function revertPendingChanges () {
-    if (reverting.value || restartStore.entries.length === 0) return false
+    if (reverting.value || restartStore.entries.length === 0) {
+      return false
+    }
     reverting.value = true
     try {
       const entries = [...restartStore.entries]
       for (const entry of entries) {
-        if (!entry.undo) continue
+        if (!entry.undo) {
+          continue
+        }
         await revertEntry(entry.undo)
       }
       restartStore.clearPending()
@@ -75,30 +80,37 @@ export function useRestartController () {
 
 async function revertEntry (undo: RestartUndoAction) {
   switch (undo.kind) {
-    case 'core-settings':
+    case 'core-settings': {
       await updateCoreSettings({ values: undo.values })
       return
-    case 'core-raw':
+    }
+    case 'core-raw': {
       await updateCoreSettingsRaw({ text: undo.text })
       return
-    case 'plugin-settings':
+    }
+    case 'plugin-settings': {
       await updatePluginSettings(undo.moduleName, { values: undo.values })
       return
-    case 'plugin-raw':
+    }
+    case 'plugin-raw': {
       await updatePluginSettingsRaw(undo.moduleName, { text: undo.text })
       return
-    case 'plugin-config':
+    }
+    case 'plugin-config': {
       await updatePluginConfig({ modules: undo.modules, dirs: undo.dirs })
       return
-    case 'plugin-toggle':
+    }
+    case 'plugin-toggle': {
       await updatePlugin(undo.moduleName, undo.enabled)
       return
-    case 'plugin-install':
+    }
+    case 'plugin-install': {
       await revertPluginStoreInstall({
         package_name: undo.packageName,
         module_name: undo.moduleName,
       })
       return
+    }
   }
 }
 
@@ -112,9 +124,13 @@ async function waitForStatus (expectedOnline: boolean, maxAttempts: number, dela
     await sleep(delayMs)
     try {
       await getStatus()
-      if (expectedOnline) return
+      if (expectedOnline) {
+        return
+      }
     } catch {
-      if (!expectedOnline) return
+      if (!expectedOnline) {
+        return
+      }
     }
   }
 

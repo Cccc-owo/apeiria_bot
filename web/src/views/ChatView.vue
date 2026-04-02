@@ -27,7 +27,7 @@
     <div class="chat-shell">
       <aside class="chat-sidebar">
         <div class="chat-sidebar__body">
-          <v-list v-if="recentSessions.length" class="chat-session-list" density="compact" lines="two">
+          <v-list v-if="recentSessions.length > 0" class="chat-session-list" density="compact" lines="two">
             <v-list-item
               v-for="recent in recentSessions"
               :key="recent.session.session_id"
@@ -84,7 +84,7 @@
 
       <main class="chat-panel">
         <div ref="messagesContainer" class="chat-panel__messages">
-          <div v-if="!messages.length" class="chat-empty">
+          <div v-if="messages.length === 0" class="chat-empty">
             <div class="chat-empty__title">{{ t('chat.newSession') }}</div>
           </div>
 
@@ -195,7 +195,7 @@
             <v-btn icon="mdi-close" size="small" variant="text" @click="clearPendingReply" />
           </div>
 
-          <div v-if="orderedComposerImages.length" class="composer-attachments">
+          <div v-if="orderedComposerImages.length > 0" class="composer-attachments">
             <div
               v-for="(image, index) in orderedComposerImages"
               :key="image.id"
@@ -320,9 +320,6 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-  import { useI18n } from 'vue-i18n'
-  import { ChatClient } from '@/api/chat'
   import type {
     CapabilitiesResponsePayload,
     ChatCapabilities,
@@ -338,6 +335,9 @@
     SessionStatePayload,
     WebUIPrincipal,
   } from '@/types/chat'
+  import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import { ChatClient } from '@/api/chat'
 
   const client = new ChatClient()
   let composerRange: Range | null = null
@@ -504,7 +504,7 @@
 
   const composerHasContent = computed(() => {
     const segments = buildComposerSegments()
-    return segments.length > 0 && segments.some(segment => {
+    return segments.some(segment => {
       if (segment.type === 'text') {
         return segment.text.trim().length > 0
       }
@@ -523,9 +523,10 @@
       .map(node => node.dataset.imageId || '')
       .filter(Boolean)
 
-    return ids
-      .map(id => composerImages.get(id))
-      .filter((image): image is PendingImage => Boolean(image))
+    return ids.flatMap(id => {
+      const image = composerImages.get(id)
+      return image ? [image] : []
+    })
   })
 
   function pickImages () {
@@ -535,11 +536,11 @@
   async function handleImageSelection (event: Event) {
     const target = event.target as HTMLInputElement | null
     const files = Array.from(target?.files || [])
-    if (!files.length) return
+    if (files.length === 0) return
 
     isPreparingImages.value = true
     try {
-      const images = await Promise.all(files.map(readImageFile))
+      const images = await Promise.all(files.map(file => readImageFile(file)))
       for (const image of images) {
         composerImages.set(image.id, image)
         insertImageIntoComposer(image)
@@ -596,9 +597,9 @@
   }
 
   function revokeProtectedAssetUrls () {
-    Object.values(protectedAssetUrls.value).forEach(url => {
+    for (const url of Object.values(protectedAssetUrls.value)) {
       URL.revokeObjectURL(url)
-    })
+    }
     protectedAssetUrls.value = {}
     loadingProtectedAssets.clear()
   }
@@ -674,7 +675,7 @@
   const previewImageStyle = computed(() => ({
     transform: `translate(${previewOffsetX.value}px, ${previewOffsetY.value}px) scale(${previewScale.value})`,
     transformOrigin: 'center center',
-    cursor: isDraggingPreview.value ? 'grabbing' : canDragPreview.value ? 'grab' : 'zoom-in',
+    cursor: isDraggingPreview.value ? 'grabbing' : (canDragPreview.value ? 'grab' : 'zoom-in'),
   }))
 
   function startImageDrag (event: MouseEvent) {
@@ -767,7 +768,7 @@
 
   function estimateImageSize (segment: ImageSegment) {
     if (segment.base64) {
-      const padding = segment.base64.endsWith('==') ? 2 : segment.base64.endsWith('=') ? 1 : 0
+      const padding = segment.base64.endsWith('==') ? 2 : (segment.base64.endsWith('=') ? 1 : 0)
       const bytes = Math.max(0, Math.floor(segment.base64.length * 3 / 4) - padding)
       return formatBytes(bytes)
     }
@@ -784,8 +785,8 @@
   async function readImageFile (file: File): Promise<PendingImage> {
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result || ''))
-      reader.onerror = () => reject(reader.error || new Error(t('chat.imageReadFailed')))
+      reader.addEventListener('load', () => resolve(String(reader.result || '')))
+      reader.addEventListener('error', () => reject(reader.error || new Error(t('chat.imageReadFailed'))))
       reader.readAsDataURL(file)
     })
 
@@ -884,10 +885,10 @@
     const tokens = Array.from(
       composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
     )
-    tokens.forEach(token => {
+    for (const token of tokens) {
       const active = token.dataset.imageId === selectedComposerImageId.value
       token.classList.toggle('composer-image-token--selected', active)
-    })
+    }
   }
 
   function selectComposerImage (id: string | null) {
@@ -1066,12 +1067,12 @@
     const tokens = Array.from(
       composer.querySelectorAll<HTMLElement>('[data-kind="image-token"][data-image-id]'),
     )
-    tokens.forEach((token, index) => {
+    for (const [index, token] of tokens.entries()) {
       const label = token.querySelector<HTMLElement>('[data-role="token-label"]')
       if (label) {
         label.textContent = t('chat.imageIndexedToken', { index: index + 1 })
       }
-    })
+    }
   }
 
   function buildComposerSegments (): ChatSegment[] {
@@ -1136,13 +1137,17 @@
       if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
         textBuffer += '\n'
       }
-      node.childNodes.forEach(walkNode)
+      for (const childNode of node.childNodes) {
+        walkNode(childNode)
+      }
       if (isBlock && textBuffer && !textBuffer.endsWith('\n')) {
         textBuffer += '\n'
       }
     }
 
-    composer.childNodes.forEach(walkNode)
+    for (const childNode of composer.childNodes) {
+      walkNode(childNode)
+    }
     flushText()
 
     return segments
@@ -1158,9 +1163,9 @@
     if (composer) {
       composer.innerHTML = ''
     }
-    composerImages.forEach(image => {
+    for (const image of composerImages.values()) {
       URL.revokeObjectURL(image.previewUrl)
-    })
+    }
     composerImages.clear()
     composerMentions.clear()
     composerRange = null
@@ -1186,18 +1191,21 @@
 
   function handleEnvelope (event: ChatEnvelope) {
     switch (event.type) {
-      case 'auth.ok':
+      case 'auth.ok': {
         authenticated.value = true
         principal.value = (event.payload as { principal: WebUIPrincipal }).principal
         client.requestCapabilities()
         client.listSessions()
         break
-      case 'capabilities.response':
+      }
+      case 'capabilities.response': {
         capabilities.value = (event.payload as CapabilitiesResponsePayload).capabilities
         break
-      case 'session.list':
+      }
+      case 'session.list': {
         recentSessions.value = (event.payload as SessionListPayload).sessions
         break
+      }
       case 'session.deleted': {
         const payload = event.payload as SessionDeletedPayload
         recentSessions.value = recentSessions.value.filter(
@@ -1234,13 +1242,14 @@
         scrollToBottom()
         break
       }
-      case 'message.receive':
+      case 'message.receive': {
         appendMessage(event.payload as MessageReceivePayload)
         break
+      }
       case 'message.error':
       case 'auth.error':
       case 'system.error': {
-        const payload = event.payload as { message?: string; code?: string }
+        const payload = event.payload as { message?: string, code?: string }
         appendSimpleMessage('error', payload.message || payload.code || t('common.unknownError'))
         break
       }
@@ -1304,7 +1313,7 @@
         text: summarizeReplyMessage(pendingReply.value),
       })
     }
-    if (!segments.length) return
+    if (segments.length === 0) return
     const messageId = `cli_${Date.now()}`
     if (session.value) {
       client.sendMessage({

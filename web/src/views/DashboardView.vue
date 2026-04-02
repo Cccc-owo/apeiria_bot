@@ -235,9 +235,9 @@
 </template>
 
 <script setup lang="ts">
+  import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
   import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import type { DashboardEventItem, DashboardStatus, WebUIBuildStatus } from '@/api'
   import { getDashboardEvents, getStatus, getWebUIBuildStatus, streamRebuildWebUI } from '@/api'
   import { getErrorMessage } from '@/api/client'
   import { useRestartController } from '@/composables/useRestartController'
@@ -398,7 +398,7 @@
     stopAutoRefresh()
     refreshTimer = window.setInterval(() => {
       void refreshDashboard({ silent: true })
-    }, 15000)
+    }, 15_000)
   }
 
   function stopAutoRefresh () {

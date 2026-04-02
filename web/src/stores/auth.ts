@@ -1,14 +1,14 @@
+import type { WebUIPrincipal } from '@/api'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { WebUIPrincipal } from '@/api'
 import { CAP_CONTROL_PANEL } from '@/constants/access'
 
-export type AuthStatus =
-  | 'anonymous'
-  | 'restoring'
-  | 'authenticated'
-  | 'forbidden'
-  | 'expired'
+export type AuthStatus
+  = | 'anonymous'
+    | 'restoring'
+    | 'authenticated'
+    | 'forbidden'
+    | 'expired'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(readToken())
@@ -159,7 +159,9 @@ function readToken () {
 
 function readPrincipal (): WebUIPrincipal | null {
   const raw = localStorage.getItem('apeiria-principal')
-  if (!raw) return null
+  if (!raw) {
+    return null
+  }
   try {
     return JSON.parse(raw) as WebUIPrincipal
   } catch {

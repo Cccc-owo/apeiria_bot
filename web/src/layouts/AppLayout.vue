@@ -226,6 +226,7 @@
 </template>
 
 <script setup lang="ts">
+  import type { SupportedLocale } from '@/plugins/i18n'
   import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
@@ -234,7 +235,6 @@
   import { useAuthStore } from '@/stores/auth'
   import { useNoticeStore } from '@/stores/notice'
   import { useRestartStore } from '@/stores/restart'
-  import type { SupportedLocale } from '@/plugins/i18n'
 
   const drawer = ref(true)
   const rail = ref(false)

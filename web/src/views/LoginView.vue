@@ -89,8 +89,8 @@
         authStore.handleForbidden()
         error.value = t('login.forbidden')
       }
-    } catch (err) {
-      error.value = getErrorMessage(err, t('login.wrongPassword'))
+    } catch (error_) {
+      error.value = getErrorMessage(error_, t('login.wrongPassword'))
     } finally {
       loading.value = false
     }

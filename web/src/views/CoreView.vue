@@ -263,6 +263,7 @@
   import { useRawTomlValidation } from '@/composables/useRawTomlValidation'
   import { useNoticeStore } from '@/stores/notice'
   import { useRestartStore } from '@/stores/restart'
+  import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import {
     buildRevertValues,
     buildSettingsPreviewItems,
@@ -270,7 +271,6 @@
     displayFieldValue,
     type PluginSettingField,
   } from '@/views/plugins/settingsEditor'
-  import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
   import SettingsFieldEditor from '@/views/plugins/SettingsFieldEditor.vue'
   import SettingsModeBar from '@/views/plugins/SettingsModeBar.vue'
   import SettingsPreviewDialog from '@/views/plugins/SettingsPreviewDialog.vue'
@@ -515,11 +515,7 @@
   }
 
   async function confirmPreviewSave () {
-    if (previewAction.value === 'core-basic') {
-      await saveCoreSettings()
-    } else {
-      await saveCoreRawSettings()
-    }
+    await (previewAction.value === 'core-basic' ? saveCoreSettings() : saveCoreRawSettings())
 
     if (!coreErrorMessage.value && !coreRawErrorMessage.value) {
       previewDialogVisible.value = false
