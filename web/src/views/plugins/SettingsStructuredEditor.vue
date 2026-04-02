@@ -342,8 +342,18 @@
   gap: 8px;
   padding: 10px;
   border-radius: var(--shape-small);
-  border: 1px solid rgba(var(--v-border-color), 0.65);
-  background: rgba(var(--v-theme-on-surface), 0.018);
+  border: 1px solid rgba(var(--v-theme-outline), 0.18);
+  background: rgba(var(--v-theme-surface), 0.82);
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease);
+}
+
+.structured-object__row:focus-within,
+.structured-list__item:focus-within,
+.structured-map__row:focus-within {
+  border-color: rgba(var(--v-theme-primary), 0.3);
+  box-shadow: var(--focus-ring);
 }
 
 .structured-object__meta {

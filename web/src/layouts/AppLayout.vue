@@ -492,7 +492,7 @@
   border: 1px solid rgba(var(--v-theme-outline), 0.12);
   border-radius: var(--shape-large);
   background: rgb(var(--v-theme-surface));
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--elevation-flyout);
 }
 
 .app-drawer__rail-menu-title {
@@ -530,10 +530,36 @@
 
 .app-drawer__group :deep(.v-list-group__header .v-list-item) {
   min-height: 46px;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.app-drawer__group :deep(.v-list-group__header .v-list-item:hover) {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.app-drawer__group :deep(.v-list-group__header .v-list-item:focus-visible) {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .app-drawer__group :deep(.v-list-group__items .v-list-item) {
   opacity: 0.96;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
+}
+
+.app-drawer__group :deep(.v-list-group__items .v-list-item:hover) {
+  opacity: 1;
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.app-drawer__group :deep(.v-list-group__items .v-list-item:focus-visible) {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .app-drawer__child-item:deep(.v-list-item__prepend) {
@@ -611,7 +637,9 @@
 .app-main {
   min-height: 100vh;
   background: rgb(var(--v-theme-background));
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color var(--motion-base) var(--motion-ease),
+    color var(--motion-base) var(--motion-ease);
 }
 
 .app-container {

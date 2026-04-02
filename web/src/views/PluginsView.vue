@@ -63,11 +63,11 @@
             </v-btn>
           </div>
           <div class="section-heading__actions">
-            <div :aria-label="t('plugins.scopeTabs')" class="plugin-scope-tabs" role="tablist">
+            <div :aria-label="t('plugins.scopeTabs')" class="plugin-scope-tabs segmented-control" role="tablist">
               <button
                 :aria-selected="pluginScopeTab === 'managed'"
-                class="plugin-scope-tab"
-                :class="{ 'plugin-scope-tab--active': pluginScopeTab === 'managed' }"
+                class="plugin-scope-tab segmented-control__tab"
+                :class="{ 'plugin-scope-tab--active segmented-control__tab--active': pluginScopeTab === 'managed' }"
                 role="tab"
                 type="button"
                 @click="pluginScopeTab = 'managed'"
@@ -76,8 +76,8 @@
               </button>
               <button
                 :aria-selected="pluginScopeTab === 'framework'"
-                class="plugin-scope-tab"
-                :class="{ 'plugin-scope-tab--active': pluginScopeTab === 'framework' }"
+                class="plugin-scope-tab segmented-control__tab"
+                :class="{ 'plugin-scope-tab--active segmented-control__tab--active': pluginScopeTab === 'framework' }"
                 role="tab"
                 type="button"
                 @click="pluginScopeTab = 'framework'"
@@ -92,7 +92,7 @@
           <article
             v-for="item in visiblePlugins"
             :key="item.module_name"
-            class="plugin-card"
+            class="plugin-card surface-gradient-card"
           >
             <div class="plugin-card__top">
               <div class="plugin-card__headline">
@@ -1925,8 +1925,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background: rgb(var(--v-theme-surface-container-low));
+  border: 1px solid rgba(var(--v-theme-outline), 0.14);
   border-radius: var(--shape-medium);
 }
 
@@ -1938,10 +1938,10 @@
 
 .settings-list-row {
   padding: 18px 20px;
-  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-bottom: 1px solid rgba(var(--v-theme-outline), 0.12);
   background:
-    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.98)),
-    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.02), rgba(var(--v-theme-secondary), 0.02));
+    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.94), rgba(var(--v-theme-surface), 0.94)),
+    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.015), rgba(var(--v-theme-secondary), 0.015));
 }
 
 .settings-list-row:last-child {
@@ -1986,8 +1986,17 @@
   min-width: 0;
   padding: 14px;
   border-radius: var(--shape-medium);
-  background: rgba(var(--v-theme-on-surface), 0.025);
-  border: 1px solid rgba(var(--v-border-color), 0.65);
+  background: rgba(var(--v-theme-surface), 0.72);
+  border: 1px solid rgba(var(--v-theme-outline), 0.2);
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease);
+}
+
+.settings-list-row__control:focus-within {
+  border-color: rgba(var(--v-theme-primary), 0.3);
+  box-shadow: var(--focus-ring);
 }
 
 .settings-list-row__actions {
@@ -2023,63 +2032,17 @@
   width: 100%;
 }
 
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.section-heading__main,
-.section-heading__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+.settings-list-row__control :deep(.v-field--variant-outlined .v-field__outline) {
+  color: rgba(var(--v-theme-outline), 0.26);
 }
 
 .plugin-scope-tabs {
-  display: inline-flex;
   flex: 0 0 auto;
-  align-items: stretch;
-  width: min(420px, 100%);
-  min-width: 0;
-  padding: 4px;
-  border-radius: var(--shape-base);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background: rgba(var(--v-theme-surface-variant), 0.22);
+  --segmented-max-width: 420px;
 }
 
 .plugin-scope-tab {
-  flex: 1 1 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   min-width: 0;
-  height: 40px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: var(--shape-small);
-  background: transparent;
-  color: rgba(var(--v-theme-on-surface), 0.72);
-  font-size: 0.95rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
-}
-
-.plugin-scope-tab:hover {
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.plugin-scope-tab--active {
-  background: rgba(var(--v-theme-primary), 0.18);
-  color: rgb(var(--v-theme-primary));
-  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.14);
 }
 
 .plugin-search {
@@ -2098,12 +2061,19 @@
   gap: 12px;
   min-height: 228px;
   padding: 16px;
-  border-radius: var(--shape-large);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background:
-    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.94)),
-    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.03), rgba(var(--v-theme-secondary), 0.03));
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  transition:
+    transform var(--motion-base) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    border-color var(--motion-base) var(--motion-ease);
+}
+
+.plugin-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-soft-hover);
+}
+
+.plugin-card:focus-within {
+  box-shadow: var(--focus-ring), var(--elevation-soft);
 }
 
 .plugin-card__top {
@@ -2180,6 +2150,14 @@
 .plugin-card__actions :deep(.v-btn) {
   min-width: 44px;
   padding-inline: 4px;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
+}
+
+.plugin-card__actions :deep(.v-btn:hover) {
+  opacity: 0.92;
 }
 
 .plugin-card__switch :deep(.v-switch) {
@@ -2264,6 +2242,12 @@
   text-decoration: underline;
 }
 
+.markdown-content :deep(a:focus-visible) {
+  outline: none;
+  text-decoration: underline;
+  box-shadow: var(--focus-ring);
+}
+
 .markdown-content :deep(blockquote) {
   padding-left: 14px;
   border-left: 3px solid rgba(var(--v-theme-primary), 0.35);
@@ -2278,7 +2262,7 @@
 
 .markdown-content :deep(code) {
   padding: 0.1em 0.35em;
-  border-radius: 6px;
+  border-radius: var(--shape-xxsmall);
   background: rgba(var(--v-theme-on-surface), 0.08);
   font-family: var(--font-family-mono);
 }

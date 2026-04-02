@@ -237,6 +237,7 @@
   min-height: 240px;
   border-radius: var(--shape-medium);
   overflow: hidden;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border: 1px solid rgba(var(--v-theme-outline), 0.2);
+  background: rgba(var(--v-theme-surface), 0.9);
 }
 </style>

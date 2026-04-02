@@ -1,10 +1,10 @@
 <template>
   <div class="settings-mode-bar">
-    <div :aria-label="tablistLabel" class="settings-mode-tabs" role="tablist">
+    <div :aria-label="tablistLabel" class="settings-mode-tabs segmented-control" role="tablist">
       <button
         :aria-selected="modelValue === 'basic'"
-        class="settings-mode-tab"
-        :class="{ 'settings-mode-tab--active': modelValue === 'basic' }"
+        class="settings-mode-tab segmented-control__tab"
+        :class="{ 'settings-mode-tab--active segmented-control__tab--active': modelValue === 'basic' }"
         role="tab"
         type="button"
         @click="$emit('update:modelValue', 'basic')"
@@ -13,8 +13,8 @@
       </button>
       <button
         :aria-selected="modelValue === 'advanced'"
-        class="settings-mode-tab"
-        :class="{ 'settings-mode-tab--active': modelValue === 'advanced' }"
+        class="settings-mode-tab segmented-control__tab"
+        :class="{ 'settings-mode-tab--active segmented-control__tab--active': modelValue === 'advanced' }"
         role="tab"
         type="button"
         @click="$emit('update:modelValue', 'advanced')"
@@ -52,40 +52,11 @@
 }
 
 .settings-mode-tabs {
-  display: inline-flex;
-  align-items: stretch;
-  width: min(320px, 100%);
-  min-width: 0;
-  padding: 4px;
-  border-radius: var(--shape-base);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  background: rgba(var(--v-theme-surface-variant), 0.22);
+  --segmented-max-width: 320px;
 }
 
 .settings-mode-tab {
-  flex: 1 1 0;
   min-width: 0;
-  height: 40px;
-  border: 0;
-  border-radius: var(--shape-small);
-  background: transparent;
-  color: rgba(var(--v-theme-on-surface), 0.72);
-  font-size: 0.95rem;
-  font-weight: 600;
-  transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
-}
-
-.settings-mode-tab:hover {
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.settings-mode-tab--active {
-  background: rgba(var(--v-theme-primary), 0.18);
-  color: rgb(var(--v-theme-primary));
-  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.14);
 }
 
 .settings-mode-bar__actions {
