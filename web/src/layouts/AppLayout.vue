@@ -276,8 +276,6 @@
       title: t('layout.moreGroup'),
       children: [
         { icon: 'mdi-shield-account', title: t('layout.permissions'), to: '/permissions' },
-        { icon: 'mdi-account-group', title: t('layout.groups'), to: '/groups' },
-        { icon: 'mdi-database-outline', title: t('layout.data'), to: '/data' },
       ],
     },
     ...(authStore.isOwner
@@ -307,11 +305,7 @@
       if (nextPath.startsWith('/logs')) {
         openedGroups.value = Array.from(new Set([...openedGroups.value, 'logs-group']))
       }
-      if (
-        nextPath.startsWith('/permissions')
-        || nextPath.startsWith('/groups')
-        || nextPath.startsWith('/data')
-      ) {
+      if (nextPath.startsWith('/permissions')) {
         openedGroups.value = Array.from(new Set([...openedGroups.value, 'more-group']))
       }
     },

@@ -885,7 +885,6 @@
     buildRevertValues,
     buildSettingsPreviewItems,
     displayChoiceTitle,
-    displayFieldValue,
     type PluginSettingField,
   } from '@/views/plugins/settingsEditor'
   import RawSettingsEditor from '@/views/plugins/RawSettingsEditor.vue'
