@@ -904,7 +904,7 @@
 
 .task-log-card__content {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-word;

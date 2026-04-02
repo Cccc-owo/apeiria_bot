@@ -426,7 +426,7 @@
 }
 
 .live-log-viewer__title {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.82rem;
   color: rgba(var(--v-theme-on-surface), 0.62);
 }
@@ -443,7 +443,7 @@
   gap: 12px;
   align-items: start;
   padding: 6px 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.94rem;
   line-height: 1.55;
 }
