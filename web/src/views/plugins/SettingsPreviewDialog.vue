@@ -113,7 +113,7 @@
   border-radius: 10px;
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-word;

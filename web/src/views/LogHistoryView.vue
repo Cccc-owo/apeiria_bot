@@ -743,7 +743,7 @@
 
 .history-list-row__source,
 .history-list-row__time {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.82rem;
   color: rgba(var(--v-theme-on-surface), 0.66);
   white-space: nowrap;
@@ -785,7 +785,7 @@
 
 .history-detail-panel__source,
 .history-detail-panel__time {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.82rem;
   color: rgba(var(--v-theme-on-surface), 0.66);
 }
@@ -804,7 +804,7 @@
   background: rgba(var(--v-theme-on-surface), 0.05);
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-family: var(--font-family-mono);
   font-size: 12px;
 }
 
