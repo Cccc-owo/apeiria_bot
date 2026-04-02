@@ -25,292 +25,201 @@
       </button>
     </div>
 
-    <template v-if="perspective === 'plugins'">
-      <div class="permission-layout">
-        <section class="permission-sidebar">
-          <v-text-field
-            v-model="pluginSearch"
-            class="permission-sidebar__search"
-            clearable
-            density="compact"
-            hide-details
-            :placeholder="t('permissions.searchPlugins')"
-            prepend-inner-icon="mdi-magnify"
-            single-line
-            variant="outlined"
-          />
+    <v-fade-transition mode="out-in">
+      <div v-if="perspective === 'plugins'" key="plugins" class="permission-view">
+        <div class="permission-layout">
+          <section class="permission-sidebar surface-elevated-panel">
+            <v-text-field
+              v-model="pluginSearch"
+              class="permission-sidebar__search"
+              clearable
+              density="compact"
+              hide-details
+              :placeholder="t('permissions.searchPlugins')"
+              prepend-inner-icon="mdi-magnify"
+              single-line
+              variant="outlined"
+            />
 
-          <div class="permission-sidebar__list">
-            <button
-              v-for="item in visiblePlugins"
-              :key="item.module_name"
-              class="permission-sidebar__item"
-              :class="{ 'permission-sidebar__item--active': item.module_name === selectedPluginModule }"
-              type="button"
-              @click="selectedPluginModule = item.module_name"
-            >
-              <div class="permission-sidebar__item-main">
-                <span class="permission-sidebar__item-title">{{ item.name || item.module_name }}</span>
-                <span class="permission-sidebar__item-subtitle">{{ item.module_name }}</span>
-              </div>
-              <div class="permission-sidebar__item-tags">
-                <v-chip
-                  v-if="!item.is_global_enabled"
-                  color="warning"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ t('permissions.globalOff') }}
-                </v-chip>
-                <v-chip
-                  v-if="item.is_protected"
-                  color="error"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ t('permissions.protected') }}
-                </v-chip>
-                <v-chip
-                  v-if="pluginRuleCount(item.module_name) > 0"
-                  color="primary"
-                  size="x-small"
-                  variant="tonal"
-                >
-                  {{ pluginRuleCount(item.module_name) }}
-                </v-chip>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        <section v-if="selectedPlugin" class="permission-main">
-          <div class="permission-panel permission-panel--hero">
-            <div class="permission-panel__hero-main">
-              <div class="permission-panel__title">{{ selectedPlugin.name || selectedPlugin.module_name }}</div>
-              <div class="permission-panel__subtitle">{{ selectedPlugin.module_name }}</div>
+            <div class="permission-sidebar__list">
+              <button
+                v-for="item in visiblePlugins"
+                :key="item.module_name"
+                class="permission-sidebar__item"
+                :class="{ 'permission-sidebar__item--active': item.module_name === selectedPluginModule }"
+                type="button"
+                @click="selectedPluginModule = item.module_name"
+              >
+                <div class="permission-sidebar__item-main">
+                  <span class="permission-sidebar__item-title">{{ item.name || item.module_name }}</span>
+                  <span class="permission-sidebar__item-subtitle">{{ item.module_name }}</span>
+                </div>
+                <div class="permission-sidebar__item-tags">
+                  <v-chip
+                    v-if="!item.is_global_enabled"
+                    color="warning"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ t('permissions.globalOff') }}
+                  </v-chip>
+                  <v-chip
+                    v-if="item.is_protected"
+                    color="error"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ t('permissions.protected') }}
+                  </v-chip>
+                  <v-chip
+                    v-if="pluginRuleCount(item.module_name) > 0"
+                    color="primary"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ pluginRuleCount(item.module_name) }}
+                  </v-chip>
+                </div>
+              </button>
             </div>
-            <div class="permission-panel__hero-stats">
-              <div class="permission-inline-stat permission-inline-stat--control">
-                <span class="permission-inline-stat__label">{{ t('permissions.accessMode') }}</span>
-                <v-select
-                  class="permission-access-mode"
-                  density="compact"
-                  hide-details
-                  item-title="title"
-                  item-value="value"
-                  :items="accessModeOptions"
-                  :loading="pendingPluginAccessMode"
-                  :model-value="selectedPlugin.access_mode"
-                  @update:model-value="updateSelectedPluginAccessMode"
-                />
+          </section>
+
+          <section v-if="selectedPlugin" class="permission-main">
+            <div class="permission-panel permission-panel--hero surface-elevated-panel">
+              <div class="permission-panel__hero-main">
+                <div class="permission-panel__title">{{ selectedPlugin.name || selectedPlugin.module_name }}</div>
+                <div class="permission-panel__subtitle">{{ selectedPlugin.module_name }}</div>
               </div>
-              <div class="permission-inline-stat">
-                <span class="permission-inline-stat__label">{{ t('permissions.explicitRules') }}</span>
-                <span class="permission-inline-stat__value">{{ selectedPluginRules.length }}</span>
+              <div class="permission-panel__hero-stats">
+                <div class="permission-inline-stat permission-inline-stat--control">
+                  <span class="permission-inline-stat__label">{{ t('permissions.accessMode') }}</span>
+                  <v-select
+                    class="permission-access-mode"
+                    density="compact"
+                    hide-details
+                    item-title="title"
+                    item-value="value"
+                    :items="accessModeOptions"
+                    :loading="pendingPluginAccessMode"
+                    :model-value="selectedPlugin.access_mode"
+                    @update:model-value="updateSelectedPluginAccessMode"
+                  />
+                </div>
+                <div class="permission-inline-stat">
+                  <span class="permission-inline-stat__label">{{ t('permissions.explicitRules') }}</span>
+                  <span class="permission-inline-stat__value">{{ selectedPluginRules.length }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="permission-grid">
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.userRules') }}</v-card-title>
-              <v-card-text class="permission-rule-columns">
-                <div>
-                  <div class="permission-section-title">{{ t('permissions.allow') }}</div>
-                  <div v-if="selectedPluginUserAllowRules.length > 0" class="permission-rule-list">
-                    <div
-                      v-for="rule in selectedPluginUserAllowRules"
-                      :key="ruleKey(rule)"
-                      class="permission-rule-row"
-                    >
-                      <div>
-                        <div class="font-weight-medium">{{ rule.subject_id }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+            <div class="permission-grid">
+              <v-card class="permission-panel surface-elevated-panel">
+                <v-card-title>{{ t('permissions.userRules') }}</v-card-title>
+                <v-card-text class="permission-rule-columns">
+                  <div>
+                    <div class="permission-section-title">{{ t('permissions.allow') }}</div>
+                    <div v-if="selectedPluginUserAllowRules.length > 0" class="permission-rule-list">
+                      <div
+                        v-for="rule in selectedPluginUserAllowRules"
+                        :key="ruleKey(rule)"
+                        class="permission-rule-row"
+                      >
+                        <div>
+                          <div class="font-weight-medium">{{ rule.subject_id }}</div>
+                          <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                        </div>
+                        <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                       </div>
-                      <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                     </div>
+                    <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
                   </div>
-                  <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
-                </div>
-                <div>
-                  <div class="permission-section-title">{{ t('permissions.deny') }}</div>
-                  <div v-if="selectedPluginUserDenyRules.length > 0" class="permission-rule-list">
-                    <div
-                      v-for="rule in selectedPluginUserDenyRules"
-                      :key="ruleKey(rule)"
-                      class="permission-rule-row"
-                    >
-                      <div>
-                        <div class="font-weight-medium">{{ rule.subject_id }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                  <div>
+                    <div class="permission-section-title">{{ t('permissions.deny') }}</div>
+                    <div v-if="selectedPluginUserDenyRules.length > 0" class="permission-rule-list">
+                      <div
+                        v-for="rule in selectedPluginUserDenyRules"
+                        :key="ruleKey(rule)"
+                        class="permission-rule-row"
+                      >
+                        <div>
+                          <div class="font-weight-medium">{{ rule.subject_id }}</div>
+                          <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                        </div>
+                        <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                       </div>
-                      <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                     </div>
+                    <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
                   </div>
-                  <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
-                </div>
-              </v-card-text>
-            </v-card>
+                </v-card-text>
+              </v-card>
 
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.groupRules') }}</v-card-title>
-              <v-card-text class="permission-rule-columns">
-                <div>
-                  <div class="permission-section-title">{{ t('permissions.allow') }}</div>
-                  <div v-if="selectedPluginGroupAllowRules.length > 0" class="permission-rule-list">
-                    <div
-                      v-for="rule in selectedPluginGroupAllowRules"
-                      :key="ruleKey(rule)"
-                      class="permission-rule-row"
-                    >
-                      <div>
-                        <div class="font-weight-medium">{{ rule.subject_id }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+              <v-card class="permission-panel surface-elevated-panel">
+                <v-card-title>{{ t('permissions.groupRules') }}</v-card-title>
+                <v-card-text class="permission-rule-columns">
+                  <div>
+                    <div class="permission-section-title">{{ t('permissions.allow') }}</div>
+                    <div v-if="selectedPluginGroupAllowRules.length > 0" class="permission-rule-list">
+                      <div
+                        v-for="rule in selectedPluginGroupAllowRules"
+                        :key="ruleKey(rule)"
+                        class="permission-rule-row"
+                      >
+                        <div>
+                          <div class="font-weight-medium">{{ rule.subject_id }}</div>
+                          <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                        </div>
+                        <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                       </div>
-                      <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                     </div>
+                    <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
                   </div>
-                  <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
-                </div>
-                <div>
-                  <div class="permission-section-title">{{ t('permissions.deny') }}</div>
-                  <div v-if="selectedPluginGroupDenyRules.length > 0" class="permission-rule-list">
-                    <div
-                      v-for="rule in selectedPluginGroupDenyRules"
-                      :key="ruleKey(rule)"
-                      class="permission-rule-row"
-                    >
-                      <div>
-                        <div class="font-weight-medium">{{ rule.subject_id }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                  <div>
+                    <div class="permission-section-title">{{ t('permissions.deny') }}</div>
+                    <div v-if="selectedPluginGroupDenyRules.length > 0" class="permission-rule-list">
+                      <div
+                        v-for="rule in selectedPluginGroupDenyRules"
+                        :key="ruleKey(rule)"
+                        class="permission-rule-row"
+                      >
+                        <div>
+                          <div class="font-weight-medium">{{ rule.subject_id }}</div>
+                          <div class="text-caption text-medium-emphasis">{{ rule.note || t('permissions.noNote') }}</div>
+                        </div>
+                        <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                       </div>
-                      <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
                     </div>
+                    <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
                   </div>
-                  <div v-else class="permission-empty">{{ t('permissions.noRules') }}</div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-
-          <v-card class="permission-panel">
-            <v-card-title>{{ t('permissions.createRuleTitle') }}</v-card-title>
-            <v-card-text class="permission-form-grid">
-              <v-select
-                v-model="pluginRuleForm.subject_type"
-                density="comfortable"
-                hide-details
-                :items="subjectTypeOptions"
-                :label="t('permissions.subjectType')"
-              />
-              <v-text-field
-                v-model="pluginRuleForm.subject_id"
-                density="comfortable"
-                hide-details
-                :label="t('permissions.subjectId')"
-                :placeholder="pluginRuleForm.subject_type === 'group' ? t('permissions.groupIdPlaceholder') : t('permissions.userIdPlaceholder')"
-              />
-              <v-select
-                v-model="pluginRuleForm.effect"
-                density="comfortable"
-                hide-details
-                :items="effectOptions"
-                :label="t('permissions.effect')"
-              />
-              <v-text-field
-                v-model="pluginRuleForm.note"
-                density="comfortable"
-                hide-details
-                :label="t('permissions.note')"
-              />
-              <div class="permission-form-grid__actions">
-                <v-btn
-                  color="primary"
-                  :disabled="!pluginRuleForm.subject_id.trim()"
-                  :loading="creatingRule"
-                  @click="createRuleForPlugin"
-                >
-                  {{ t('permissions.createRule') }}
-                </v-btn>
-              </div>
-            </v-card-text>
-          </v-card>
-
-        </section>
-      </div>
-    </template>
-
-    <template v-else-if="perspective === 'users'">
-      <div class="permission-layout">
-        <section class="permission-sidebar">
-          <v-text-field
-            v-model="userSearch"
-            class="permission-sidebar__search"
-            clearable
-            density="compact"
-            hide-details
-            :placeholder="t('permissions.searchUsers')"
-            prepend-inner-icon="mdi-magnify"
-            single-line
-            variant="outlined"
-          />
-
-          <div class="permission-sidebar__list">
-            <button
-              v-for="item in visibleUserEntries"
-              :key="item.user_id"
-              class="permission-sidebar__item"
-              :class="{ 'permission-sidebar__item--active': item.user_id === selectedUserId }"
-              type="button"
-              @click="selectedUserId = item.user_id"
-            >
-              <div class="permission-sidebar__item-main">
-                <span class="permission-sidebar__item-title">{{ item.user_id }}</span>
-                <span class="permission-sidebar__item-subtitle">
-                  {{ t('permissions.userGroupsMeta', { count: item.groups }) }}
-                </span>
-              </div>
-              <div class="permission-sidebar__item-tags">
-                <v-chip v-if="item.rules > 0" color="primary" size="x-small" variant="tonal">
-                  {{ item.rules }}
-                </v-chip>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        <section v-if="selectedUserId" class="permission-main">
-          <div class="permission-panel permission-panel--hero">
-            <div>
-              <div class="permission-panel__eyebrow">{{ t('permissions.userView') }}</div>
-              <div class="permission-panel__title">{{ selectedUserId }}</div>
-              <div class="permission-panel__subtitle">{{ t('permissions.userRulesAndLevels') }}</div>
+                </v-card-text>
+              </v-card>
             </div>
-          </div>
 
-          <div class="permission-grid">
-            <v-card class="permission-panel">
+            <v-card class="permission-panel surface-elevated-panel">
               <v-card-title>{{ t('permissions.createRuleTitle') }}</v-card-title>
               <v-card-text class="permission-form-grid">
                 <v-select
-                  v-model="userRuleForm.effect"
+                  v-model="pluginRuleForm.subject_type"
+                  density="comfortable"
+                  hide-details
+                  :items="subjectTypeOptions"
+                  :label="t('permissions.subjectType')"
+                />
+                <v-text-field
+                  v-model="pluginRuleForm.subject_id"
+                  density="comfortable"
+                  hide-details
+                  :label="t('permissions.subjectId')"
+                  :placeholder="pluginRuleForm.subject_type === 'group' ? t('permissions.groupIdPlaceholder') : t('permissions.userIdPlaceholder')"
+                />
+                <v-select
+                  v-model="pluginRuleForm.effect"
                   density="comfortable"
                   hide-details
                   :items="effectOptions"
                   :label="t('permissions.effect')"
                 />
-                <v-autocomplete
-                  v-model="userRuleForm.plugin_module"
-                  clearable
-                  density="comfortable"
-                  hide-details
-                  item-title="title"
-                  item-value="value"
-                  :items="pluginModuleOptions"
-                  :label="t('permissions.pluginModule')"
-                />
                 <v-text-field
-                  v-model="userRuleForm.note"
+                  v-model="pluginRuleForm.note"
                   density="comfortable"
                   hide-details
                   :label="t('permissions.note')"
@@ -318,9 +227,9 @@
                 <div class="permission-form-grid__actions">
                   <v-btn
                     color="primary"
-                    :disabled="!userRuleForm.plugin_module.trim()"
+                    :disabled="!pluginRuleForm.subject_id.trim()"
                     :loading="creatingRule"
-                    @click="createRuleForUser"
+                    @click="createRuleForPlugin"
                   >
                     {{ t('permissions.createRule') }}
                   </v-btn>
@@ -328,97 +237,190 @@
               </v-card-text>
             </v-card>
 
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.userRules') }}</v-card-title>
+          </section>
+        </div>
+      </div>
+
+      <div v-else-if="perspective === 'users'" key="users" class="permission-view">
+        <div class="permission-layout">
+          <section class="permission-sidebar surface-elevated-panel">
+            <v-text-field
+              v-model="userSearch"
+              class="permission-sidebar__search"
+              clearable
+              density="compact"
+              hide-details
+              :placeholder="t('permissions.searchUsers')"
+              prepend-inner-icon="mdi-magnify"
+              single-line
+              variant="outlined"
+            />
+
+            <div class="permission-sidebar__list">
+              <button
+                v-for="item in visibleUserEntries"
+                :key="item.user_id"
+                class="permission-sidebar__item"
+                :class="{ 'permission-sidebar__item--active': item.user_id === selectedUserId }"
+                type="button"
+                @click="selectedUserId = item.user_id"
+              >
+                <div class="permission-sidebar__item-main">
+                  <span class="permission-sidebar__item-title">{{ item.user_id }}</span>
+                  <span class="permission-sidebar__item-subtitle">
+                    {{ t('permissions.userGroupsMeta', { count: item.groups }) }}
+                  </span>
+                </div>
+                <div class="permission-sidebar__item-tags">
+                  <v-chip v-if="item.rules > 0" color="primary" size="x-small" variant="tonal">
+                    {{ item.rules }}
+                  </v-chip>
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <section v-if="selectedUserId" class="permission-main">
+            <div class="permission-panel permission-panel--hero surface-elevated-panel">
+              <div>
+                <div class="permission-panel__eyebrow">{{ t('permissions.userView') }}</div>
+                <div class="permission-panel__title">{{ selectedUserId }}</div>
+                <div class="permission-panel__subtitle">{{ t('permissions.userRulesAndLevels') }}</div>
+              </div>
+            </div>
+
+            <div class="permission-grid">
+              <v-card class="permission-panel surface-elevated-panel">
+                <v-card-title>{{ t('permissions.createRuleTitle') }}</v-card-title>
+                <v-card-text class="permission-form-grid">
+                  <v-select
+                    v-model="userRuleForm.effect"
+                    density="comfortable"
+                    hide-details
+                    :items="effectOptions"
+                    :label="t('permissions.effect')"
+                  />
+                  <v-autocomplete
+                    v-model="userRuleForm.plugin_module"
+                    clearable
+                    density="comfortable"
+                    hide-details
+                    item-title="title"
+                    item-value="value"
+                    :items="pluginModuleOptions"
+                    :label="t('permissions.pluginModule')"
+                  />
+                  <v-text-field
+                    v-model="userRuleForm.note"
+                    density="comfortable"
+                    hide-details
+                    :label="t('permissions.note')"
+                  />
+                  <div class="permission-form-grid__actions">
+                    <v-btn
+                      color="primary"
+                      :disabled="!userRuleForm.plugin_module.trim()"
+                      :loading="creatingRule"
+                      @click="createRuleForUser"
+                    >
+                      {{ t('permissions.createRule') }}
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-card>
+
+              <v-card class="permission-panel surface-elevated-panel">
+                <v-card-title>{{ t('permissions.userRules') }}</v-card-title>
+                <v-card-text class="permission-rule-list">
+                  <div
+                    v-for="rule in selectedUserRules"
+                    :key="ruleKey(rule)"
+                    class="permission-rule-row"
+                  >
+                    <div>
+                      <div class="font-weight-medium">{{ rule.plugin_module }}</div>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ rule.effect === 'allow' ? t('permissions.allow') : t('permissions.deny') }}
+                      </div>
+                    </div>
+                    <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
+                  </div>
+                  <div v-if="selectedUserRules.length === 0" class="permission-empty">{{ t('permissions.noRules') }}</div>
+                </v-card-text>
+              </v-card>
+            </div>
+
+            <v-card class="permission-panel surface-elevated-panel">
+              <v-card-title>{{ t('permissions.userLevels') }}</v-card-title>
               <v-card-text class="permission-rule-list">
                 <div
-                  v-for="rule in selectedUserRules"
-                  :key="ruleKey(rule)"
+                  v-for="entry in selectedUserLevels"
+                  :key="`${entry.user_id}:${entry.group_id}`"
                   class="permission-rule-row"
                 >
                   <div>
-                    <div class="font-weight-medium">{{ rule.plugin_module }}</div>
-                    <div class="text-caption text-medium-emphasis">
-                      {{ rule.effect === 'allow' ? t('permissions.allow') : t('permissions.deny') }}
-                    </div>
+                    <div class="font-weight-medium">{{ entry.group_id }}</div>
                   </div>
-                  <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
+                  <v-select
+                    class="permission-level-select"
+                    density="compact"
+                    hide-details
+                    :items="levelOptions"
+                    :model-value="entry.level"
+                    @update:model-value="updateLevel(entry, $event)"
+                  />
                 </div>
-                <div v-if="selectedUserRules.length === 0" class="permission-empty">{{ t('permissions.noRules') }}</div>
+                <div v-if="selectedUserLevels.length === 0" class="permission-empty">{{ t('permissions.noUsers') }}</div>
               </v-card-text>
             </v-card>
-          </div>
-
-          <v-card class="permission-panel">
-            <v-card-title>{{ t('permissions.userLevels') }}</v-card-title>
-            <v-card-text class="permission-rule-list">
-              <div
-                v-for="entry in selectedUserLevels"
-                :key="`${entry.user_id}:${entry.group_id}`"
-                class="permission-rule-row"
-              >
-                <div>
-                  <div class="font-weight-medium">{{ entry.group_id }}</div>
-                </div>
-                <v-select
-                  class="permission-level-select"
-                  density="compact"
-                  hide-details
-                  :items="levelOptions"
-                  :model-value="entry.level"
-                  @update:model-value="updateLevel(entry, $event)"
-                />
-              </div>
-              <div v-if="selectedUserLevels.length === 0" class="permission-empty">{{ t('permissions.noUsers') }}</div>
-            </v-card-text>
-          </v-card>
-        </section>
+          </section>
+        </div>
       </div>
-    </template>
 
-    <template v-else>
-      <v-card class="permission-panel">
-        <v-card-title>{{ t('permissions.rulesView') }}</v-card-title>
-        <v-card-text class="permission-stack">
-          <div class="permission-filters">
-            <v-text-field
-              v-model="ruleSearch"
-              clearable
-              density="comfortable"
-              hide-details
-              :label="t('permissions.searchRules')"
-              prepend-inner-icon="mdi-magnify"
-            />
-            <v-select
-              v-model="ruleEffectFilter"
-              density="comfortable"
-              hide-details
-              :items="ruleEffectOptions"
-              :label="t('permissions.effect')"
-            />
-          </div>
+      <div v-else key="overview" class="permission-view">
+        <v-card class="permission-panel surface-elevated-panel">
+          <v-card-title>{{ t('permissions.rulesView') }}</v-card-title>
+          <v-card-text class="permission-stack">
+            <div class="permission-filters">
+              <v-text-field
+                v-model="ruleSearch"
+                clearable
+                density="comfortable"
+                hide-details
+                :label="t('permissions.searchRules')"
+                prepend-inner-icon="mdi-magnify"
+              />
+              <v-select
+                v-model="ruleEffectFilter"
+                density="comfortable"
+                hide-details
+                :items="ruleEffectOptions"
+                :label="t('permissions.effect')"
+              />
+            </div>
 
-          <v-data-table
-            density="comfortable"
-            :headers="ruleHeaders"
-            :items="filteredRules"
-            :loading="loading"
-          >
-            <template #item.subject_type="{ value }">
-              {{ value === 'user' ? t('permissions.user') : t('permissions.group') }}
-            </template>
-            <template #item.effect="{ value }">
-              <v-chip :color="value === 'allow' ? 'success' : 'warning'" size="small" variant="tonal">
-                {{ value === 'allow' ? t('permissions.allow') : t('permissions.deny') }}
-              </v-chip>
-            </template>
-            <template #item.actions="{ item }">
-              <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(item)" />
-            </template>
-          </v-data-table>
-        </v-card-text>
-      </v-card>
-    </template>
+            <v-data-table
+              density="comfortable"
+              :headers="ruleHeaders"
+              :items="filteredRules"
+              :loading="loading"
+            >
+              <template #item.subject_type="{ value }">
+                {{ value === 'user' ? t('permissions.user') : t('permissions.group') }}
+              </template>
+              <template #item.effect="{ value }">
+                <v-chip :color="value === 'allow' ? 'success' : 'warning'" size="small" variant="tonal">
+                  {{ value === 'allow' ? t('permissions.allow') : t('permissions.deny') }}
+                </v-chip>
+              </template>
+              <template #item.actions="{ item }">
+                <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(item)" />
+              </template>
+            </v-data-table>
+          </v-card-text>
+        </v-card>
+      </div>
+    </v-fade-transition>
   </div>
 </template>
 
@@ -787,6 +789,13 @@
   font-size: 0.92rem;
 }
 
+.permission-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .permission-perspectives {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -799,8 +808,21 @@
   border-radius: var(--shape-large);
   padding: 12px 16px;
   text-align: left;
+  cursor: pointer;
   background: rgb(var(--v-theme-surface));
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color var(--motion-base) var(--motion-ease),
+    background var(--motion-base) var(--motion-ease),
+    transform var(--motion-base) var(--motion-ease);
+}
+
+.permission-perspective:hover {
+  border-color: rgba(var(--v-theme-primary), 0.28);
+}
+
+.permission-perspective:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .permission-perspective--active {
@@ -827,14 +849,6 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
-}
-
-.permission-sidebar,
-.permission-panel {
-  border: 1px solid rgba(var(--v-theme-outline), 0.14);
-  border-radius: 24px;
-  background: rgb(var(--v-theme-surface));
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
 .permission-sidebar {
@@ -877,7 +891,21 @@
   border-radius: var(--shape-base);
   padding: 10px 12px;
   text-align: left;
+  cursor: pointer;
   background: rgb(var(--v-theme-surface));
+  transition:
+    border-color var(--motion-base) var(--motion-ease),
+    background var(--motion-base) var(--motion-ease),
+    transform var(--motion-base) var(--motion-ease);
+}
+
+.permission-sidebar__item:hover {
+  border-color: rgba(var(--v-theme-primary), 0.28);
+}
+
+.permission-sidebar__item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .permission-sidebar__item--active {

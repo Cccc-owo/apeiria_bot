@@ -414,15 +414,15 @@
 }
 
 .live-log-viewer__dots span:nth-child(1) {
-  background: #ff5f57;
+  background: rgb(var(--v-theme-error));
 }
 
 .live-log-viewer__dots span:nth-child(2) {
-  background: #febc2e;
+  background: rgb(var(--v-theme-warning));
 }
 
 .live-log-viewer__dots span:nth-child(3) {
-  background: #28c840;
+  background: rgb(var(--v-theme-success));
 }
 
 .live-log-viewer__title {
@@ -458,30 +458,30 @@
   justify-content: center;
   min-width: 64px;
   padding: 1px 8px;
-  border-radius: 8px;
+  border-radius: var(--shape-xsmall);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 .live-log-row__level--info {
-  background: rgba(52, 211, 153, 0.18);
-  color: #34d399;
+  background: rgba(var(--v-theme-info), 0.18);
+  color: rgb(var(--v-theme-info));
 }
 
 .live-log-row__level--warning {
-  background: rgba(250, 204, 21, 0.18);
-  color: #facc15;
+  background: rgba(var(--v-theme-warning), 0.18);
+  color: rgb(var(--v-theme-warning));
 }
 
 .live-log-row__level--error,
 .live-log-row__level--critical {
-  background: rgba(248, 113, 113, 0.18);
-  color: #f87171;
+  background: rgba(var(--v-theme-error), 0.18);
+  color: rgb(var(--v-theme-error));
 }
 
 .live-log-row__level--success {
-  background: rgba(96, 165, 250, 0.18);
-  color: #60a5fa;
+  background: rgba(var(--v-theme-success), 0.18);
+  color: rgb(var(--v-theme-success));
 }
 
 .live-log-row__message {

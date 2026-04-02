@@ -97,7 +97,7 @@
       <v-skeleton-loader
         v-for="index in 16"
         :key="index"
-        class="store-card"
+        class="store-card surface-gradient-card"
         type="article"
       />
     </div>
@@ -106,7 +106,7 @@
       <article
         v-for="item in pagedItems"
         :key="`${item.source_id}:${item.plugin_id}`"
-        class="store-card"
+        class="store-card surface-gradient-card"
       >
         <div class="store-card__header">
           <div class="store-card__avatar">
@@ -727,7 +727,7 @@
 }
 
 .store-grid--loading :deep(.v-skeleton-loader__article) {
-  border-radius: 24px;
+  border-radius: var(--shape-xlarge);
 }
 
 .store-card {
@@ -736,12 +736,19 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border: 1px solid rgba(var(--v-theme-outline-variant), 0.34);
-  border-radius: var(--shape-large);
-  background:
-    linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.94)),
-    linear-gradient(135deg, rgba(var(--v-theme-primary), 0.03), rgba(var(--v-theme-secondary), 0.03));
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  transition:
+    transform var(--motion-base) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    border-color var(--motion-base) var(--motion-ease);
+}
+
+.store-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-soft-hover);
+}
+
+.store-card:focus-within {
+  box-shadow: var(--focus-ring), var(--elevation-soft);
 }
 
 .store-card__header {
@@ -821,6 +828,11 @@
   text-decoration: underline;
 }
 
+.store-card__author--link:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
 .store-card__description {
   margin: 0;
   color: rgba(var(--v-theme-on-surface), 0.74);
@@ -848,18 +860,56 @@
   margin-top: auto;
 }
 
+.store-card__actions :deep(.v-btn) {
+  border-radius: var(--shape-medium) !important;
+  min-height: 36px;
+  padding-inline: 16px;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.store-card__actions :deep(.v-btn:not(.v-btn--disabled):hover) {
+  box-shadow: var(--elevation-soft-press);
+}
+
+.store-card__actions :deep(.v-btn:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
 .store-card__link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--shape-medium);
   color: rgb(var(--v-theme-primary));
   text-decoration: none;
   font-weight: 700;
   font-size: 0.9rem;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.store-card__link:hover {
+  background: rgba(var(--v-theme-primary), 0.14);
+}
+
+.store-card__link:focus-visible {
+  outline: none;
+  background: rgba(var(--v-theme-primary), 0.14);
+  box-shadow: var(--focus-ring);
 }
 
 .store-card__link--muted {
   color: rgba(var(--v-theme-on-surface), 0.44);
+}
+
+.store-card__link--muted:hover {
+  background: transparent;
 }
 
 .store-empty {
@@ -870,7 +920,7 @@
   gap: 10px;
   min-height: 320px;
   border: 1px dashed rgba(var(--v-theme-outline-variant), 0.7);
-  border-radius: 28px;
+  border-radius: var(--shape-2xlarge);
   color: rgba(var(--v-theme-on-surface), 0.58);
 }
 
