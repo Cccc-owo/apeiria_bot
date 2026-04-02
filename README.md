@@ -1,202 +1,283 @@
-# apeiria_bot
+<div align="center">
 
-## Environment Setup
+# Apeiria Bot
 
-This project uses `uv` to manage two environments:
+✨ 基于 NoneBot 2 的项目化机器人框架 ✨
 
-1. the main project environment in `.venv`
-2. the user extension environment in `.apeiria/extensions/.venv`
+[NoneBot 官网](https://nonebot.dev/) · [驱动文档](https://nonebot.dev/docs/advanced/driver) · [适配器文档](https://nonebot.dev/docs/advanced/adapter) · [配置文档](https://nonebot.dev/docs/appendices/config)
 
-Before initialization, make sure the machine has:
+</div>
 
-1. Python 3.10+
-2. `uv`
+## 简介
 
-Some plugins may still require extra system libraries depending on the platform.
+Apeiria 基于 [NoneBot 2](https://nonebot.dev/) 构建，在 NoneBot 的驱动、适配器、插件体系之上，补充了更适合长期维护的项目层能力：拆分式配置、双环境管理、内置管理插件、Web UI、插件商店接入和宿主机 CLI。
 
-### Local Development
+## 特色
 
-For local development, install frontend tooling if Web UI assets may need to build
-or rebuild on startup:
+- 项目化配置：把核心配置、插件、适配器、驱动拆分到独立 TOML 文件，降低长期维护成本
+- 双环境管理：Apeiria 项目环境与扩展环境分离，减少主环境污染
+- 开箱可管理：内置聊天管理命令、帮助系统、统一渲染服务和 Web UI
+- 基于 NoneBot 生态：底层沿用 NoneBot 2 的驱动、适配器、插件机制，项目侧统一通过 Apeiria CLI 与 Web UI 管理
+- 同时面向运维和开发：既有浏览器管理面板，也有宿主机 CLI
 
-1. `node`
-2. `pnpm` or `npm`
+## 与 NoneBot 的关系
 
-User-managed project files:
+- NoneBot 2 提供事件驱动框架、驱动、适配器和插件生态
+- Apeiria 提供项目组织、配置管理、运行时管理和可视化运维能力
+- 驱动统一通过 `apeiria.drivers.toml` 管理
+- 适配器统一通过 `apeiria.adapters.toml` 管理
+- 插件统一通过 `apeiria.plugins.toml`、CLI 和 Web UI 管理
+- 项目配置统一通过 `apeiria.config.toml` 管理
 
-1. `apeiria.config.toml`
-2. `apeiria.plugins.toml`
-3. `apeiria.adapters.toml`
-4. `apeiria.drivers.toml`
-5. `.env`
-6. `.env.dev`
-7. `.env.prod`
+NoneBot 官方文档可作为本项目的基础参考：
 
-Create `apeiria.*.toml` from the example files before first run:
+- 官方首页：<https://nonebot.dev/>
+- 驱动说明：<https://nonebot.dev/docs/advanced/driver>
+- 适配器说明：<https://nonebot.dev/docs/advanced/adapter>
+- 配置相关：<https://nonebot.dev/docs/appendices/config>
 
-1. `cp apeiria.config.example.toml apeiria.config.toml`
-2. `cp apeiria.plugins.example.toml apeiria.plugins.toml`
-3. `cp apeiria.adapters.example.toml apeiria.adapters.toml`
-4. `cp apeiria.drivers.example.toml apeiria.drivers.toml`
+## 当前能力
 
-`apeiria env init` only creates missing `.env`, `.env.dev`, and `.env.prod`
-as empty files. It does not create or rewrite any `apeiria.*.toml`.
+Apeiria 提供这些核心能力：
 
-Generated state:
+- 基于 NoneBot 2 的机器人运行入口与项目化启动流程
+- 按职责拆分的项目配置文件：核心配置、插件、适配器、驱动分别管理
+- 双环境管理：Apeiria 项目环境与 `.apeiria/extensions` 扩展环境分离
+- 内置插件：`apeiria.builtin_plugins.admin`、`apeiria.builtin_plugins.help`、`apeiria.builtin_plugins.render`、`apeiria.builtin_plugins.web_ui`
+- Web UI：仪表盘、核心配置编辑、插件启停与配置编辑、插件商店、权限管理、日志、Web Chat、账户管理
+- 宿主机 CLI：环境初始化、修复、导入导出、健康检查，驱动、适配器、插件管理，Web UI 账户恢复与注册码管理
 
-1. `.apeiria/extensions/`
-2. `.apeiria/cache/`
-3. `data/`
+## 项目结构
 
-## How to start
-
-1. clone the repository
-2. install project environment using `uv sync --locked`
-3. activate the virtual environment
-4. POSIX shells: `source .venv/bin/activate`
-5. create `apeiria.*.toml` from the example files
-6. initialize the project and user extension environments using
-   `apeiria env init`
-7. install user plugins using `apeiria plugin install <package>`
-8. run your bot using `apeiria run`
-9. if you need to rebuild Web UI assets before startup, use `apeiria run --build`
-
-## Environment Management
-
-After activating `.venv`, use these commands:
-
-1. `apeiria env init`
-   create missing empty `.env*` files, then sync the main project environment and the user extension environment
-2. `apeiria env init --no-dev`
-   sync the main project environment without development dependencies
-3. `apeiria env repair`
-   re-sync both environments from current managed files
-4. `apeiria env info`
-   show current environment paths and status
-5. `apeiria run --build`
-   build Web UI frontend assets, then run the bot
-6. `apeiria check`
-   validate bot startup without entering the event loop
-
-Main environment responsibilities:
-
-1. runtime for the Apeiria project itself
-2. framework and built-in project dependencies
-
-User extension environment responsibilities:
-
-1. user-installed plugins
-2. user-installed adapters
-3. user-installed drivers
-
-The extension environment is managed under `.apeiria/extensions/` and is ignored by git.
-If `APEIRIA_CONFIG_DIR` is set, Apeiria reads and writes `apeiria.*.toml` in that
-directory instead of the project root.
-`apeiria env init` does not create or rewrite these TOML files.
-The root aliases `apeiria init` and `apeiria repair` are still available for
-compatibility, but `apeiria env init|repair` is the primary interface.
-
-## User Packages
-
-Use Apeiria commands to manage packages in the user extension environment:
-
-1. `apeiria plugin install <package>`
-2. `apeiria adapter install <package>`
-3. `apeiria driver install <package>`
-
-Common install modes:
-
-1. `apeiria plugin install`
-   browse the default store interactively when no package is specified
-2. `apeiria plugin install <package>`
-   install by package name, with store metadata used automatically when available
-3. `apeiria plugin install --requirement "<requirement>"`
-   install from a raw requirement such as a git URL, local path, or version range
-4. `apeiria plugin install --store --source official-nonebot`
-   choose from a specific store source explicitly
-
-The same patterns also apply to `adapter install` and `driver install`.
-
-Installed user packages are declared in `.apeiria/extensions/pyproject.toml`.
-Their project registrations remain in these files:
-
-1. `apeiria.plugins.toml`
-2. `apeiria.adapters.toml`
-3. `apeiria.drivers.toml`
-
-When `APEIRIA_CONFIG_DIR` is set, these files are created in that directory.
-Example config files are kept in the project root:
-
-1. `apeiria.config.example.toml`
-2. `apeiria.plugins.example.toml`
-3. `apeiria.adapters.example.toml`
-4. `apeiria.drivers.example.toml`
-
-To move local runtime state to another machine:
-
-1. export local state with `apeiria env export`
-2. clone the repo on the new machine
-3. install project environment using `uv sync --locked`
-4. activate the virtual environment
-5. POSIX shells: `source .venv/bin/activate`
-6. initialize environments with `apeiria env init`
-7. import local state with `apeiria env import .apeiria/export`
-
-## Documentation
-
-See [Docs](https://nonebot.dev/)
-
-## Docker
-
-The container image keeps the main project environment in `/app/.venv`.
-User extension state stays under `/app/.apeiria`, which should be mounted.
-The frontend is built into the image at build time, so the running container does
-not need `node`, `pnpm`, or `npm`. Startup frontend builds are explicitly disabled
-in the container.
-
-Build and run:
-
-```bash
-docker compose up --build
+```text
+.
+├── apeiria/
+│   ├── app/                # 应用层服务：插件、权限、聊天、仪表盘
+│   ├── builtin_plugins/    # 内置 NoneBot 插件
+│   ├── infra/              # 基础设施：配置、运行时、数据库、日志、认证
+│   ├── interfaces/         # 对外入口：CLI、HTTP、Bot
+│   └── shared/             # 共享类型、工具与 i18n
+├── web/                    # Vue 3 + Vuetify Web UI
+├── bot.py                  # Bot 运行入口
+├── user_bot.example.py     # 本地自定义启动扩展示例
+└── apeiria.*.example.toml  # 配置模板
 ```
 
-The container command is:
+## 快速开始
+
+### 环境要求
+
+- Python `>=3.10, <4.0`
+- `uv`
+- Node.js
+- `pnpm`
+
+说明：
+
+- 后端环境初始化依赖 `uv`
+- 如果仓库内没有现成的 `web/dist`，首次本地运行或前端开发需要 Node.js 和 `pnpm`
+- 渲染相关功能依赖 Playwright
+
+### 1. 准备配置文件
+
+```bash
+cp apeiria.config.example.toml apeiria.config.toml
+cp apeiria.plugins.example.toml apeiria.plugins.toml
+cp apeiria.adapters.example.toml apeiria.adapters.toml
+cp apeiria.drivers.example.toml apeiria.drivers.toml
+cp user_bot.example.py user_bot.py
+```
+
+`.env`、`.env.dev`、`.env.prod` 可为空文件，`apeiria env init` 会自动补齐。`apeiria env init` 不会创建 `apeiria.*.toml`，这些文件需要先从示例模板复制。
+
+### 2. 初始化运行环境
+
+```bash
+uv sync
+./.venv/bin/apeiria env init
+```
+
+`apeiria env init` 会同步 Apeiria 项目环境、创建 `.apeiria/extensions` 扩展环境、同步扩展环境依赖，并补齐运行期需要的 `.env` 文件。
+
+### 3. 启动项目
+
+```bash
+./.venv/bin/apeiria run
+```
+
+需要先构建前端资源时，可执行：
+
+```bash
+./.venv/bin/apeiria run --build
+```
+
+也可以直接运行入口文件：
+
+```bash
+./.venv/bin/python bot.py
+```
+
+## Web UI
+
+默认访问地址：
+
+```text
+http://127.0.0.1:8080/
+```
+
+首次使用前，建议在宿主机创建或恢复一个 Owner 账号：
+
+```bash
+./.venv/bin/apeiria webui recover
+```
+
+常用命令：
+
+```bash
+./.venv/bin/apeiria webui accounts list
+./.venv/bin/apeiria webui accounts create
+./.venv/bin/apeiria webui codes create --role owner
+```
+
+## 配置文件说明
+
+配置文件请直接参考仓库中的示例文件：
+
+- `apeiria.config.example.toml`
+- `apeiria.plugins.example.toml`
+- `apeiria.adapters.example.toml`
+- `apeiria.drivers.example.toml`
+
+### `user_bot.py`
+
+本地项目扩展入口，仅用于用户自定义启动逻辑，适合放这些内容：
+
+- 启动与关闭生命周期钩子
+- 项目私有初始化逻辑
+- 少量不适合进入项目配置面的自定义注入逻辑
+
+不推荐把驱动、适配器、插件等项目级配置写在这里。这些内容应优先通过 Web UI 或 `apeiria.*.toml` 管理。
+
+这个文件默认不纳入仓库版本控制，适合承载本地定制。
+
+## Apeiria 与 NoneBot 的协作方式
+
+Apeiria 的启动流程如下：
+
+1. 启动前先整理 Apeiria 的项目配置、项目环境和扩展环境。
+2. 用 `apeiria.config.toml` 与环境变量生成 `nonebot.init(...)` 参数。
+3. 继续完成 NoneBot 初始化与框架层加载。
+4. 加载框架依赖插件和 Apeiria 内置插件。
+5. 执行 `user_bot.py` 中的本地自定义钩子。
+6. 从 `apeiria.adapters.toml` 注册适配器。
+7. 从 `apeiria.plugins.toml` 加载用户插件。
+
+项目约定如下：
+
+- 项目配置、插件、适配器、驱动统一通过 `apeiria.*.toml` 管理
+- 安装、启停、更新、排障优先使用 Apeiria CLI 和 Web UI
+- `user_bot.py` 仅用于钩子注入和其他少量自定义需求
+
+## 常用 CLI
+
+查看主命令：
+
+```bash
+./.venv/bin/apeiria --help
+```
+
+环境相关：
+
+```bash
+./.venv/bin/apeiria env init
+./.venv/bin/apeiria env repair
+./.venv/bin/apeiria env doctor
+./.venv/bin/apeiria env info
+./.venv/bin/apeiria check
+./.venv/bin/apeiria status
+```
+
+插件、适配器、驱动：
+
+```bash
+./.venv/bin/apeiria plugin list
+./.venv/bin/apeiria plugin store
+./.venv/bin/apeiria plugin install --store
+
+./.venv/bin/apeiria adapter list
+./.venv/bin/apeiria adapter install --store
+
+./.venv/bin/apeiria driver list
+./.venv/bin/apeiria driver install --store
+```
+
+## Docker 运行
+
+仓库自带 `Dockerfile` 和 `docker-compose.yml`。镜像构建阶段会先打包 `web/dist`，容器启动时不会再做前端构建；容器内执行的命令等价于：
 
 ```bash
 APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria env init --no-dev
 APEIRIA_BUILD_FRONTEND_ON_START=false .venv/bin/apeiria run
 ```
 
-Mounted paths in `docker-compose.yml`:
+`docker-compose.yml` 会挂载这些运行期文件：
 
-1. `.apeiria:/app/.apeiria`
-2. `data:/app/data`
-3. `apeiria.config.toml:/app/apeiria.config.toml`
-4. `apeiria.plugins.toml:/app/apeiria.plugins.toml`
-5. `apeiria.adapters.toml:/app/apeiria.adapters.toml`
-6. `apeiria.drivers.toml:/app/apeiria.drivers.toml`
-7. `.env:/app/.env`
-8. `.env.dev:/app/.env.dev`
-9. `.env.prod:/app/.env.prod`
+- `./.apeiria`
+- `./data`
+- `./apeiria.config.toml`
+- `./apeiria.plugins.toml`
+- `./apeiria.adapters.toml`
+- `./apeiria.drivers.toml`
+- `./.env`
+- `./.env.dev`
+- `./.env.prod`
 
-That means Docker keeps:
-
-1. extension environment in `.apeiria/extensions/`
-2. uv cache in `.apeiria/cache/`
-3. root runtime config files in `apeiria.*.toml`
-4. environment files in `.env*`
-
-The bind-mounted `apeiria.*.toml` files must exist on the host before `docker compose up`.
-Missing `.env*` files can be created by `apeiria env init`, including the
-container startup command, as empty files.
-
-The compose service also sets `HOST=0.0.0.0`, so the Web UI is reachable from the
-host on `http://127.0.0.1:8080/`.
-
-If you need to install user plugins inside the container:
+启动：
 
 ```bash
-docker compose exec apeiria /app/.venv/bin/apeiria plugin install <package>
-docker compose exec apeiria /app/.venv/bin/apeiria adapter install <package>
-docker compose exec apeiria /app/.venv/bin/apeiria driver install <package>
+docker compose up -d --build
 ```
+
+默认暴露端口：
+
+```text
+8080
+```
+
+`docker-compose.yml` 同时设置了 `HOST=0.0.0.0`，因此宿主机可直接访问 `http://127.0.0.1:8080/`。
+
+## 前端开发
+
+Web UI 使用 Vue 3 + Vuetify。
+
+```bash
+cd web
+pnpm install
+pnpm lint
+pnpm type-check
+pnpm build
+```
+
+## 什么不是 Apeiria
+
+- Apeiria 不是对 NoneBot 2 的替代，而是基于 NoneBot 2 的项目封装层
+- Apeiria 不是某个平台协议的具体实现，平台接入能力仍来自对应适配器
+- Apeiria 不试图屏蔽 NoneBot 原生概念；驱动、适配器、插件仍然是理解项目的基础
+
+## 开发建议
+
+- 涉及框架基础概念时，优先参考 NoneBot 官方文档
+- 新增插件或依赖时，先确认它应进入 Apeiria 项目环境还是扩展环境
+- 修改核心事件处理时，避免在核心逻辑中直接依赖特定适配器类型
+- 对外说明优先写在插件 README 或主 README，避免能力只存在于代码中
+
+## 参考资料
+
+- NoneBot 官方站点：<https://nonebot.dev/>
+- NoneBot 驱动：<https://nonebot.dev/docs/advanced/driver>
+- NoneBot 适配器：<https://nonebot.dev/docs/advanced/adapter>
+- NoneBot 配置：<https://nonebot.dev/docs/appendices/config>
+
+## 许可协议
+
+[MIT](LICENSE)

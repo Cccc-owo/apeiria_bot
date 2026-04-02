@@ -1,75 +1,65 @@
-# vuetify-project
+# Apeiria Web UI
 
-Scaffolded with Vuetify CLI.
+Apeiria 的前端管理界面，基于 Vue 3、Vite、TypeScript 和 Vuetify 构建。
 
-## ❗️ Documentation
+## 功能
 
-- Primary docs: https://vuetifyjs.com/
-- Getting started guide: https://vuetifyjs.com/en/getting-started/installation/
-- Community support: https://community.vuetifyjs.com/
-- Issue tracker: https://issues.vuetifyjs.com/
+- 登录、注册与账户管理
+- 仪表盘与运行状态展示
+- 核心配置编辑
+- 插件列表、启停、配置编辑、安装与升级
+- 插件商店浏览与安装任务跟踪
+- 权限管理
+- 实时日志与历史日志
+- Web Chat
 
-## 🧱 Stack
+## 技术栈
 
-- Framework: Vue 3 + Vite
-- UI Library: Vuetify
-- Language: TypeScript
-- Package manager: pnpm
+- Vue 3
+- Vite
+- TypeScript
+- Vuetify
+- Vue Router
+- Pinia
+- Vue I18n
 
-## 🧭 Start Here
+## 目录
 
-- Main entry: `src/main.ts`
-- Main app component: `src/App.vue`
-- Main styles: `src/styles/`
-- Plugin setup: `src/plugins/`
+- `src/main.ts`：应用入口
+- `src/App.vue`：根组件
+- `src/router/`：路由配置
+- `src/views/`：页面视图
+- `src/components/`：通用组件
+- `src/stores/`：状态管理
+- `src/api/`：接口封装
+- `src/plugins/`：前端插件初始化
+- `src/styles/`：全局样式
 
-## 📁 Project Structure
-
-- `src/main.ts` — application entry point
-- `src/App.vue` — root component
-- `src/components/` — reusable Vue components
-- `src/plugins/` — plugin registration and setup
-- `src/styles/` — global styles and theme settings
-- `public/` — static public files
-
-## ✨ Enabled Features
-
-- Base setup
-
-## 💿 Install
-
-Use your selected package manager (pnpm) to install dependencies:
-
-```bash
-pnpm install
-```
-
-## 🚀 Quick Start
+## 开发
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-## 🏗️ Build
+## 构建
 
 ```bash
 pnpm build
 ```
 
-## 🧪 Available Scripts
+## 校验
+
+```bash
+pnpm lint
+pnpm type-check
+```
+
+## 脚本
 
 - `pnpm dev`
 - `pnpm build`
 - `pnpm preview`
 - `pnpm build-only`
+- `pnpm lint`
 - `pnpm type-check`
-
-## 💪 Support Vuetify Development
-
-This project uses Vuetify - an MIT licensed Open Source project. We are glad to welcome contributors and any support for ongoing development:
-
-- Contribute to Vuetify and ecosystem projects: https://github.com/vuetifyjs
-- Request enterprise support: https://support.vuetifyjs.com/
-- Sponsor on GitHub: https://github.com/sponsors/vuetifyjs
-- Support on Open Collective: https://opencollective.com/vuetify
