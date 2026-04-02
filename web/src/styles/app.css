@@ -3,6 +3,7 @@
   --font-family-sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', sans-serif;
   --font-family-mono: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
   --shape-large: 18px;
+  --shape-base: 16px;
   --shape-medium: 14px;
   --shape-small: 12px;
   --shape-pill: 999px;
@@ -52,6 +53,23 @@ samp,
 
 .v-card > .v-card-actions {
   padding: 8px 14px 14px !important;
+}
+
+.task-log-card {
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: var(--shape-small);
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.task-log-card__content {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .page-view {

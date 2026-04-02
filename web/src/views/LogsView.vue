@@ -409,7 +409,7 @@
 .live-log-viewer__dots span {
   width: 10px;
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--shape-pill);
   background: rgba(var(--v-theme-on-surface), 0.3);
 }
 

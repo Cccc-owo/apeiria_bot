@@ -1426,7 +1426,7 @@
 .chat-sidebar {
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   overflow: hidden;
 }
 
@@ -1449,7 +1449,7 @@
   gap: 8px;
   min-height: 152px;
   padding: 10px 12px;
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   background: rgb(var(--v-theme-surface-container));
 }
 
@@ -1548,7 +1548,7 @@
 .chat-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   overflow: hidden;
 }
 
@@ -1590,7 +1590,7 @@
 
 .chat-message {
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1628,7 +1628,7 @@
 
 .chat-bubble {
   padding: 11px 13px 7px;
-  border-radius: 14px !important;
+  border-radius: var(--shape-medium) !important;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 2px 8px rgba(15, 23, 42, 0.05);
@@ -1700,13 +1700,13 @@
   width: auto;
   max-width: 100%;
   max-height: min(52vh, 560px);
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   cursor: zoom-in;
 }
 
 .reply-segment {
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   border-left: 2px solid rgba(var(--v-theme-secondary), 0.4);
   background: rgba(var(--v-theme-on-surface), 0.045);
 }
@@ -1784,7 +1784,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   background: rgb(var(--v-theme-secondary-container));
 }
 
@@ -1835,7 +1835,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgb(var(--v-theme-surface-container));
 }
 
@@ -1853,7 +1853,7 @@
   width: 56px;
   height: 56px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   cursor: zoom-in;
 }
 
@@ -1883,7 +1883,7 @@
   max-height: 188px;
   overflow: auto;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgb(var(--v-theme-surface-container-high));
   line-height: 1.58;
   outline: none;
@@ -1913,7 +1913,7 @@
   gap: 4px;
   margin: 2px 4px 2px 0;
   padding: 2px 6px 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--shape-pill);
   vertical-align: middle;
   background: rgb(var(--v-theme-secondary-container));
   color: rgb(var(--v-theme-on-secondary-container));
@@ -1935,7 +1935,7 @@
   padding: 0;
   width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--shape-pill);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -1966,7 +1966,7 @@
   width: 100%;
   height: min(78vh, 860px);
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgb(var(--v-theme-surface-container));
 }
 

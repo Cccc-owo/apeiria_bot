@@ -341,7 +341,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   border: 1px solid rgba(var(--v-border-color), 0.65);
   background: rgba(var(--v-theme-on-surface), 0.018);
 }
