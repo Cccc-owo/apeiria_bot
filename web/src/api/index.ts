@@ -332,48 +332,59 @@ export interface UserLevelItem {
   level: number
 }
 
-export const login = (payload: {
+export function login (payload: {
   username: string
   password: string
-}) =>
-  client.post<{ token: string; principal: WebUIPrincipal }>('/auth/login', payload)
+}) {
+  return client.post<{ token: string, principal: WebUIPrincipal }>('/auth/login', payload)
+}
 
-export const register = (payload: {
+export function register (payload: {
   registration_code: string
   username: string
   password: string
-}) =>
-  client.post<{ status: string; detail?: string | null }>('/auth/register', payload)
+}) {
+  return client.post<{ status: string, detail?: string | null }>('/auth/register', payload)
+}
 
-export const getCurrentUser = () =>
-  client.get<WebUIPrincipal>('/auth/me')
+export function getCurrentUser () {
+  return client.get<WebUIPrincipal>('/auth/me')
+}
 
-export const getCurrentAccount = () =>
-  client.get<WebUIAccountItem>('/auth/me/account')
+export function getCurrentAccount () {
+  return client.get<WebUIAccountItem>('/auth/me/account')
+}
 
-export const changePassword = (payload: {
+export function changePassword (payload: {
   current_password: string
   new_password: string
-}) =>
-  client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/password', payload)
+}) {
+  return client.post<{ status: string, detail?: string | null, token: string, principal: WebUIPrincipal }>('/auth/password', payload)
+}
 
-export const getSecurityAuditEvents = () =>
-  client.get<SecurityAuditEventItem[]>('/auth/audit-events')
+export function getSecurityAuditEvents () {
+  return client.get<SecurityAuditEventItem[]>('/auth/audit-events')
+}
 
-export const revokeOtherSessions = () =>
-  client.post<{ status: string; detail?: string | null; token: string; principal: WebUIPrincipal }>('/auth/sessions/revoke-others')
+export function revokeOtherSessions () {
+  return client.post<{ status: string, detail?: string | null, token: string, principal: WebUIPrincipal }>('/auth/sessions/revoke-others')
+}
 
-export const getStatus = () =>
-  client.get<DashboardStatus>('/dashboard/status')
+export function getStatus () {
+  return client.get<DashboardStatus>('/dashboard/status')
+}
 
-export const getDashboardEvents = () =>
-  client.get<{ items: DashboardEventItem[] }>('/dashboard/events')
+export function getDashboardEvents () {
+  return client.get<{ items: DashboardEventItem[] }>('/dashboard/events')
+}
 
-export const getWebUIBuildStatus = () =>
-  client.get<WebUIBuildStatus>('/dashboard/webui-build')
+export function getWebUIBuildStatus () {
+  return client.get<WebUIBuildStatus>('/dashboard/webui-build')
+}
 
-export const rebuildWebUI = () =>
-  client.post<WebUIBuildRunResult>('/dashboard/webui-build')
+export function rebuildWebUI () {
+  return client.post<WebUIBuildRunResult>('/dashboard/webui-build')
+}
 
 function clearSessionAndRedirect () {
   localStorage.removeItem('token')
@@ -439,49 +450,56 @@ export async function streamRebuildWebUI (
   }
 }
 
-export const restartBot = () =>
-  client.post<{ status: string; detail?: string | null }>('/dashboard/restart')
+export function restartBot () {
+  return client.post<{ status: string, detail?: string | null }>('/dashboard/restart')
+}
 
-export const getLogHistory = (
-  params?: LogHistoryQuery,
-  signal?: AbortSignal,
-) =>
-  client.get<LogHistoryResponse>('/logs/history', { params, signal })
+export function getLogHistory (params?: LogHistoryQuery,
+  signal?: AbortSignal) {
+  return client.get<LogHistoryResponse>('/logs/history', { params, signal })
+}
 
-export const getLogSources = (signal?: AbortSignal) =>
-  client.get<LogSourcesResponse>('/logs/sources', { signal })
+export function getLogSources (signal?: AbortSignal) {
+  return client.get<LogSourcesResponse>('/logs/sources', { signal })
+}
 
-export const getPlugins = () =>
-  client.get<PluginItem[]>('/plugins/')
+export function getPlugins () {
+  return client.get<PluginItem[]>('/plugins/')
+}
 
-export const checkPluginUpdates = (payload?: { force_refresh?: boolean }) =>
-  client.post<PluginUpdateCheckItem[]>('/plugins/update-checks', payload || {})
+export function checkPluginUpdates (payload?: { force_refresh?: boolean }) {
+  return client.post<PluginUpdateCheckItem[]>('/plugins/update-checks', payload || {})
+}
 
-export const getOrphanPluginConfigs = () =>
-  client.get<OrphanPluginConfigResponse>('/plugins/orphan-configs')
+export function getOrphanPluginConfigs () {
+  return client.get<OrphanPluginConfigResponse>('/plugins/orphan-configs')
+}
 
-export const cleanupOrphanPluginConfigs = () =>
-  client.post<OrphanPluginConfigResponse>('/plugins/orphan-configs/cleanup')
+export function cleanupOrphanPluginConfigs () {
+  return client.post<OrphanPluginConfigResponse>('/plugins/orphan-configs/cleanup')
+}
 
-export const installManualPlugin = (payload: {
+export function installManualPlugin (payload: {
   requirement: string
   module_name?: string
-}) =>
-  client.post<PluginStoreTask>('/plugins/install/manual', payload)
+}) {
+  return client.post<PluginStoreTask>('/plugins/install/manual', payload)
+}
 
-export const getPluginInstallTask = (taskId: string) =>
-  client.get<PluginStoreTask>(`/plugins/install/tasks/${taskId}`)
+export function getPluginInstallTask (taskId: string) {
+  return client.get<PluginStoreTask>(`/plugins/install/tasks/${taskId}`)
+}
 
-export const updateInstalledPlugin = (
-  moduleName: string,
-  payload: { package_name: string },
-) =>
-  client.post<PluginStoreTask>(`/plugins/${moduleName}/update`, payload)
+export function updateInstalledPlugin (moduleName: string,
+  payload: { package_name: string }) {
+  return client.post<PluginStoreTask>(`/plugins/${moduleName}/update`, payload)
+}
 
-export const getPluginStoreSources = () =>
-  client.get<PluginStoreSource[]>('/plugins/store/sources')
+export function getPluginStoreSources () {
+  return client.get<PluginStoreSource[]>('/plugins/store/sources')
+}
 
-export const getPluginStoreItems = (params?: {
+export function getPluginStoreItems (params?: {
   source?: string
   search?: string
   category?: string
@@ -490,171 +508,192 @@ export const getPluginStoreItems = (params?: {
   uninstalled_only?: boolean
   page?: number
   per_page?: number
-}) =>
-  client.get<PluginStoreItemsResponse>('/plugins/store/items', { params })
+}) {
+  return client.get<PluginStoreItemsResponse>('/plugins/store/items', { params })
+}
 
-export const getPluginStoreItem = (sourceId: string, pluginId: string) =>
-  client.get<PluginStoreItem>(`/plugins/store/items/${encodeURIComponent(sourceId)}/${encodeURIComponent(pluginId)}`)
+export function getPluginStoreItem (sourceId: string, pluginId: string) {
+  return client.get<PluginStoreItem>(`/plugins/store/items/${encodeURIComponent(sourceId)}/${encodeURIComponent(pluginId)}`)
+}
 
-export const refreshPluginStoreSources = (payload?: {
+export function refreshPluginStoreSources (payload?: {
   source_id?: string
-}) =>
-  client.post<PluginStoreSource[]>('/plugins/store/refresh', payload || {})
+}) {
+  return client.post<PluginStoreSource[]>('/plugins/store/refresh', payload || {})
+}
 
-export const installPluginStoreItem = (payload: {
+export function installPluginStoreItem (payload: {
   source_id: string
   plugin_id: string
   package_name: string
   module_name: string
-}) =>
-  client.post<PluginStoreTask>('/plugins/store/install', payload)
+}) {
+  return client.post<PluginStoreTask>('/plugins/store/install', payload)
+}
 
-export const updatePluginStoreItem = (payload: {
+export function updatePluginStoreItem (payload: {
   source_id: string
   plugin_id: string
   package_name: string
   module_name: string
-}) =>
-  client.post<PluginStoreTask>('/plugins/store/update', payload)
+}) {
+  return client.post<PluginStoreTask>('/plugins/store/update', payload)
+}
 
-export const getPluginStoreTask = (taskId: string) =>
-  client.get<PluginStoreTask>(`/plugins/store/tasks/${taskId}`)
+export function getPluginStoreTask (taskId: string) {
+  return client.get<PluginStoreTask>(`/plugins/store/tasks/${taskId}`)
+}
 
-export const revertPluginStoreInstall = (payload: {
+export function revertPluginStoreInstall (payload: {
   package_name: string
   module_name: string
-}) =>
-  client.post<{ status: string }>('/plugins/store/revert-install', payload)
+}) {
+  return client.post<{ status: string }>('/plugins/store/revert-install', payload)
+}
 
-export const getCoreSettings = () =>
-  client.get<SettingsResponse>('/plugins/core/settings')
+export function getCoreSettings () {
+  return client.get<SettingsResponse>('/plugins/core/settings')
+}
 
-export const getCoreSettingsRaw = () =>
-  client.get<RawSettingsResponse>('/plugins/core/settings/raw')
+export function getCoreSettingsRaw () {
+  return client.get<RawSettingsResponse>('/plugins/core/settings/raw')
+}
 
-export const updateCoreSettings = (payload: {
+export function updateCoreSettings (payload: {
   values: Record<string, unknown>
   clear?: string[]
-}) =>
-  client.patch<SettingsResponse>('/plugins/core/settings', payload)
+}) {
+  return client.patch<SettingsResponse>('/plugins/core/settings', payload)
+}
 
-export const updateCoreSettingsRaw = (payload: { text: string }) =>
-  client.patch<RawSettingsResponse>('/plugins/core/settings/raw', payload)
+export function updateCoreSettingsRaw (payload: { text: string }) {
+  return client.patch<RawSettingsResponse>('/plugins/core/settings/raw', payload)
+}
 
-export const validateCoreSettingsRaw = (payload: { text: string }) =>
-  client.post<RawSettingsValidationResponse>('/plugins/core/settings/raw/validate', payload)
+export function validateCoreSettingsRaw (payload: { text: string }) {
+  return client.post<RawSettingsValidationResponse>('/plugins/core/settings/raw/validate', payload)
+}
 
-export const getPluginSettings = (moduleName: string) =>
-  client.get<SettingsResponse>(`/plugins/${moduleName}/settings`)
+export function getPluginSettings (moduleName: string) {
+  return client.get<SettingsResponse>(`/plugins/${moduleName}/settings`)
+}
 
-export const getPluginSettingsRaw = (moduleName: string) =>
-  client.get<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`)
+export function getPluginSettingsRaw (moduleName: string) {
+  return client.get<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`)
+}
 
-export const getPluginReadme = (moduleName: string) =>
-  client.get<PluginReadmeResponse>(`/plugins/${moduleName}/readme`)
+export function getPluginReadme (moduleName: string) {
+  return client.get<PluginReadmeResponse>(`/plugins/${moduleName}/readme`)
+}
 
-export const updatePluginSettings = (
-  moduleName: string,
+export function updatePluginSettings (moduleName: string,
   payload: {
     values: Record<string, unknown>
     clear?: string[]
-  },
-) =>
-  client.patch<SettingsResponse>(`/plugins/${moduleName}/settings`, payload)
+  }) {
+  return client.patch<SettingsResponse>(`/plugins/${moduleName}/settings`, payload)
+}
 
-export const updatePluginSettingsRaw = (
-  moduleName: string,
-  payload: { text: string },
-) =>
-  client.patch<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`, payload)
+export function updatePluginSettingsRaw (moduleName: string,
+  payload: { text: string }) {
+  return client.patch<RawSettingsResponse>(`/plugins/${moduleName}/settings/raw`, payload)
+}
 
-export const validatePluginSettingsRaw = (
-  moduleName: string,
-  payload: { text: string },
-) =>
-  client.post<RawSettingsValidationResponse>(`/plugins/${moduleName}/settings/raw/validate`, payload)
+export function validatePluginSettingsRaw (moduleName: string,
+  payload: { text: string }) {
+  return client.post<RawSettingsValidationResponse>(`/plugins/${moduleName}/settings/raw/validate`, payload)
+}
 
-export const getPluginConfig = () =>
-  client.get<{
+export function getPluginConfig () {
+  return client.get<{
     modules: ModuleConfigItem[]
     dirs: DirConfigItem[]
   }>('/plugins/config')
+}
 
-export const getAdapterConfig = () =>
-  client.get<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config')
+export function getAdapterConfig () {
+  return client.get<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config')
+}
 
-export const updateAdapterConfig = (payload: { modules: string[] }) =>
-  client.patch<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config', payload)
+export function updateAdapterConfig (payload: { modules: string[] }) {
+  return client.patch<{ modules: ModuleConfigItem[] }>('/plugins/adapters/config', payload)
+}
 
-export const getDriverConfig = () =>
-  client.get<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config')
+export function getDriverConfig () {
+  return client.get<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config')
+}
 
-export const updateDriverConfig = (payload: { builtin: string[] }) =>
-  client.patch<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config', payload)
+export function updateDriverConfig (payload: { builtin: string[] }) {
+  return client.patch<{ builtin: DriverConfigItem[] }>('/plugins/drivers/config', payload)
+}
 
-export const updatePluginConfig = (payload: {
+export function updatePluginConfig (payload: {
   modules: string[]
   dirs: string[]
-}) =>
-  client.patch<{
+}) {
+  return client.patch<{
     modules: ModuleConfigItem[]
     dirs: DirConfigItem[]
   }>('/plugins/config', payload)
+}
 
-export const updatePlugin = (
-  moduleName: string,
+export function updatePlugin (moduleName: string,
   enabled: boolean,
-  cascade = false,
-) =>
-  client.patch<PluginToggleResult>(`/plugins/${moduleName}`, null, {
+  cascade = false) {
+  return client.patch<PluginToggleResult>(`/plugins/${moduleName}`, null, {
     params: { enabled, cascade },
   })
+}
 
-export const getPluginTogglePreview = (moduleName: string, enabled: boolean) =>
-  client.get<PluginTogglePreview>(`/plugins/${moduleName}/toggle-preview`, {
+export function getPluginTogglePreview (moduleName: string, enabled: boolean) {
+  return client.get<PluginTogglePreview>(`/plugins/${moduleName}/toggle-preview`, {
     params: { enabled },
   })
+}
 
-export const uninstallPlugin = (
-  moduleName: string,
-  payload?: { remove_config?: boolean },
-) =>
-  client.post<{ status: string; detail?: string | null }>(
+export function uninstallPlugin (moduleName: string,
+  payload?: { remove_config?: boolean }) {
+  return client.post<{ status: string, detail?: string | null }>(
     `/plugins/${encodeURIComponent(moduleName)}/uninstall`,
     payload || {},
   )
+}
 
-export const getAccessRules = () =>
-  client.get<AccessRuleItem[]>('/permissions/rules')
+export function getAccessRules () {
+  return client.get<AccessRuleItem[]>('/permissions/rules')
+}
 
-export const createAccessRule = (payload: {
+export function createAccessRule (payload: {
   subject_type: string
   subject_id: string
   plugin_module: string
   effect: string
   note?: string | null
-}) =>
-  client.post<AccessRuleItem>('/permissions/rules', payload)
+}) {
+  return client.post<AccessRuleItem>('/permissions/rules', payload)
+}
 
-export const deleteAccessRule = (payload: {
+export function deleteAccessRule (payload: {
   subject_type: string
   subject_id: string
   plugin_module: string
-}) =>
-  client.post('/permissions/rules/delete', payload)
+}) {
+  return client.post('/permissions/rules/delete', payload)
+}
 
-export const updatePluginAccessMode = (
-  moduleName: string,
-  accessMode: string,
-) =>
-  client.patch('/permissions/plugins/' + encodeURIComponent(moduleName) + '/access-mode', {
+export function updatePluginAccessMode (moduleName: string,
+  accessMode: string) {
+  return client.patch('/permissions/plugins/' + encodeURIComponent(moduleName) + '/access-mode', {
     access_mode: accessMode,
   })
+}
 
-export const getUsers = () =>
-  client.get<UserLevelItem[]>('/permissions/users')
+export function getUsers () {
+  return client.get<UserLevelItem[]>('/permissions/users')
+}
 
-export const updateUserLevel = (userId: string, groupId: string, level: number) =>
-  client.patch(`/permissions/users/${userId}`, { level }, {
+export function updateUserLevel (userId: string, groupId: string, level: number) {
+  return client.patch(`/permissions/users/${userId}`, { level }, {
     params: { group_id: groupId },
   })
+}

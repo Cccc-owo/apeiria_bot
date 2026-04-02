@@ -51,8 +51,10 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
 
   const fields = computed(() =>
     [...(state.value?.fields ?? [])]
-      .sort((left, right) => {
-        if (left.order !== right.order) return left.order - right.order
+      .toSorted((left, right) => {
+        if (left.order !== right.order) {
+          return left.order - right.order
+        }
         return left.key.localeCompare(right.key)
       }),
   )
@@ -100,7 +102,9 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
   }
 
   async function reload () {
-    if (!options.load) return
+    if (!options.load) {
+      return
+    }
     loading.value = true
     errorMessage.value = ''
     try {
@@ -130,7 +134,9 @@ export function useSettingsEditor (options: UseSettingsEditorOptions) {
       return
     }
 
-    if (Object.keys(payload.values).length === 0 && payload.clear.length === 0) return
+    if (Object.keys(payload.values).length === 0 && payload.clear.length === 0) {
+      return
+    }
 
     saving.value = true
     errorMessage.value = ''

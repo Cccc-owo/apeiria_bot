@@ -1,6 +1,6 @@
+import type { RawSettingsValidationResponse } from '@/api'
 import { computed, onBeforeUnmount, ref, type Ref, watch } from 'vue'
 import { getErrorMessage } from '@/api/client'
-import type { RawSettingsValidationResponse } from '@/api'
 
 interface UseRawTomlValidationOptions {
   text: Ref<string>
@@ -36,7 +36,9 @@ export function useRawTomlValidation (options: UseRawTomlValidationOptions) {
     validationPending.value = true
     try {
       const result = await options.validate(text)
-      if (currentRequestId !== requestId) return false
+      if (currentRequestId !== requestId) {
+        return false
+      }
       if (result.valid) {
         clearValidation()
         return true
@@ -46,7 +48,9 @@ export function useRawTomlValidation (options: UseRawTomlValidationOptions) {
       validationColumn.value = result.column
       return false
     } catch (error) {
-      if (currentRequestId !== requestId) return false
+      if (currentRequestId !== requestId) {
+        return false
+      }
       validationMessage.value = getErrorMessage(error, options.fallbackMessage)
       validationLine.value = null
       validationColumn.value = null

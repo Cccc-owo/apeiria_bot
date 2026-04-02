@@ -141,7 +141,7 @@
         {{ validationMessage }}
       </v-alert>
 
-      <div v-if="activeFilterChips.length" class="history-active-filters">
+      <div v-if="activeFilterChips.length > 0" class="history-active-filters">
         <v-chip
           v-for="chip in activeFilterChips"
           :key="chip.key"
@@ -218,7 +218,7 @@
             </div>
             <div class="history-detail-panel__message">{{ entry.message }}</div>
             <pre class="history-log-card__raw">{{ entry.raw }}</pre>
-            <pre v-if="Object.keys(entry.extra).length" class="history-log-card__raw">{{ JSON.stringify(entry.extra, null, 2) }}</pre>
+            <pre v-if="Object.keys(entry.extra).length > 0" class="history-log-card__raw">{{ JSON.stringify(entry.extra, null, 2) }}</pre>
           </div>
         </div>
       </div>
@@ -263,12 +263,12 @@
 </template>
 
 <script setup lang="ts">
+  import type { LogHistoryQuery, LogItem } from '@/api'
   import axios from 'axios'
   import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
   import { getLogHistory, getLogSources } from '@/api'
-  import type { LogHistoryQuery, LogItem } from '@/api'
   import { getErrorMessage } from '@/api/client'
 
   interface HistoryLogEntry extends LogItem {

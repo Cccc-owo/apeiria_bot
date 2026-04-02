@@ -1,15 +1,15 @@
 declare module 'markdown-it' {
   export interface MarkdownItToken {
-    attrGet(name: string): string | null
-    attrSet(name: string, value: string): void
+    attrGet: (name: string) => string | null
+    attrSet: (name: string, value: string) => void
   }
 
   export interface MarkdownItRenderer {
-    renderToken(
+    renderToken: (
       tokens: MarkdownItToken[],
       idx: number,
       options: unknown,
-    ): string
+    ) => string
   }
 
   export type MarkdownItRenderRule = (
@@ -24,11 +24,11 @@ declare module 'markdown-it' {
     renderer: {
       rules: Record<string, MarkdownItRenderRule | undefined>
     }
-    use<Args extends unknown[]>(
+    use: <Args extends unknown[]>(
       plugin: (instance: MarkdownItInstance, ...args: Args) => void,
       ...args: Args
-    ): MarkdownItInstance
-    render(src: string): string
+    ) => MarkdownItInstance
+    render: (src: string) => string
   }
 
   export interface MarkdownItOptions {
@@ -39,13 +39,16 @@ declare module 'markdown-it' {
 
   export default class MarkdownIt implements MarkdownItInstance {
     constructor (options?: MarkdownItOptions)
+
     renderer: {
       rules: Record<string, MarkdownItRenderRule | undefined>
     }
-    use<Args extends unknown[]> (
+
+    use: <Args extends unknown[]> (
       plugin: (instance: MarkdownItInstance, ...args: Args) => void,
       ...args: Args
-    ): MarkdownItInstance
-    render (src: string): string
+    ) => MarkdownItInstance
+
+    render: (src: string) => string
   }
 }

@@ -1,14 +1,14 @@
-import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 
-export type RestartUndoAction =
-  | { kind: 'core-settings'; values: Record<string, unknown> }
-  | { kind: 'core-raw'; text: string }
-  | { kind: 'plugin-settings'; moduleName: string; values: Record<string, unknown> }
-  | { kind: 'plugin-raw'; moduleName: string; text: string }
-  | { kind: 'plugin-config'; modules: string[]; dirs: string[] }
-  | { kind: 'plugin-toggle'; moduleName: string; enabled: boolean }
-  | { kind: 'plugin-install'; packageName: string; moduleName: string }
+export type RestartUndoAction
+  = | { kind: 'core-settings', values: Record<string, unknown> }
+    | { kind: 'core-raw', text: string }
+    | { kind: 'plugin-settings', moduleName: string, values: Record<string, unknown> }
+    | { kind: 'plugin-raw', moduleName: string, text: string }
+    | { kind: 'plugin-config', modules: string[], dirs: string[] }
+    | { kind: 'plugin-toggle', moduleName: string, enabled: boolean }
+    | { kind: 'plugin-install', packageName: string, moduleName: string }
 
 export interface RestartPendingEntry {
   id: string
@@ -59,19 +59,21 @@ function persistEntries (entries: RestartPendingEntry[]) {
 
 function readEntries () {
   const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return [] as RestartPendingEntry[]
+  if (!raw) {
+    return [] as RestartPendingEntry[]
+  }
   try {
     const parsed = JSON.parse(raw) as RestartPendingEntry[]
     return Array.isArray(parsed)
       ? parsed.filter(item =>
-        item
-        && typeof item.id === 'string'
-        && typeof item.scope === 'string'
-        && typeof item.summary === 'string'
-        && typeof item.updated_at === 'string'
-        && item.undo
-        && typeof item.undo === 'object',
-      )
+          item
+          && typeof item.id === 'string'
+          && typeof item.scope === 'string'
+          && typeof item.summary === 'string'
+          && typeof item.updated_at === 'string'
+          && item.undo
+          && typeof item.undo === 'object',
+        )
       : []
   } catch {
     localStorage.removeItem(STORAGE_KEY)

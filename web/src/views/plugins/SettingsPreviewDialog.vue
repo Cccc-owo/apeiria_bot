@@ -66,8 +66,8 @@
   }>()
 
   const emit = defineEmits<{
-    cancel: []
-    confirm: []
+    'cancel': []
+    'confirm': []
     'update:modelValue': [value: boolean]
   }>()
 </script>

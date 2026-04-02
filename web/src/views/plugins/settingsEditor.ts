@@ -68,8 +68,12 @@ export interface SettingsUpdatePayload {
 }
 
 export function displayFieldValue (value: unknown) {
-  if (value == null) return 'null'
-  if (typeof value === 'string') return value
+  if (value == null) {
+    return 'null'
+  }
+  if (typeof value === 'string') {
+    return value
+  }
   try {
     return JSON.stringify(value)
   } catch {
@@ -96,7 +100,9 @@ export function isNestedEditorField (field: PluginSettingField) {
 }
 
 export function textInputType (field: PluginSettingField) {
-  if (field.secret) return 'password'
+  if (field.secret) {
+    return 'password'
+  }
   return field.type === 'int' || field.type === 'float' ? 'number' : 'text'
 }
 
@@ -117,17 +123,29 @@ export function cloneSettingValue<T> (value: T): T {
 }
 
 export function buildSchemaDefaultValue (schema: PluginSettingSchema | null): unknown {
-  if (!schema) return ''
-  if (schema.allows_null) return null
-  if (schema.type === 'bool') return false
-  if (schema.type === 'int' || schema.type === 'float') return ''
-  if (schema.type === 'list' || schema.type === 'set') return []
-  if (schema.type === 'dict') return {}
+  if (!schema) {
+    return ''
+  }
+  if (schema.allows_null) {
+    return null
+  }
+  if (schema.type === 'bool') {
+    return false
+  }
+  if (schema.type === 'int' || schema.type === 'float') {
+    return ''
+  }
+  if (schema.type === 'list' || schema.type === 'set') {
+    return []
+  }
+  if (schema.type === 'dict') {
+    return {}
+  }
   if (schema.fields.length > 0) {
     return Object.fromEntries(
       schema.fields.map(field => [
         field.key,
-        field.default != null ? cloneSettingValue(field.default) : buildSchemaDefaultValue(field.schema),
+        field.default == null ? buildSchemaDefaultValue(field.schema) : cloneSettingValue(field.default),
       ]),
     )
   }
@@ -135,7 +153,7 @@ export function buildSchemaDefaultValue (schema: PluginSettingSchema | null): un
 }
 
 export function buildSchemaFieldDefaultValue (field: PluginSettingSchemaField): unknown {
-  return field.default != null ? cloneSettingValue(field.default) : buildSchemaDefaultValue(field.schema)
+  return field.default == null ? buildSchemaDefaultValue(field.schema) : cloneSettingValue(field.default)
 }
 
 export function toEditorValue (field: PluginSettingField, sourceValue: unknown) {
@@ -189,21 +207,25 @@ export function buildClearedFieldValue (field: PluginSettingField) {
 function coercePrimitiveValue (typeName: string | null, value: unknown) {
   if (typeName === 'int') {
     if (typeof value !== 'number' || !Number.isInteger(value)) {
-      throw new Error('invalid int')
+      throw new TypeError('invalid int')
     }
     return value
   }
   if (typeName === 'float') {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new Error('invalid float')
+      throw new TypeError('invalid float')
     }
     return value
   }
   if (typeName === 'bool') {
-    if (typeof value === 'boolean') return value
+    if (typeof value === 'boolean') {
+      return value
+    }
     throw new Error('invalid bool')
   }
-  if (value == null) return null
+  if (value == null) {
+    return null
+  }
   return String(value)
 }
 
@@ -211,22 +233,24 @@ function normalizeScalarNumberValue (
   typeName: 'int' | 'float',
   rawValue: unknown,
 ) {
-  if (rawValue === null) return null
-  const numericValue =
-    typeof rawValue === 'number'
+  if (rawValue === null) {
+    return null
+  }
+  const numericValue
+    = typeof rawValue === 'number'
       ? rawValue
-      : typeof rawValue === 'string' && rawValue.trim()
-        ? Number(rawValue)
-        : Number.NaN
+      : (typeof rawValue === 'string' && rawValue.trim()
+          ? Number(rawValue)
+          : Number.NaN)
 
   if (typeName === 'int') {
     if (!Number.isInteger(numericValue)) {
-      throw new Error('invalid int')
+      throw new TypeError('invalid int')
     }
     return numericValue
   }
   if (!Number.isFinite(numericValue)) {
-    throw new Error('invalid float')
+    throw new TypeError('invalid float')
   }
   return numericValue
 }
@@ -239,9 +263,13 @@ function normalizeSequenceValue (field: PluginSettingField, rawValue: unknown) {
   if (isSequenceChipField(field)) {
     values = Array.isArray(rawValue) ? rawValue : []
   } else {
-    if (typeof rawValue !== 'string' || !rawValue.trim()) return null
+    if (typeof rawValue !== 'string' || !rawValue.trim()) {
+      return null
+    }
     const parsed = JSON.parse(rawValue)
-    if (!Array.isArray(parsed)) throw new Error('invalid array')
+    if (!Array.isArray(parsed)) {
+      throw new TypeError('invalid array')
+    }
     values = parsed
   }
   return values
@@ -254,7 +282,9 @@ function normalizeBySchema (
   rawValue: unknown,
 ): unknown {
   if (rawValue == null) {
-    if (schema.allows_null) return null
+    if (schema.allows_null) {
+      return null
+    }
     throw new Error('null not allowed')
   }
 
@@ -267,7 +297,9 @@ function normalizeBySchema (
   }
 
   if (schema.type === 'bool') {
-    if (typeof rawValue === 'boolean') return rawValue
+    if (typeof rawValue === 'boolean') {
+      return rawValue
+    }
     throw new Error('invalid bool')
   }
   if (schema.type === 'int') {
@@ -278,7 +310,7 @@ function normalizeBySchema (
   }
   if (schema.type === 'list' || schema.type === 'set') {
     if (!Array.isArray(rawValue)) {
-      throw new Error('invalid array')
+      throw new TypeError('invalid array')
     }
     const itemSchema = schema.item_schema?.schema
     const normalized = itemSchema
@@ -326,7 +358,9 @@ function normalizeScalarLike (typeName: string, rawValue: unknown) {
     return normalizeScalarNumberValue('float', rawValue)
   }
   if (typeName === 'bool') {
-    if (typeof rawValue === 'boolean') return rawValue
+    if (typeof rawValue === 'boolean') {
+      return rawValue
+    }
     throw new Error('invalid bool')
   }
   return rawValue === null ? null : String(rawValue)
@@ -352,7 +386,9 @@ export function normalizeFieldValueForSave (
     return normalizeSequenceValue(field, rawValue)
   }
   if (field.type_category === 'mapping') {
-    if (typeof rawValue !== 'string' || !rawValue.trim()) return null
+    if (typeof rawValue !== 'string' || !rawValue.trim()) {
+      return null
+    }
     return JSON.parse(rawValue)
   }
   if (
@@ -369,14 +405,18 @@ function comparableBySchema (
   schema: PluginSettingSchema,
   value: unknown,
 ): unknown {
-  if (value == null) return null
-  if (schema.type === 'float') return Number(value)
+  if (value == null) {
+    return null
+  }
+  if (schema.type === 'float') {
+    return Number(value)
+  }
   if ((schema.type === 'list' || schema.type === 'set') && Array.isArray(value)) {
     const itemSchema = schema.item_schema?.schema
     return value.map(item => itemSchema ? comparableBySchema(itemSchema, item) : item)
   }
   if ((schema.type === 'dict' || schema.fields.length > 0) && isPlainObject(value)) {
-    const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+    const entries = Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right))
     if (schema.type === 'dict') {
       const valueSchema = schema.value_schema?.schema
       return Object.fromEntries(
@@ -399,11 +439,15 @@ export function normalizeComparableFieldValue (
   field: PluginSettingField,
   value: unknown,
 ) {
-  if (value == null) return null
+  if (value == null) {
+    return null
+  }
   if (field.schema) {
     return comparableBySchema(field.schema, value)
   }
-  if (field.type === 'float') return Number(value)
+  if (field.type === 'float') {
+    return Number(value)
+  }
   if (field.type_category === 'sequence') {
     return Array.isArray(value)
       ? value.map(item => field.item_type === 'float' ? Number(item) : item)
@@ -416,7 +460,9 @@ export function resolveNullableFieldValue (
   field: PluginSettingField,
   value: unknown,
 ) {
-  if (value !== null || field.allows_null) return value
+  if (value !== null || field.allows_null) {
+    return value
+  }
   throw new Error('null not allowed')
 }
 
@@ -429,11 +475,13 @@ export function buildSettingsUpdate (
   form: Record<string, unknown>,
   draftClears: Record<string, boolean>,
   invalidJsonMessage: string,
-) : SettingsUpdatePayload {
+): SettingsUpdatePayload {
   const values: Record<string, unknown> = {}
   const clear: string[] = []
   for (const field of fields) {
-    if (!field.editable) continue
+    if (!field.editable) {
+      continue
+    }
     if (draftClears[field.key] && field.has_local_override) {
       clear.push(field.key)
       continue
@@ -464,11 +512,11 @@ export function buildSettingsPreviewItems (
   try {
     const editableFields = fields.filter(field =>
       field.editable
-        && (
-          field.has_local_override
-          || Boolean(draftOverrides[field.key])
-          || Boolean(draftClears[field.key])
-        ),
+      && (
+        field.has_local_override
+        || Boolean(draftOverrides[field.key])
+        || Boolean(draftClears[field.key])
+      ),
     )
 
     const payload = buildSettingsUpdate(

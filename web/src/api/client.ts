@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const client = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 10_000,
 })
 
 client.interceptors.request.use(config => {
@@ -33,14 +33,20 @@ client.interceptors.response.use(
 )
 
 function joinValidationErrors (detail: unknown) {
-  if (!Array.isArray(detail)) return ''
+  if (!Array.isArray(detail)) {
+    return ''
+  }
   const messages = detail
     .map(item => {
-      if (!item || typeof item !== 'object') return ''
-      const entry = item as { loc?: unknown; msg?: unknown }
+      if (!item || typeof item !== 'object') {
+        return ''
+      }
+      const entry = item as { loc?: unknown, msg?: unknown }
       const path = Array.isArray(entry.loc) ? entry.loc.join('.') : ''
       const message = typeof entry.msg === 'string' ? entry.msg : ''
-      if (!message) return ''
+      if (!message) {
+        return ''
+      }
       return path ? `${path}: ${message}` : message
     })
     .filter(Boolean)

@@ -93,7 +93,7 @@
       </div>
     </section>
 
-    <div v-if="loading && !pagedItems.length" class="store-grid store-grid--loading">
+    <div v-if="loading && pagedItems.length === 0" class="store-grid store-grid--loading">
       <v-skeleton-loader
         v-for="index in 16"
         :key="index"
@@ -102,7 +102,7 @@
       />
     </div>
 
-    <div v-else-if="pagedItems.length" class="store-grid">
+    <div v-else-if="pagedItems.length > 0" class="store-grid">
       <article
         v-for="item in pagedItems"
         :key="`${item.source_id}:${item.plugin_id}`"

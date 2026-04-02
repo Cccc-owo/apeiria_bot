@@ -130,9 +130,9 @@
 </template>
 
 <script setup lang="ts">
+  import type { SecurityAuditEventItem, WebUIAccountItem } from '@/api'
   import { computed, onMounted, reactive, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
-  import type { SecurityAuditEventItem, WebUIAccountItem } from '@/api'
   import {
     changePassword,
     getCurrentAccount,
@@ -199,8 +199,8 @@
       ])
       currentAccount.value = currentAccountResponse.data
       auditEvents.value = auditEventsResponse.data
-    } catch (err) {
-      errorMessage.value = getErrorMessage(err, t('accounts.loadFailed'))
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('accounts.loadFailed'))
     } finally {
       loading.value = false
     }
@@ -225,8 +225,8 @@
       passwordForm.new_password = ''
       confirmPassword.value = ''
       await loadData()
-    } catch (err) {
-      passwordError.value = getErrorMessage(err, t('accounts.passwordChangeFailed'))
+    } catch (error) {
+      passwordError.value = getErrorMessage(error, t('accounts.passwordChangeFailed'))
     } finally {
       passwordSaving.value = false
     }
@@ -239,8 +239,8 @@
       authStore.acceptSession(response.data.token, response.data.principal)
       noticeStore.show(response.data.detail || t('accounts.otherSessionsRevoked'), 'success')
       await loadData()
-    } catch (err) {
-      errorMessage.value = getErrorMessage(err, t('accounts.revokeOtherSessionsFailed'))
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, t('accounts.revokeOtherSessionsFailed'))
     } finally {
       revokingSessions.value = false
     }

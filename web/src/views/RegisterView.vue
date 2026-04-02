@@ -105,8 +105,8 @@
       })
       noticeStore.show(response.data.detail || t('register.success'), 'success')
       router.push('/login')
-    } catch (err) {
-      error.value = getErrorMessage(err, t('register.failed'))
+    } catch (error_) {
+      error.value = getErrorMessage(error_, t('register.failed'))
     } finally {
       loading.value = false
     }

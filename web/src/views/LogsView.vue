@@ -122,10 +122,10 @@
 </template>
 
 <script setup lang="ts">
+  import type { LogItem } from '@/api'
   import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { getLogHistory } from '@/api'
-  import type { LogItem } from '@/api'
   import { getErrorMessage } from '@/api/client'
 
   interface LogEntry {
@@ -155,10 +155,10 @@
   const pendingLiveLogs: LogEntry[] = []
   const MAX_LIVE_LOGS = 500
 
-  const levelOptions = computed(() => Array.from(new Set(logs.value.map(item => item.level))).sort())
+  const levelOptions = computed(() => Array.from(new Set(logs.value.map(item => item.level))).toSorted())
   const sourceOptions = computed(() => Array.from(new Set(logs.value
     .filter(item => showAccessLogs.value || item.source !== 'uvicorn.access')
-    .map(item => item.source))).sort())
+    .map(item => item.source))).toSorted())
   const filteredLogs = computed(() => logs.value.filter(entry => {
     if (!showAccessLogs.value && entry.source === 'uvicorn.access') {
       return false
@@ -182,15 +182,15 @@
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     ws = new WebSocket(`${proto}//${location.host}/api/logs/ws`)
 
-    ws.onopen = () => {
+    ws.addEventListener('open', () => {
       const token = localStorage.getItem('token')
       if (token) {
         ws?.send(token)
       }
       connected.value = true
-    }
+    })
 
-    ws.onmessage = event => {
+    ws.addEventListener('message', event => {
       const entry = normalizeLogFrame(event.data)
       if (primingHistory) {
         pendingLiveLogs.push(entry)
@@ -198,11 +198,11 @@
       }
       appendLiveLog(entry)
       scrollToBottomIfNeeded()
-    }
+    })
 
-    ws.onclose = () => {
+    ws.addEventListener('close', () => {
       connected.value = false
-    }
+    })
   }
 
   function disconnect () {
@@ -250,7 +250,7 @@
         limit: 50,
         include_access: showAccessLogs.value,
       })
-      logs.value = response.data.items.slice().reverse().map(item => toLogEntry(item))
+      logs.value = response.data.items.toReversed().map(item => toLogEntry(item))
       recentHistoryCount.value = logs.value.length
       await nextTick()
       logContainer.value?.scrollTo({ top: logContainer.value.scrollHeight })

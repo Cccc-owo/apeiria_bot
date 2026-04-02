@@ -27,28 +27,34 @@ export class ChatClient {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     this.ws = new WebSocket(`${proto}//${location.host}/api/chat/ws`)
 
-    this.ws.onopen = () => {
-      this.openHandlers.forEach(handler => handler())
-    }
+    this.ws.addEventListener('open', () => {
+      for (const handler of this.openHandlers) {
+        handler()
+      }
+    })
 
-    this.ws.onclose = () => {
-      this.closeHandlers.forEach(handler => handler())
-    }
+    this.ws.addEventListener('close', () => {
+      for (const handler of this.closeHandlers) {
+        handler()
+      }
+    })
 
-    this.ws.onmessage = event => {
+    this.ws.addEventListener('message', event => {
       try {
         const parsed = JSON.parse(event.data) as ChatEnvelope
-        this.messageHandlers.forEach(handler => handler(parsed))
+        for (const handler of this.messageHandlers) {
+          handler(parsed)
+        }
       } catch {
-        this.messageHandlers.forEach(handler =>
+        for (const handler of this.messageHandlers) {
           handler({
             version: '1.0',
             type: 'system.error',
             payload: { code: 'INVALID_FRAME', message: String(event.data) },
-          }),
-        )
+          })
+        }
       }
-    }
+    })
   }
 
   disconnect () {
