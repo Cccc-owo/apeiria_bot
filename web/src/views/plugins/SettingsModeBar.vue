@@ -1,27 +1,30 @@
 <template>
   <div class="settings-mode-bar">
-    <div :aria-label="tablistLabel" class="settings-mode-tabs segmented-control" role="tablist">
-      <button
-        :aria-selected="modelValue === 'basic'"
-        class="settings-mode-tab segmented-control__tab"
-        :class="{ 'settings-mode-tab--active segmented-control__tab--active': modelValue === 'basic' }"
-        role="tab"
-        type="button"
-        @click="$emit('update:modelValue', 'basic')"
+    <v-btn-toggle
+      :aria-label="tablistLabel"
+      class="settings-mode-tabs"
+      density="comfortable"
+      mandatory
+      :model-value="modelValue"
+      @update:model-value="$emit('update:modelValue', $event)"
+    >
+      <v-btn
+        class="settings-mode-tab"
+        rounded="pill"
+        value="basic"
+        variant="text"
       >
         {{ basicLabel }}
-      </button>
-      <button
-        :aria-selected="modelValue === 'advanced'"
-        class="settings-mode-tab segmented-control__tab"
-        :class="{ 'settings-mode-tab--active segmented-control__tab--active': modelValue === 'advanced' }"
-        role="tab"
-        type="button"
-        @click="$emit('update:modelValue', 'advanced')"
+      </v-btn>
+      <v-btn
+        class="settings-mode-tab"
+        rounded="pill"
+        value="advanced"
+        variant="text"
       >
         {{ advancedLabel }}
-      </button>
-    </div>
+      </v-btn>
+    </v-btn-toggle>
 
     <div v-if="$slots.actions" class="settings-mode-bar__actions">
       <slot name="actions" />
@@ -53,10 +56,21 @@
 
 .settings-mode-tabs {
   --segmented-max-width: 320px;
+  width: min(320px, 100%);
+  border-radius: var(--shape-pill);
+  background: rgba(var(--v-theme-surface-container-high), 0.9);
+  border: 1px solid rgba(var(--v-theme-outline), 0.24);
+  padding: 4px;
 }
 
 .settings-mode-tab {
-  min-width: 0;
+  min-width: 0 !important;
+  text-transform: none !important;
+}
+
+.settings-mode-tabs :deep(.v-btn--active) {
+  background: rgb(var(--v-theme-secondary-container));
+  color: rgb(var(--v-theme-on-secondary-container));
 }
 
 .settings-mode-bar__actions {
