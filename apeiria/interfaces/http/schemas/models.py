@@ -497,13 +497,6 @@ class DriverConfigRequest(BaseModel):
     builtin: list[str]
 
 
-class GroupItem(BaseModel):
-    group_id: str
-    group_name: str | None
-    bot_status: bool
-    disabled_plugins: list[str]
-
-
 class UserLevelItem(BaseModel):
     user_id: str
     group_id: str
@@ -512,35 +505,6 @@ class UserLevelItem(BaseModel):
 
 class UpdateLevelRequest(BaseModel):
     level: int = Field(ge=0, le=4)
-
-
-class DataTableInfo(BaseModel):
-    """Metadata describing one browsable internal table."""
-
-    name: str
-    label: str
-    primary_key: str
-
-
-class DataListResponse(BaseModel):
-    """Paginated read-only table response."""
-
-    table: str
-    primary_key: str
-    columns: list[str]
-    total: int
-    page: int
-    page_size: int
-    search: str = ""
-    items: list[dict[str, object | None]]
-
-
-class DataRecordResponse(BaseModel):
-    """Single record response for the data browser."""
-
-    table: str
-    primary_key: str
-    record: dict[str, object | None]
 
 
 class DataUpdateRequest(BaseModel):

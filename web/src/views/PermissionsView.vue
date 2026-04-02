@@ -108,14 +108,6 @@
                 <span class="permission-inline-stat__label">{{ t('permissions.explicitRules') }}</span>
                 <span class="permission-inline-stat__value">{{ selectedPluginRules.length }}</span>
               </div>
-              <div class="permission-inline-stat">
-                <span class="permission-inline-stat__label">{{ t('permissions.disabledInGroups') }}</span>
-                <span class="permission-inline-stat__value">{{ groupsWithPluginDisabled.length }}</span>
-              </div>
-              <div class="permission-inline-stat">
-                <span class="permission-inline-stat__label">{{ t('permissions.groupsWithBotOff') }}</span>
-                <span class="permission-inline-stat__value">{{ groupsWithBotDisabled.length }}</span>
-              </div>
             </div>
           </div>
 
@@ -244,208 +236,6 @@
             </v-card-text>
           </v-card>
 
-          <div v-if="groupsWithPluginDisabled.length || groupsWithBotDisabled.length" class="permission-grid">
-            <v-card v-if="groupsWithPluginDisabled.length" class="permission-panel">
-              <v-card-title>{{ t('permissions.disabledInGroups') }}</v-card-title>
-              <v-card-text>
-                <div class="permission-chip-list">
-                  <v-chip
-                    v-for="group in groupsWithPluginDisabled"
-                    :key="group.group_id"
-                    color="warning"
-                    variant="tonal"
-                  >
-                    {{ group.group_name || group.group_id }}
-                  </v-chip>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <v-card v-if="groupsWithBotDisabled.length" class="permission-panel">
-              <v-card-title>{{ t('permissions.groupsWithBotOff') }}</v-card-title>
-              <v-card-text>
-                <div class="permission-chip-list">
-                  <v-chip
-                    v-for="group in groupsWithBotDisabled"
-                    :key="group.group_id"
-                    color="warning"
-                    variant="tonal"
-                  >
-                    {{ group.group_name || group.group_id }}
-                  </v-chip>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-        </section>
-      </div>
-    </template>
-
-    <template v-else-if="perspective === 'groups'">
-      <div class="permission-layout">
-        <section class="permission-sidebar">
-          <v-text-field
-            v-model="groupSearch"
-            class="permission-sidebar__search"
-            clearable
-            density="compact"
-            hide-details
-            :placeholder="t('permissions.searchGroups')"
-            prepend-inner-icon="mdi-magnify"
-            single-line
-            variant="outlined"
-          />
-
-          <div class="permission-sidebar__list">
-            <button
-              v-for="item in visibleGroups"
-              :key="item.group_id"
-              class="permission-sidebar__item"
-              :class="{ 'permission-sidebar__item--active': item.group_id === selectedGroupId }"
-              type="button"
-              @click="selectGroup(item.group_id)"
-            >
-              <div class="permission-sidebar__item-main">
-                <span class="permission-sidebar__item-title">{{ item.group_name || item.group_id }}</span>
-                <span class="permission-sidebar__item-subtitle">{{ item.group_id }}</span>
-              </div>
-              <div class="permission-sidebar__item-tags">
-                <v-chip :color="item.bot_status ? 'success' : 'warning'" size="x-small" variant="tonal">
-                  {{ item.bot_status ? t('permissions.botOn') : t('permissions.botOff') }}
-                </v-chip>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        <section v-if="selectedGroup" class="permission-main">
-          <div class="permission-panel permission-panel--hero">
-            <div>
-              <div class="permission-panel__eyebrow">{{ t('permissions.groupView') }}</div>
-              <div class="permission-panel__title">{{ selectedGroup.group_name || selectedGroup.group_id }}</div>
-              <div class="permission-panel__subtitle">{{ selectedGroup.group_id }}</div>
-            </div>
-            <v-switch
-              color="success"
-              hide-details
-              inset
-              :loading="pendingGroupBot"
-              :model-value="selectedGroup.bot_status"
-              @update:model-value="updateSelectedGroupBot($event)"
-            />
-          </div>
-
-          <div class="permission-grid">
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.groupPluginSwitches') }}</v-card-title>
-              <v-card-text class="permission-stack">
-                <v-autocomplete
-                  v-model="selectedGroupDisabledPluginsDraft"
-                  chips
-                  closable-chips
-                  density="comfortable"
-                  item-title="title"
-                  item-value="value"
-                  :items="pluginModuleOptions"
-                  :label="t('permissions.disabledPlugins')"
-                  multiple
-                />
-                <div class="permission-form-grid__actions">
-                  <v-btn
-                    color="primary"
-                    :disabled="!hasPendingGroupPluginChanges"
-                    :loading="pendingGroupPlugins"
-                    @click="saveSelectedGroupPlugins"
-                  >
-                    {{ t('common.save') }}
-                  </v-btn>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.createRuleTitle') }}</v-card-title>
-              <v-card-text class="permission-form-grid">
-                <v-select
-                  v-model="groupRuleForm.effect"
-                  density="comfortable"
-                  hide-details
-                  :items="effectOptions"
-                  :label="t('permissions.effect')"
-                />
-                <v-autocomplete
-                  v-model="groupRuleForm.plugin_module"
-                  clearable
-                  density="comfortable"
-                  hide-details
-                  item-title="title"
-                  item-value="value"
-                  :items="pluginModuleOptions"
-                  :label="t('permissions.pluginModule')"
-                />
-                <v-text-field
-                  v-model="groupRuleForm.note"
-                  density="comfortable"
-                  hide-details
-                  :label="t('permissions.note')"
-                />
-                <div class="permission-form-grid__actions">
-                  <v-btn
-                    color="primary"
-                    :disabled="!groupRuleForm.plugin_module.trim()"
-                    :loading="creatingRule"
-                    @click="createRuleForGroup"
-                  >
-                    {{ t('permissions.createRule') }}
-                  </v-btn>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-
-          <div class="permission-grid">
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.groupRules') }}</v-card-title>
-              <v-card-text class="permission-rule-list">
-                <div
-                  v-for="rule in selectedGroupRules"
-                  :key="ruleKey(rule)"
-                  class="permission-rule-row"
-                >
-                  <div>
-                    <div class="font-weight-medium">{{ rule.plugin_module }}</div>
-                    <div class="text-caption text-medium-emphasis">
-                      {{ rule.effect === 'allow' ? t('permissions.allow') : t('permissions.deny') }}
-                    </div>
-                  </div>
-                  <v-btn icon="mdi-delete" size="small" variant="text" @click="handleDeleteRule(rule)" />
-                </div>
-                <div v-if="!selectedGroupRules.length" class="permission-empty">{{ t('permissions.noRules') }}</div>
-              </v-card-text>
-            </v-card>
-
-            <v-card class="permission-panel">
-              <v-card-title>{{ t('permissions.groupUserLevels') }}</v-card-title>
-              <v-card-text class="permission-rule-list">
-                <div
-                  v-for="entry in selectedGroupUsers"
-                  :key="`${entry.user_id}:${entry.group_id}`"
-                  class="permission-rule-row"
-                >
-                  <div class="font-weight-medium">{{ entry.user_id }}</div>
-                  <v-select
-                    class="permission-level-select"
-                    density="compact"
-                    hide-details
-                    :items="levelOptions"
-                    :model-value="entry.level"
-                    @update:model-value="updateLevel(entry, $event)"
-                  />
-                </div>
-                <div v-if="!selectedGroupUsers.length" class="permission-empty">{{ t('permissions.noUsers') }}</div>
-              </v-card-text>
-            </v-card>
-          </div>
         </section>
       </div>
     </template>
@@ -569,7 +359,6 @@
               >
                 <div>
                   <div class="font-weight-medium">{{ entry.group_id }}</div>
-                  <div class="text-caption text-medium-emphasis">{{ groupNameById(entry.group_id) }}</div>
                 </div>
                 <v-select
                   class="permission-level-select"
@@ -642,13 +431,9 @@
     createAccessRule,
     deleteAccessRule,
     getAccessRules,
-    getGroups,
     getPlugins,
     getUsers,
-    type GroupItem,
     type PluginItem,
-    updateGroup,
-    updateGroupPlugins,
     updatePluginAccessMode,
     updateUserLevel,
     type UserLevelItem,
@@ -656,7 +441,7 @@
   import { getErrorMessage } from '@/api/client'
   import { useNoticeStore } from '@/stores/notice'
 
-  type Perspective = 'plugins' | 'groups' | 'users' | 'rules'
+  type Perspective = 'plugins' | 'users' | 'rules'
 
   const route = useRoute()
   const { t } = useI18n()
@@ -665,36 +450,25 @@
   const perspective = ref<Perspective>('plugins')
   const loading = ref(false)
   const creatingRule = ref(false)
-  const pendingGroupBot = ref(false)
-  const pendingGroupPlugins = ref(false)
   const pendingPluginAccessMode = ref(false)
   const pendingUserKey = ref('')
   const errorMessage = ref('')
 
   const plugins = ref<PluginItem[]>([])
-  const groups = ref<GroupItem[]>([])
   const rules = ref<AccessRuleItem[]>([])
   const users = ref<UserLevelItem[]>([])
 
   const pluginSearch = ref('')
-  const groupSearch = ref('')
   const userSearch = ref('')
   const ruleSearch = ref('')
   const ruleEffectFilter = ref<'all' | 'allow' | 'deny'>('all')
 
   const selectedPluginModule = ref('')
-  const selectedGroupId = ref('')
   const selectedUserId = ref('')
-  const selectedGroupDisabledPluginsDraft = ref<string[]>([])
 
   const pluginRuleForm = reactive({
     subject_type: 'user',
     subject_id: '',
-    effect: 'allow',
-    note: '',
-  })
-  const groupRuleForm = reactive({
-    plugin_module: '',
     effect: 'allow',
     note: '',
   })
@@ -710,7 +484,6 @@
     Array<{ value: Perspective; title: string; meta: string }>
   >(() => [
     { value: 'plugins', title: t('permissions.pluginsTab'), meta: String(plugins.value.length) },
-    { value: 'groups', title: t('permissions.groupsTab'), meta: String(groups.value.length) },
     { value: 'users', title: t('permissions.usersTab'), meta: String(userEntries.value.length) },
     { value: 'rules', title: t('permissions.rulesTab'), meta: String(rules.value.length) },
   ])
@@ -761,14 +534,6 @@
     })
   })
 
-  const visibleGroups = computed(() => {
-    const keyword = groupSearch.value.trim().toLowerCase()
-    return groups.value.filter(item => {
-      if (!keyword) return true
-      return `${item.group_name || ''} ${item.group_id}`.toLowerCase().includes(keyword)
-    })
-  })
-
   const filteredRules = computed(() => {
     const keyword = ruleSearch.value.trim().toLowerCase()
     return rules.value.filter(item => {
@@ -787,10 +552,6 @@
   const selectedPlugin = computed(() =>
     manageablePlugins.value.find(item => item.module_name === selectedPluginModule.value) || null,
   )
-  const selectedGroup = computed(() =>
-    groups.value.find(item => item.group_id === selectedGroupId.value) || null,
-  )
-
   const selectedPluginRules = computed(() =>
     rules.value.filter(rule => rule.plugin_module === selectedPluginModule.value),
   )
@@ -805,20 +566,6 @@
   )
   const selectedPluginGroupDenyRules = computed(() =>
     selectedPluginRules.value.filter(rule => rule.subject_type === 'group' && rule.effect === 'deny'),
-  )
-
-  const groupsWithPluginDisabled = computed(() =>
-    groups.value.filter(group => group.disabled_plugins.includes(selectedPluginModule.value)),
-  )
-  const groupsWithBotDisabled = computed(() =>
-    groups.value.filter(group => !group.bot_status),
-  )
-
-  const selectedGroupRules = computed(() =>
-    rules.value.filter(rule => rule.subject_type === 'group' && rule.subject_id === selectedGroupId.value),
-  )
-  const selectedGroupUsers = computed(() =>
-    users.value.filter(item => item.group_id === selectedGroupId.value),
   )
 
   const userEntries = computed(() => {
@@ -848,12 +595,6 @@
     users.value.filter(item => item.user_id === selectedUserId.value),
   )
 
-  const hasPendingGroupPluginChanges = computed(() => {
-    const current = [...(selectedGroup.value?.disabled_plugins || [])].sort()
-    const draft = [...selectedGroupDisabledPluginsDraft.value].sort()
-    return JSON.stringify(current) !== JSON.stringify(draft)
-  })
-
   function ruleKey (rule: AccessRuleItem): string {
     return `${rule.subject_type}:${rule.subject_id}:${rule.plugin_module}`
   }
@@ -862,20 +603,9 @@
     return rules.value.filter(rule => rule.plugin_module === moduleName).length
   }
 
-  function selectGroup (groupId: string): void {
-    selectedGroupId.value = groupId
-    selectedGroupDisabledPluginsDraft.value = [
-      ...(groups.value.find(item => item.group_id === groupId)?.disabled_plugins || []),
-    ]
-  }
-
-  function groupNameById (groupId: string): string {
-    return groups.value.find(item => item.group_id === groupId)?.group_name || groupId
-  }
-
   function applyRouteState (): void {
     const tabQuery = route.query.tab
-    if (tabQuery === 'plugins' || tabQuery === 'groups' || tabQuery === 'users' || tabQuery === 'rules') {
+    if (tabQuery === 'plugins' || tabQuery === 'users' || tabQuery === 'rules') {
       perspective.value = tabQuery
     }
   }
@@ -890,14 +620,8 @@
     ) {
       selectedPluginModule.value = manageablePlugins.value[0]?.module_name || ''
     }
-    if (!selectedGroupId.value && groups.value.length) {
-      selectGroup(groups.value[0].group_id)
-    }
     if (!selectedUserId.value && userEntries.value.length) {
       selectedUserId.value = userEntries.value[0].user_id
-    }
-    if (selectedGroup.value) {
-      selectedGroupDisabledPluginsDraft.value = [...selectedGroup.value.disabled_plugins]
     }
   }
 
@@ -905,14 +629,12 @@
     loading.value = true
     errorMessage.value = ''
     try {
-      const [pluginsResponse, groupsResponse, rulesResponse, usersResponse] = await Promise.all([
+      const [pluginsResponse, rulesResponse, usersResponse] = await Promise.all([
         getPlugins(),
-        getGroups(),
         getAccessRules(),
         getUsers(),
       ])
       plugins.value = pluginsResponse.data
-      groups.value = groupsResponse.data
       rules.value = rulesResponse.data
       users.value = usersResponse.data
       ensureSelections()
@@ -982,20 +704,6 @@
     }
   }
 
-  async function createRuleForGroup (): Promise<void> {
-    if (!selectedGroupId.value || !groupRuleForm.plugin_module.trim()) return
-    await createRule({
-      subject_type: 'group',
-      subject_id: selectedGroupId.value,
-      plugin_module: groupRuleForm.plugin_module.trim(),
-      effect: groupRuleForm.effect,
-      note: groupRuleForm.note.trim() || null,
-    })
-    groupRuleForm.plugin_module = ''
-    groupRuleForm.note = ''
-    groupRuleForm.effect = 'allow'
-  }
-
   async function createRuleForUser (): Promise<void> {
     if (!selectedUserId.value || !userRuleForm.plugin_module.trim()) return
     await createRule({
@@ -1023,46 +731,6 @@
     } catch (error) {
       errorMessage.value = getErrorMessage(error, t('permissions.ruleDeleteFailed'))
       noticeStore.show(errorMessage.value, 'error')
-    }
-  }
-
-  async function updateSelectedGroupBot (nextValue: unknown): Promise<void> {
-    if (!selectedGroup.value) return
-    const enabled = Boolean(nextValue)
-    if (selectedGroup.value.bot_status === enabled) return
-
-    const previous = selectedGroup.value.bot_status
-    selectedGroup.value.bot_status = enabled
-    pendingGroupBot.value = true
-    errorMessage.value = ''
-    try {
-      await updateGroup(selectedGroup.value.group_id, enabled)
-      noticeStore.show(t('permissions.groupUpdated'), 'success')
-    } catch (error) {
-      selectedGroup.value.bot_status = previous
-      errorMessage.value = getErrorMessage(error, t('permissions.groupUpdateFailed'))
-      noticeStore.show(errorMessage.value, 'error')
-    } finally {
-      pendingGroupBot.value = false
-    }
-  }
-
-  async function saveSelectedGroupPlugins (): Promise<void> {
-    if (!selectedGroup.value) return
-    pendingGroupPlugins.value = true
-    errorMessage.value = ''
-    const nextValue = [...selectedGroupDisabledPluginsDraft.value]
-    const previous = [...selectedGroup.value.disabled_plugins]
-    try {
-      await updateGroupPlugins(selectedGroup.value.group_id, nextValue)
-      selectedGroup.value.disabled_plugins = nextValue
-      noticeStore.show(t('permissions.groupPluginsUpdated'), 'success')
-    } catch (error) {
-      selectedGroupDisabledPluginsDraft.value = previous
-      errorMessage.value = getErrorMessage(error, t('permissions.groupUpdateFailed'))
-      noticeStore.show(errorMessage.value, 'error')
-    } finally {
-      pendingGroupPlugins.value = false
     }
   }
 

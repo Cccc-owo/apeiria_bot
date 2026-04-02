@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
-
 from nonebot_plugin_orm import get_session
 from sqlalchemy import delete, select
 
 from apeiria.infra.db.models.access_policy import AccessPolicyEntry
 from apeiria.infra.db.models.group import GroupConsole
 from apeiria.infra.db.models.level import LevelUser
+from apeiria.shared.group_state import decode_disabled_plugins
 
 
 class AccessRepository:
@@ -63,11 +62,7 @@ class AccessRepository:
                 )
             )
             raw = result.scalar_one_or_none()
-        try:
-            disabled = json.loads(raw) if raw else []
-        except (TypeError, json.JSONDecodeError):
-            disabled = []
-        return [item for item in disabled if isinstance(item, str)]
+        return decode_disabled_plugins(raw)
 
     async def list_access_rules(self) -> list[AccessPolicyEntry]:
         async with get_session() as session:

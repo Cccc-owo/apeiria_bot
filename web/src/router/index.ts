@@ -27,10 +27,8 @@ const routes = [
       { path: 'plugins/config', name: 'plugins', component: () => import('@/views/PluginsView.vue'), meta: { titleKey: 'plugins.title' } },
       { path: 'plugins/store', name: 'plugins-store', component: () => import('@/views/PluginStoreView.vue'), meta: { titleKey: 'pluginStore.title' } },
       { path: 'permissions', name: 'permissions', component: () => import('@/views/PermissionsView.vue'), meta: { titleKey: 'permissions.title' } },
-      { path: 'groups', name: 'groups', component: () => import('@/views/GroupsView.vue'), meta: { titleKey: 'groups.title' } },
       { path: 'logs', name: 'logs', component: () => import('@/views/LogsView.vue'), meta: { titleKey: 'logs.liveTitle' } },
       { path: 'logs/history', name: 'logs-history', component: () => import('@/views/LogHistoryView.vue'), meta: { titleKey: 'logs.historyTitle' } },
-      { path: 'data', name: 'data', component: () => import('@/views/DataView.vue'), meta: { titleKey: 'data.title' } },
       { path: 'chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { titleKey: 'chat.title' } },
       {
         path: 'accounts',

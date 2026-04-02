@@ -326,13 +326,6 @@ export interface AccessRuleItem {
   note: string | null
 }
 
-export interface GroupItem {
-  group_id: string
-  group_name: string | null
-  bot_status: boolean
-  disabled_plugins: string[]
-}
-
 export interface UserLevelItem {
   user_id: string
   group_id: string
@@ -658,17 +651,6 @@ export const updatePluginAccessMode = (
     access_mode: accessMode,
   })
 
-export const getGroups = () =>
-  client.get<GroupItem[]>('/groups/')
-
-export const updateGroup = (groupId: string, botStatus: boolean) =>
-  client.patch(`/groups/${groupId}`, null, {
-    params: { bot_status: botStatus },
-  })
-
-export const updateGroupPlugins = (groupId: string, disabledPlugins: string[]) =>
-  client.patch(`/groups/${groupId}/plugins`, disabledPlugins)
-
 export const getUsers = () =>
   client.get<UserLevelItem[]>('/permissions/users')
 
@@ -676,31 +658,3 @@ export const updateUserLevel = (userId: string, groupId: string, level: number) 
   client.patch(`/permissions/users/${userId}`, { level }, {
     params: { group_id: groupId },
   })
-
-export const getDataTables = () =>
-  client.get<{ name: string; label: string; primary_key: string }[]>('/data/')
-
-export const getDataRecords = (table: string, page = 1, pageSize = 20, search = '') =>
-  client.get<{
-    table: string
-    primary_key: string
-    columns: string[]
-    total: number
-    page: number
-    page_size: number
-    search: string
-    items: Record<string, unknown>[]
-  }>(`/data/${table}`, {
-    params: {
-      page,
-      page_size: pageSize,
-      search,
-    },
-  })
-
-export const getDataRecord = (table: string, recordId: string) =>
-  client.get<{
-    table: string
-    primary_key: string
-    record: Record<string, unknown>
-  }>(`/data/${table}/${recordId}`)
