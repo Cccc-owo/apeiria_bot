@@ -770,7 +770,7 @@
 .history-detail-panel {
   margin: 0 16px 14px;
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   background: rgba(var(--v-theme-on-surface), 0.05);
   border: 1px solid rgba(var(--v-theme-outline-variant), 0.28);
 }
@@ -800,7 +800,7 @@
 .history-log-card__raw {
   margin: 0 0 8px;
   padding: 12px;
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   background: rgba(var(--v-theme-on-surface), 0.05);
   white-space: pre-wrap;
   word-break: break-word;

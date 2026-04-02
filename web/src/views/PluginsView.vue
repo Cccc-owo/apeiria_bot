@@ -1927,7 +1927,7 @@
   overflow: hidden;
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
 }
 
 .settings-shell--dialog .settings-list-panel {
@@ -1985,7 +1985,7 @@
   gap: 10px;
   min-width: 0;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgba(var(--v-theme-on-surface), 0.025);
   border: 1px solid rgba(var(--v-border-color), 0.65);
 }
@@ -2046,7 +2046,7 @@
   width: min(420px, 100%);
   min-width: 0;
   padding: 4px;
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   background: rgba(var(--v-theme-surface-variant), 0.22);
 }
@@ -2060,7 +2060,7 @@
   height: 40px;
   padding: 0 20px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   background: transparent;
   color: rgba(var(--v-theme-on-surface), 0.72);
   font-size: 0.95rem;
@@ -2098,7 +2098,7 @@
   gap: 12px;
   min-height: 228px;
   padding: 16px;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   background:
     linear-gradient(180deg, rgba(var(--v-theme-surface), 0.98), rgba(var(--v-theme-surface), 0.94)),
@@ -2192,23 +2192,6 @@
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
-}
-
-.task-log-card {
-  max-height: 360px;
-  overflow: auto;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.task-log-card__content {
-  margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .readme-dialog__body {
@@ -2365,7 +2348,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   background: rgba(var(--v-theme-on-surface), 0.02);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }

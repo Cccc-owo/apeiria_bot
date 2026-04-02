@@ -796,7 +796,7 @@
 
 .permission-perspective {
   border: 1px solid rgba(var(--v-theme-outline), 0.18);
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   padding: 12px 16px;
   text-align: left;
   background: rgb(var(--v-theme-surface));
@@ -852,7 +852,7 @@
 }
 
 .permission-sidebar__search :deep(.v-field) {
-  border-radius: 12px;
+  border-radius: var(--shape-small);
 }
 
 .permission-sidebar__search :deep(.v-field__input) {
@@ -874,7 +874,7 @@
 
 .permission-sidebar__item {
   border: 1px solid rgba(var(--v-theme-outline), 0.14);
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   padding: 10px 12px;
   text-align: left;
   background: rgb(var(--v-theme-surface));

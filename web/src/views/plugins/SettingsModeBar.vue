@@ -57,7 +57,7 @@
   width: min(320px, 100%);
   min-width: 0;
   padding: 4px;
-  border-radius: 16px;
+  border-radius: var(--shape-base);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   background: rgba(var(--v-theme-surface-variant), 0.22);
 }
@@ -67,7 +67,7 @@
   min-width: 0;
   height: 40px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   background: transparent;
   color: rgba(var(--v-theme-on-surface), 0.72);
   font-size: 0.95rem;

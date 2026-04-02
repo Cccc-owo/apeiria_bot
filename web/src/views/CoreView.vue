@@ -559,7 +559,7 @@
   overflow: hidden;
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
 }
 
 .settings-list-row {
@@ -611,7 +611,7 @@
   gap: 10px;
   min-width: 0;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgba(var(--v-theme-on-surface), 0.025);
   border: 1px solid rgba(var(--v-border-color), 0.65);
 }

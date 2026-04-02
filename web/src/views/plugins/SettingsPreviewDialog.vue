@@ -84,7 +84,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--shape-small);
   background: rgba(var(--v-theme-on-surface), 0.02);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }

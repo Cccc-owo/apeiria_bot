@@ -473,7 +473,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   background: rgba(var(--v-theme-primary), 0.06);
 }
 
@@ -490,7 +490,7 @@
   min-width: 188px;
   padding: 8px;
   border: 1px solid rgba(var(--v-theme-outline), 0.12);
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   background: rgb(var(--v-theme-surface));
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
 }

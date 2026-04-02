@@ -235,7 +235,7 @@
 .monaco-editor-host {
   height: 100%;
   min-height: 240px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   overflow: hidden;
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }

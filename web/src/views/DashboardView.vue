@@ -442,7 +442,7 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   background: rgb(var(--v-theme-surface-container));
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
@@ -482,7 +482,7 @@
   max-height: 48vh;
   overflow: auto;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: var(--shape-medium);
   background: rgb(var(--v-theme-surface-container-low));
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-outline-variant), 0.28);
 }
@@ -576,7 +576,7 @@
   gap: 16px;
   align-items: start;
   padding: 16px 18px;
-  border-radius: 18px;
+  border-radius: var(--shape-large);
   background: rgba(var(--v-theme-background), 0.38);
   box-shadow: inset 0 0 0 1px rgba(var(--v-theme-outline-variant), 0.32);
 }
