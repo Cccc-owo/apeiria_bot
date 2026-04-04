@@ -20,6 +20,7 @@ from apeiria.app.plugin_store.models import (
 )
 from apeiria.infra.config import project_config_service
 from apeiria.infra.package_store.nb_cli import search_store_packages_async
+from apeiria.shared.i18n import t
 
 
 class StoreSourceAdapter(ABC):
@@ -56,7 +57,7 @@ class OfficialNoneBotStoreSource(StoreSourceAdapter):
     def source_info(self) -> StoreSource:
         return StoreSource(
             source_id="official-nonebot",
-            label="NoneBot2源",
+            label=t("common.store_source_official_nonebot"),
             kind="official-nonebot",
             enabled=True,
             priority=0,

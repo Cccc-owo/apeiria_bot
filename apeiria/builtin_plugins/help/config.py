@@ -19,7 +19,7 @@ class PluginOverride(BaseModel):
 
 
 class HelpAppearanceConfig(BaseModel):
-    title: str = "帮助菜单"
+    title: str = ""
     subtitle: str = ""
     accent_color: str = "#4e96f7"
     expand_commands: bool = False

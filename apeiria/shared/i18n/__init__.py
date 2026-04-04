@@ -23,6 +23,8 @@ def t(key: str, **kwargs: Any) -> str:
         value = _resolve(key, _default_locale)
     if value is None:
         return key
+    if "{prefix}" in value and "prefix" not in kwargs:
+        kwargs["prefix"] = _get_default_prefix()
     return value.format(**kwargs) if kwargs else value
 
 
@@ -97,3 +99,12 @@ def _resolve(key: str, locale: str) -> str | None:
         else:
             return None
     return str(data) if data is not None else None
+
+
+def _get_default_prefix() -> str:
+    try:
+        from apeiria.shared.command_prefix import get_command_prefix
+
+        return get_command_prefix()
+    except Exception:  # noqa: BLE001
+        return "/"

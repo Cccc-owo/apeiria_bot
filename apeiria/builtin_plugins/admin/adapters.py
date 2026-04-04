@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import nonebot
 from arclet.alconna import CommandMeta
 from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.app.plugins import plugin_config_view_service
-from apeiria.app.plugins.registration_service import AdapterConfigStatus
 from apeiria.shared.i18n import t
 
 from .presenter import render_list_block
 from .utils import ensure_owner_message
+
+if TYPE_CHECKING:
+    from apeiria.app.plugins.registration_service import AdapterConfigStatus
 
 _adapters = on_alconna(
     Alconna("adapters", meta=CommandMeta(description=t("admin.command.adapters"))),

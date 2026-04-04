@@ -85,7 +85,10 @@ async def handle_persona(
 
     if not selected:
         await _persona.finish(
-            t("ai.command.persona_current_with_usage", persona=state.persona_name)
+            t(
+                "ai.command.persona_current_with_usage",
+                persona=state.persona_name,
+            )
         )
 
     if selected == "list":

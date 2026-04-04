@@ -2,6 +2,7 @@ common:
   group_only: "This command is only available in groups"
   error: "An error occurred, please try again later"
   plugin_not_found: "Plugin not found: {name}"
+  store_source_official_nonebot: "NoneBot2 Source"
   framework_required: "Required by the framework runtime"
   control_panel_required: "Required by the control panel"
   required_by_plugins: "Required by plugins: {plugins}"
