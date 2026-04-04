@@ -12,7 +12,7 @@ from apeiria.shared.i18n import t
 from .utils import ensure_owner_message
 
 _restart = on_alconna(
-    Alconna("restart", meta=CommandMeta(description="安排 bot 进程重启")),
+    Alconna("restart", meta=CommandMeta(description=t("admin.command.restart"))),
     use_cmd_start=True,
     priority=5,
     block=True,

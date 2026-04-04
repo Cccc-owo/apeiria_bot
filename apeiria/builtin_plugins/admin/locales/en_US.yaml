@@ -1,4 +1,21 @@
 admin:
+  meta:
+    name: "Owner Admin"
+    description: "Owner-only management commands for status, plugins, access, tasks, and restart"
+    usage: "/admin - View overview\n/status | /sid - View runtime and session status\n/plugins | /plugin info|enable|disable|configs <plugin> - Manage plugins\n/config core|plugin ... - View config summary\n/access plugin|rule|remove|level ... - Manage access control\n/tasks | /task info|pause|resume <task_id> - Manage scheduler tasks\n/restart - Restart the bot\n/adapters | /drivers - View runtime environment"
+  command:
+    admin: "View owner admin overview"
+    status: "View current bot runtime summary"
+    sid: "View current session SID and UID information"
+    adapters: "View current adapter load status"
+    drivers: "View current driver runtime information"
+    plugins: "View system plugin overview"
+    plugin: "Manage plugin state, details, or config summary"
+    config: "View core or plugin config summary"
+    access: "View or modify access control"
+    restart: "Schedule a bot process restart"
+    tasks: "View current scheduler task list"
+    task: "View, pause, or resume scheduler tasks"
   owner_only: "This command is only available to bot owners"
   overview:
     title: "Owner Admin · Overview"

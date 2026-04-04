@@ -14,7 +14,7 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
 
 _tasks = on_alconna(
-    Alconna("tasks", meta=CommandMeta(description="查看当前调度任务列表")),
+    Alconna("tasks", meta=CommandMeta(description=t("admin.command.tasks"))),
     use_cmd_start=True,
     priority=5,
     block=True,
@@ -25,7 +25,7 @@ _task = on_alconna(
         "task",
         Args["action", str],
         Args["task_id", str],
-        meta=CommandMeta(description="查看、暂停或恢复调度任务"),
+        meta=CommandMeta(description=t("admin.command.task")),
     ),
     use_cmd_start=True,
     priority=5,

@@ -1,4 +1,21 @@
 admin:
+  meta:
+    name: "主人管理"
+    description: "主人专用的管理命令集：状态、插件、访问、任务、重启"
+    usage: "/admin - 查看总览\n/status | /sid - 查看运行与会话状态\n/plugins | /plugin info|enable|disable|configs <插件名> - 管理插件\n/config core|plugin ... - 查看配置摘要\n/access plugin|rule|remove|level ... - 管理访问控制\n/tasks | /task info|pause|resume <任务ID> - 管理任务\n/restart - 重启 Bot\n/adapters | /drivers - 查看运行环境"
+  command:
+    admin: "查看主人管理总览"
+    status: "查看当前 bot 运行状态摘要"
+    sid: "查看当前会话的 SID 与 UID 信息"
+    adapters: "查看当前适配器加载状态"
+    drivers: "查看当前驱动器运行信息"
+    plugins: "查看系统插件总览"
+    plugin: "管理插件状态、详情或配置摘要"
+    config: "查看核心或插件配置摘要"
+    access: "查看或修改访问控制"
+    restart: "安排 bot 进程重启"
+    tasks: "查看当前调度任务列表"
+    task: "查看、暂停或恢复调度任务"
   owner_only: "该命令仅限主人使用"
   overview:
     title: "主人管理 · 总览"

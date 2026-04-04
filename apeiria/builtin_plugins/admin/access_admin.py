@@ -22,7 +22,7 @@ _access = on_alconna(
         Args["arg2?", str],
         Args["arg3?", str],
         Args["arg4?", str],
-        meta=CommandMeta(description="查看或修改访问控制"),
+        meta=CommandMeta(description=t("admin.command.access")),
     ),
     use_cmd_start=True,
     priority=5,

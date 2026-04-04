@@ -25,10 +25,10 @@ require("nonebot_plugin_orm")
 load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
-    name="Web管理面板",
-    description="Web UI 管理面板 API",
+    name=t("web_ui.meta.name"),
+    description=t("web_ui.meta.description"),
     homepage="https://github.com/Cccc-owo/apeiria_bot",
-    usage="访问 http://host:port/ 打开管理面板",
+    usage=t("web_ui.meta.usage"),
     type="application",
     config=WebUIConfig,
     supported_adapters=None,
@@ -43,7 +43,7 @@ __plugin_meta__ = PluginMetadata(
                 RegisterConfig(
                     key="token_expire_days",
                     default=7,
-                    help="JWT token expiration days for the Web UI",
+                    help=t("web_ui.meta.config_token_expire_days"),
                     type=int,
                 )
             ]

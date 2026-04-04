@@ -1,4 +1,12 @@
 help:
+  meta:
+    name: "帮助系统"
+    description: "图像化帮助菜单与插件详情"
+    usage: "/help - 查看帮助菜单\n/help <插件名> - 查看插件详情\n/help --admin - 查看管理视图帮助\n/help --all - 主人查看完整帮助\n/帮助 / /菜单 / /功能 - 帮助命令别名"
+    help_category: "帮助与菜单"
+    help_introduction: "统一展示插件功能、命令与说明的帮助系统。"
+  command:
+    help: "查看帮助菜单或指定插件详情"
   list_title: "帮助菜单"
   list_footer: "使用 {prefix}help <插件名> 查看详情"
   commands_label: "命令"

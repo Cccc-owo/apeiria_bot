@@ -70,10 +70,10 @@ async def resolve_plugin_catalog_query(
     for item in await plugin_catalog_service.list_plugins():
         if item.plugin_type in {"hidden", "parent"}:
             continue
-        candidates = {
+        candidates = [
             item.module_name.lower(),
             item.name.lower(),
-        }
+        ]
         if normalized in candidates:
             exact_matches.append(item)
             continue

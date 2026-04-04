@@ -14,7 +14,7 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
 
 _admin = on_alconna(
-    Alconna("admin", meta=CommandMeta(description="查看主人管理总览")),
+    Alconna("admin", meta=CommandMeta(description=t("admin.command.admin"))),
     use_cmd_start=True,
     priority=5,
     block=True,
