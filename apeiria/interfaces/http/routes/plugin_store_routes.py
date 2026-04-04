@@ -28,6 +28,7 @@ from apeiria.interfaces.http.schemas.models import (
     PluginStoreSourceItem,
     PluginStoreTaskItem,
 )
+from apeiria.shared.i18n import t
 
 router = APIRouter()
 
@@ -139,7 +140,10 @@ async def get_plugin_store_item(
         item_type="plugin",
     )
     if item is None:
-        raise HTTPException(status_code=404, detail="store plugin not found")
+        raise HTTPException(
+            status_code=404,
+            detail=t("web_ui.plugins.store_not_found"),
+        )
     return _build_plugin_store_item(item)
 
 
@@ -236,7 +240,7 @@ async def get_plugin_store_task(
 ) -> PluginStoreTaskItem:
     task = plugin_store_task_service.get_task(task_id)
     if task is None:
-        raise HTTPException(status_code=404, detail="task not found")
+        raise HTTPException(status_code=404, detail=t("web_ui.tasks.not_found"))
     return PluginStoreTaskItem(
         task_id=task.task_id,
         title=task.title,

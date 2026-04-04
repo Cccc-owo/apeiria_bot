@@ -143,7 +143,7 @@ async def update_plugin_package_task(
     ):
         raise HTTPException(
             status_code=400,
-            detail="plugin package update is not allowed",
+            detail=t("web_ui.plugins.update_not_allowed"),
         ) from None
 
     try:
@@ -163,5 +163,5 @@ async def get_plugin_install_task(
 ) -> PluginStoreTaskItem:
     task = plugin_store_task_service.get_task(task_id)
     if task is None:
-        raise HTTPException(status_code=404, detail="task not found")
+        raise HTTPException(status_code=404, detail=t("web_ui.tasks.not_found"))
     return to_plugin_store_task_item(task)

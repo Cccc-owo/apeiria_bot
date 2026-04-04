@@ -16,8 +16,8 @@ from apeiria.builtin_plugins.help.generator import (
     PluginHelpInfo,
     find_plugin_by_name,
     generate_help_list,
-    get_command_prefix,
 )
+from apeiria.shared.command_prefix import get_command_prefix
 from apeiria.shared.i18n import t
 
 _help = on_alconna(
@@ -109,7 +109,7 @@ def _format_help_list_text(
             lines.append(f"  {t('help.commands_label')}: {command_text}")
 
     lines.append("")
-    lines.append(t("help.list_footer", prefix=prefix))
+    lines.append(t("help.list_footer"))
     return "\n".join(lines)
 
 

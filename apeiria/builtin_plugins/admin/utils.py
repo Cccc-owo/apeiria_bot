@@ -31,11 +31,11 @@ def resolve_plugin_query(
     fuzzy_matches: list[Plugin] = []
     for plugin in nonebot.get_loaded_plugins():
         display_name = get_plugin_name(plugin)
-        candidates = (
+        candidates = [
             plugin.module_name.lower(),
             plugin.id_.lower(),
             display_name.lower(),
-        )
+        ]
         if normalized in candidates:
             exact_matches.append(plugin)
             continue

@@ -2,7 +2,7 @@ help:
   meta:
     name: "帮助系统"
     description: "图像化帮助菜单与插件详情"
-    usage: "/help - 查看帮助菜单\n/help <插件名> - 查看插件详情\n/help --admin - 查看管理视图帮助\n/help --all - 主人查看完整帮助\n/帮助 / /菜单 / /功能 - 帮助命令别名"
+    usage: "{prefix}help - 查看帮助菜单\n{prefix}help <插件名> - 查看插件详情\n{prefix}help --admin - 查看管理视图帮助\n{prefix}help --all - 主人查看完整帮助\n{prefix}帮助 / {prefix}菜单 / {prefix}功能 - 帮助命令别名"
     help_category: "帮助与菜单"
     help_introduction: "统一展示插件功能、命令与说明的帮助系统。"
   command:
@@ -31,3 +31,124 @@ help:
   detail_owner_help: "Owner 说明"
   detail_usage: "使用方法"
   official_badge: "官方"
+  defaults:
+    title: "帮助菜单"
+    subtitle: "发送 {prefix}help <插件名> 查看详细命令"
+    unnamed_plugin: "未命名插件"
+  arg_display:
+    plugin_name: "插件名"
+    action: "动作"
+    scope: "范围"
+    target: "目标"
+    task_id: "任务ID"
+  parser:
+    options_header: "可用的选项有"
+    shortcuts_header: "快捷命令"
+  config:
+    appearance:
+      label: "菜单外观"
+      help: "控制帮助菜单的标题、主色和展示样式。"
+      title:
+        label: "菜单标题"
+        help: "显示在帮助菜单顶部的主标题。"
+      subtitle:
+        label: "副标题"
+        help: "显示在标题下方的补充说明，可留空。"
+      accent_color:
+        label: "主色"
+        help: "帮助菜单的主题色，使用十六进制颜色值，例如 #4e96f7。"
+      expand_commands:
+        label: "直接展开命令列表"
+        help: "开启后直接展示命令列表，不再按插件卡片分组。"
+    visibility:
+      label: "显示范围"
+      help: "控制哪些插件会出现在帮助菜单中。"
+      show_builtin_plugins:
+        label: "显示内置插件"
+        help: "显示框架和内置插件；关闭后只展示常规业务插件。"
+      hidden_plugins:
+        label: "隐藏插件"
+        help: "这些插件不会出现在帮助菜单中。直接填写插件模块名，例如 apeiria.builtin_plugins.help。"
+    roles:
+      label: "身份视图"
+      help: "按普通用户、管理员、主人展示不同的帮助菜单。"
+      enabled:
+        label: "启用身份区分"
+        help: "根据当前身份展示不同内容的帮助菜单。"
+      mode:
+        label: "切换方式"
+        help: "选“自动切换”时，会按当前身份自动显示对应菜单；选“仅手动切换”时，只有使用 --admin 等参数才切换。"
+        choice_auto: "自动切换"
+        choice_manual_only: "仅手动切换"
+      owner_sees_all:
+        label: "主人默认显示全部"
+        help: "开启后，主人默认看到完整帮助列表，无需额外使用 --all。"
+      user_title:
+        label: "普通用户标题"
+        help: "普通用户视图的标题覆盖文案，留空则使用统一标题。"
+      admin_title:
+        label: "管理员标题"
+        help: "管理员视图的标题覆盖文案，留空则使用统一标题。"
+      owner_title:
+        label: "主人标题"
+        help: "主人视图的标题覆盖文案，留空则使用统一标题。"
+    assets:
+      label: "资源与品牌"
+      help: "配置菜单横幅、Logo、页脚和字体。"
+      banner_image:
+        label: "横幅背景图"
+        help: "填写帮助数据目录中的图片文件名，例如 banner.png；留空则使用默认背景。"
+      header_logo:
+        label: "顶部 Logo"
+        help: "填写帮助数据目录中的 Logo 文件名，例如 logo.png；留空则不显示。"
+      footer_text:
+        label: "页脚文案"
+        help: "显示在菜单底部的补充文案。"
+      font_urls:
+        label: "远程字体样式表"
+        help: "填写字体 CSS 地址列表，例如 https://example.com/font.css；通常无需修改。"
+      font_family:
+        label: "主字体"
+        help: "主要中文字体名称，通常保持默认即可。"
+      latin_font_family:
+        label: "西文字体"
+        help: "英文和数字使用的字体名称，通常无需修改。"
+      mono_font_family:
+        label: "等宽字体"
+        help: "命令和代码文本使用的字体名称，通常无需修改。"
+    render:
+      label: "渲染与缓存"
+      help: "模板加载、缓存和调试等高级选项。"
+      prefer_custom_templates:
+        label: "优先使用自定义模板"
+        help: "优先从插件数据目录加载模板，适合自定义样式时使用。"
+      disk_cache:
+        label: "启用磁盘缓存"
+        help: "将渲染结果缓存到磁盘，减少重复渲染开销。"
+      debug:
+        label: "输出调试日志"
+        help: "输出帮助渲染的调试日志，仅排查问题时开启。"
+    plugin_overrides:
+      label: "插件展示覆盖"
+      help: "为缺少完整元数据的插件手动补充展示名称、描述、分类标签、排序和命令。"
+      override:
+        label: "插件覆盖项"
+        help: "每一项对应一个要手动补充说明的插件。"
+        plugin_name:
+          label: "插件标识"
+          help: "填写要补充说明的插件模块名，例如 nonebot_plugin_status。"
+        display_name:
+          label: "展示名称"
+          help: "覆盖插件在帮助菜单中的显示名称。"
+        description:
+          label: "展示描述"
+          help: "覆盖插件在帮助菜单中的描述。"
+        category:
+          label: "分类标签"
+          help: "给这个插件加一个展示标签，例如 系统工具。"
+        order:
+          label: "排序"
+          help: "数值越小越靠前。"
+        extra_commands:
+          label: "补充命令"
+          help: "额外追加到该插件卡片中的命令列表。每一项写成 命令名|描述|前缀，例如 status|查看运行状态|{prefix}。"

@@ -12,6 +12,8 @@ from nonebot.matcher import matchers
 from nonebot.rule import CommandRule
 
 from apeiria.builtin_plugins.help.utils import find_plugin_icon
+from apeiria.shared.command_prefix import get_command_prefix
+from apeiria.shared.i18n import t
 from apeiria.shared.plugin_introspection import (
     get_plugin_extra,
     get_plugin_name,
@@ -24,14 +26,6 @@ if TYPE_CHECKING:
         HelpConfig,
         PluginOverride,
     )
-
-_ARG_DISPLAY_NAMES = {
-    "plugin_name": "插件名",
-    "action": "动作",
-    "scope": "范围",
-    "target": "目标",
-    "task_id": "任务ID",
-}
 
 HelpViewRole = Literal["user", "admin", "owner"]
 
@@ -169,19 +163,6 @@ def find_plugin_by_name(
         ):
             return plugin
     return None
-
-
-def get_command_prefix() -> str:
-    """Return one display prefix from current NoneBot config."""
-    command_start = getattr(nonebot.get_driver().config, "command_start", None)
-    if isinstance(command_start, set) and command_start:
-        return sorted(str(item) for item in command_start if item)[0]
-    if isinstance(command_start, (list, tuple)) and command_start:
-        return str(command_start[0])
-    if isinstance(command_start, str) and command_start:
-        return command_start
-    return "/"
-
 
 def _discover_plugins(
     config: HelpConfig,
@@ -440,8 +421,8 @@ def _apply_overrides(
             target = PluginHelpInfo(
                 plugin_id=module_name,
                 module_name=module_name,
-                name=override.plugin_name or "未命名插件",
-                display_name=override.plugin_name or "未命名插件",
+                name=override.plugin_name or t("help.defaults.unnamed_plugin"),
+                display_name=override.plugin_name or t("help.defaults.unnamed_plugin"),
                 description="",
                 usage="",
                 plugin_type="custom",
@@ -553,13 +534,15 @@ def _get_loaded_plugin(plugin_id: str):
 
 
 def _extract_usage_line(help_text: str) -> str:
+    options_header = t("help.parser.options_header")
+    shortcuts_header = t("help.parser.shortcuts_header")
     for line in help_text.splitlines():
         stripped = line.strip()
         if not stripped or stripped == "Unknown":
             continue
-        if stripped.startswith("可用的选项有"):
+        if stripped.startswith(options_header):
             break
-        if stripped.startswith("快捷命令"):
+        if stripped.startswith(shortcuts_header):
             break
         return stripped
     return ""
@@ -590,9 +573,15 @@ def _format_arg(arg: Any) -> str:
     name = getattr(arg, "name", "").strip()
     if not name or getattr(arg, "hidden", False):
         return ""
-    display_name = _ARG_DISPLAY_NAMES.get(name, name)
+    display_name = _get_arg_display_name(name)
     wrapper = "[{}]" if getattr(arg, "optional", False) else "<{}>"
     return wrapper.format(display_name)
+
+
+def _get_arg_display_name(name: str) -> str:
+    key = f"help.arg_display.{name}"
+    resolved = t(key)
+    return name if resolved == key else resolved
 
 
 def _format_option(option: Any) -> str:

@@ -10,16 +10,14 @@ from apeiria.builtin_plugins.help.config import (
     HelpConfig,
     get_help_config,
 )
-from apeiria.builtin_plugins.help.generator import (
-    generate_help_list,
-    get_command_prefix,
-)
+from apeiria.builtin_plugins.help.generator import generate_help_list
 from apeiria.builtin_plugins.help.renderer import (
     _build_main_menu_data,
     _build_sub_menu_data,
     build_render_cache_key,
     cleanup_stale_disk_cache,
 )
+from apeiria.shared.command_prefix import get_command_prefix
 from apeiria.shared.i18n import load_locales, t
 from apeiria.shared.plugin_metadata import (
     ConfigExtra,
@@ -132,258 +130,228 @@ __plugin_meta__ = PluginMetadata(
             fields=[
                 _config_meta(
                     key="appearance",
-                    label="菜单外观",
+                    label=t("help.config.appearance.label"),
                     order=10,
-                    help_text="控制帮助菜单的标题、主色和展示样式。",
+                    help_text=t("help.config.appearance.help"),
                     fields=[
                         _config_meta(
                             key="title",
-                            label="菜单标题",
+                            label=t("help.config.appearance.title.label"),
                             order=10,
-                            help_text="显示在帮助菜单顶部的主标题。",
+                            help_text=t("help.config.appearance.title.help"),
                         ),
                         _config_meta(
                             key="subtitle",
-                            label="副标题",
+                            label=t("help.config.appearance.subtitle.label"),
                             order=20,
-                            help_text="显示在标题下方的补充说明，可留空。",
+                            help_text=t("help.config.appearance.subtitle.help"),
                         ),
                         _config_meta(
                             key="accent_color",
-                            label="主色",
+                            label=t("help.config.appearance.accent_color.label"),
                             order=30,
-                            help_text=(
-                                "帮助菜单的主题色，使用十六进制颜色值，"
-                                "例如 #4e96f7。"
-                            ),
+                            help_text=t("help.config.appearance.accent_color.help"),
                         ),
                         _config_meta(
                             key="expand_commands",
-                            label="直接展开命令列表",
+                            label=t("help.config.appearance.expand_commands.label"),
                             order=40,
-                            help_text="开启后直接展示命令列表，不再按插件卡片分组。",
+                            help_text=t("help.config.appearance.expand_commands.help"),
                         ),
                     ],
                 ),
                 _config_meta(
                     key="visibility",
-                    label="显示范围",
+                    label=t("help.config.visibility.label"),
                     order=20,
-                    help_text="控制哪些插件会出现在帮助菜单中。",
+                    help_text=t("help.config.visibility.help"),
                     fields=[
                         _config_meta(
                             key="show_builtin_plugins",
-                            label="显示内置插件",
+                            label=t("help.config.visibility.show_builtin_plugins.label"),
                             order=10,
-                            help_text="显示框架和内置插件；关闭后只展示常规业务插件。",
+                            help_text=t("help.config.visibility.show_builtin_plugins.help"),
                         ),
                         _config_meta(
                             key="hidden_plugins",
-                            label="隐藏插件",
+                            label=t("help.config.visibility.hidden_plugins.label"),
                             order=20,
-                            help_text=(
-                                "这些插件不会出现在帮助菜单中。"
-                                "直接填写插件模块名，例如 "
-                                "apeiria.builtin_plugins.help。"
-                            ),
+                            help_text=t("help.config.visibility.hidden_plugins.help"),
                         ),
                     ],
                 ),
                 _config_meta(
                     key="roles",
-                    label="身份视图",
+                    label=t("help.config.roles.label"),
                     order=30,
-                    help_text="按普通用户、管理员、主人展示不同的帮助菜单。",
+                    help_text=t("help.config.roles.help"),
                     fields=[
                         _config_meta(
                             key="enabled",
-                            label="启用身份区分",
+                            label=t("help.config.roles.enabled.label"),
                             order=10,
-                            help_text="根据当前身份展示不同内容的帮助菜单。",
+                            help_text=t("help.config.roles.enabled.help"),
                         ),
                         _config_meta(
                             key="mode",
-                            label="切换方式",
+                            label=t("help.config.roles.mode.label"),
                             order=20,
-                            help_text=(
-                                "选“自动切换”时，会按当前身份自动显示对应菜单；"
-                                "选“仅手动切换”时，只有使用 --admin 等参数才切换。"
-                            ),
+                            help_text=t("help.config.roles.mode.help"),
                             choices=["auto", "manual_only"],
                             choice_labels={
-                                "auto": "自动切换",
-                                "manual_only": "仅手动切换",
+                                "auto": t("help.config.roles.mode.choice_auto"),
+                                "manual_only": t(
+                                    "help.config.roles.mode.choice_manual_only"
+                                ),
                             },
                         ),
                         _config_meta(
                             key="owner_sees_all",
-                            label="主人默认显示全部",
+                            label=t("help.config.roles.owner_sees_all.label"),
                             order=30,
-                            help_text=(
-                                "开启后，主人默认看到完整帮助列表，"
-                                "无需额外使用 --all。"
-                            ),
+                            help_text=t("help.config.roles.owner_sees_all.help"),
                         ),
                         _config_meta(
                             key="user_title",
-                            label="普通用户标题",
+                            label=t("help.config.roles.user_title.label"),
                             order=40,
-                            help_text="普通用户视图的标题覆盖文案，留空则使用统一标题。",
+                            help_text=t("help.config.roles.user_title.help"),
                         ),
                         _config_meta(
                             key="admin_title",
-                            label="管理员标题",
+                            label=t("help.config.roles.admin_title.label"),
                             order=50,
-                            help_text="管理员视图的标题覆盖文案，留空则使用统一标题。",
+                            help_text=t("help.config.roles.admin_title.help"),
                         ),
                         _config_meta(
                             key="owner_title",
-                            label="主人标题",
+                            label=t("help.config.roles.owner_title.label"),
                             order=60,
-                            help_text="主人视图的标题覆盖文案，留空则使用统一标题。",
+                            help_text=t("help.config.roles.owner_title.help"),
                         ),
                     ],
                 ),
                 _config_meta(
                     key="assets",
-                    label="资源与品牌",
+                    label=t("help.config.assets.label"),
                     order=40,
-                    help_text="配置菜单横幅、Logo、页脚和字体。",
+                    help_text=t("help.config.assets.help"),
                     fields=[
                         _config_meta(
                             key="banner_image",
-                            label="横幅背景图",
+                            label=t("help.config.assets.banner_image.label"),
                             order=10,
-                            help_text=(
-                                "填写帮助数据目录中的图片文件名，例如 banner.png；"
-                                "留空则使用默认背景。"
-                            ),
+                            help_text=t("help.config.assets.banner_image.help"),
                         ),
                         _config_meta(
                             key="header_logo",
-                            label="顶部 Logo",
+                            label=t("help.config.assets.header_logo.label"),
                             order=20,
-                            help_text=(
-                                "填写帮助数据目录中的 Logo 文件名，例如 logo.png；"
-                                "留空则不显示。"
-                            ),
+                            help_text=t("help.config.assets.header_logo.help"),
                         ),
                         _config_meta(
                             key="footer_text",
-                            label="页脚文案",
+                            label=t("help.config.assets.footer_text.label"),
                             order=30,
-                            help_text="显示在菜单底部的补充文案。",
+                            help_text=t("help.config.assets.footer_text.help"),
                         ),
                         _config_meta(
                             key="font_urls",
-                            label="远程字体样式表",
+                            label=t("help.config.assets.font_urls.label"),
                             order=40,
-                            help_text=(
-                                "填写字体 CSS 地址列表，例如 "
-                                "https://example.com/font.css；通常无需修改。"
-                            ),
+                            help_text=t("help.config.assets.font_urls.help"),
                         ),
                         _config_meta(
                             key="font_family",
-                            label="主字体",
+                            label=t("help.config.assets.font_family.label"),
                             order=50,
-                            help_text="主要中文字体名称，通常保持默认即可。",
+                            help_text=t("help.config.assets.font_family.help"),
                         ),
                         _config_meta(
                             key="latin_font_family",
-                            label="西文字体",
+                            label=t("help.config.assets.latin_font_family.label"),
                             order=60,
-                            help_text="英文和数字使用的字体名称，通常无需修改。",
+                            help_text=t("help.config.assets.latin_font_family.help"),
                         ),
                         _config_meta(
                             key="mono_font_family",
-                            label="等宽字体",
+                            label=t("help.config.assets.mono_font_family.label"),
                             order=70,
-                            help_text="命令和代码文本使用的字体名称，通常无需修改。",
+                            help_text=t("help.config.assets.mono_font_family.help"),
                         ),
                     ],
                 ),
                 _config_meta(
                     key="render",
-                    label="渲染与缓存",
+                    label=t("help.config.render.label"),
                     order=90,
-                    help_text="模板加载、缓存和调试等高级选项。",
+                    help_text=t("help.config.render.help"),
                     fields=[
                         _config_meta(
                             key="prefer_custom_templates",
-                            label="优先使用自定义模板",
+                            label=t("help.config.render.prefer_custom_templates.label"),
                             order=10,
-                            help_text="优先从插件数据目录加载模板，适合自定义样式时使用。",
+                            help_text=t("help.config.render.prefer_custom_templates.help"),
                         ),
                         _config_meta(
                             key="disk_cache",
-                            label="启用磁盘缓存",
+                            label=t("help.config.render.disk_cache.label"),
                             order=20,
-                            help_text="将渲染结果缓存到磁盘，减少重复渲染开销。",
+                            help_text=t("help.config.render.disk_cache.help"),
                         ),
                         _config_meta(
                             key="debug",
-                            label="输出调试日志",
+                            label=t("help.config.render.debug.label"),
                             order=30,
-                            help_text="输出帮助渲染的调试日志，仅排查问题时开启。",
+                            help_text=t("help.config.render.debug.help"),
                         ),
                     ],
                 ),
                 _config_meta(
                     key="plugin_overrides",
-                    label="插件展示覆盖",
+                    label=t("help.config.plugin_overrides.label"),
                     order=100,
-                    help_text=(
-                        "为缺少完整元数据的插件手动补充展示名称、描述、"
-                        "分类标签、排序和命令。"
-                    ),
+                    help_text=t("help.config.plugin_overrides.help"),
                     item_schema=_config_meta(
                         key="override",
-                        label="插件覆盖项",
-                        help_text="每一项对应一个要手动补充说明的插件。",
+                        label=t("help.config.plugin_overrides.override.label"),
+                        help_text=t("help.config.plugin_overrides.override.help"),
                         fields=[
                             _config_meta(
                                 key="plugin_name",
-                                label="插件标识",
+                                label=t("help.config.plugin_overrides.override.plugin_name.label"),
                                 order=10,
-                                help_text=(
-                                    "填写要补充说明的插件模块名，"
-                                    "例如 nonebot_plugin_status。"
-                                ),
+                                help_text=t("help.config.plugin_overrides.override.plugin_name.help"),
                             ),
                             _config_meta(
                                 key="display_name",
-                                label="展示名称",
+                                label=t("help.config.plugin_overrides.override.display_name.label"),
                                 order=20,
-                                help_text="覆盖插件在帮助菜单中的显示名称。",
+                                help_text=t("help.config.plugin_overrides.override.display_name.help"),
                             ),
                             _config_meta(
                                 key="description",
-                                label="展示描述",
+                                label=t("help.config.plugin_overrides.override.description.label"),
                                 order=30,
-                                help_text="覆盖插件在帮助菜单中的描述。",
+                                help_text=t("help.config.plugin_overrides.override.description.help"),
                             ),
                             _config_meta(
                                 key="category",
-                                label="分类标签",
+                                label=t("help.config.plugin_overrides.override.category.label"),
                                 order=40,
-                                help_text="给这个插件加一个展示标签，例如 系统工具。",
+                                help_text=t("help.config.plugin_overrides.override.category.help"),
                             ),
                             _config_meta(
                                 key="order",
-                                label="排序",
+                                label=t("help.config.plugin_overrides.override.order.label"),
                                 order=50,
-                                help_text="数值越小越靠前。",
+                                help_text=t("help.config.plugin_overrides.override.order.help"),
                             ),
                             _config_meta(
                                 key="extra_commands",
-                                label="补充命令",
+                                label=t("help.config.plugin_overrides.override.extra_commands.label"),
                                 order=60,
-                                help_text=(
-                                    "额外追加到该插件卡片中的命令列表。"
-                                    "每一项写成 命令名|描述|前缀，例如 "
-                                    "status|查看运行状态|/。"
-                                ),
+                                help_text=t("help.config.plugin_overrides.override.extra_commands.help"),
                             ),
                         ],
                     ),
