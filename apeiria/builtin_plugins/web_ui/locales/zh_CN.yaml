@@ -55,6 +55,9 @@ web_ui:
     rule_not_found: "访问规则不存在"
   plugins:
     not_found: "插件不存在"
+    not_configurable: "插件没有可配置字段"
+    update_not_allowed: "当前不允许更新该插件包"
+    store_not_found: "插件商店资源不存在"
     readme_not_found: "未找到插件 README"
     readme_asset_forbidden: "README 相对路径不能越过所在目录"
     protected: "该插件不可禁用：{reason}"
@@ -79,3 +82,6 @@ web_ui:
     credentials_file: "Web UI 凭据文件：{path}"
   dashboard:
     restart_scheduled: "已安排重启"
+    build_tool_unavailable: "当前环境缺少前端构建工具"
+  tasks:
+    not_found: "任务不存在"

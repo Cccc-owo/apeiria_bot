@@ -55,6 +55,9 @@ web_ui:
     rule_not_found: "Access rule not found"
   plugins:
     not_found: "Plugin not found"
+    not_configurable: "Plugin has no configurable fields"
+    update_not_allowed: "Plugin package update is not allowed"
+    store_not_found: "Store plugin not found"
     readme_not_found: "Plugin README not found"
     readme_asset_forbidden: "README relative paths cannot escape the current directory"
     protected: "This plugin cannot be disabled: {reason}"
@@ -79,3 +82,6 @@ web_ui:
     credentials_file: "Web UI credentials file: {path}"
   dashboard:
     restart_scheduled: "Restart scheduled"
+    build_tool_unavailable: "Frontend build tool is unavailable in current environment"
+  tasks:
+    not_found: "Task not found"

@@ -41,6 +41,7 @@ from apeiria.interfaces.http.schemas.models import (
     PluginToggleResponse,
     PluginUpdateCheckItem,
 )
+from apeiria.shared.i18n import t
 
 
 def to_orphan_plugin_config_response(
@@ -176,7 +177,7 @@ def raise_settings_error(exc: Exception) -> None:
     if isinstance(exc, PluginSettingsNotConfigurableError):
         raise HTTPException(
             status_code=404,
-            detail="plugin has no configurable fields",
+            detail=t("web_ui.plugins.not_configurable"),
         ) from exc
     if isinstance(exc, ValueError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -96,7 +96,10 @@ async def rebuild_webui_stream(
 ) -> StreamingResponse:
     status = dashboard_service.get_web_ui_build_status()
     if not status.can_build:
-        raise HTTPException(status_code=400, detail="build_tool_unavailable")
+        raise HTTPException(
+            status_code=400,
+            detail=t("web_ui.dashboard.build_tool_unavailable"),
+        )
     return StreamingResponse(
         dashboard_service.stream_web_ui_rebuild(),
         media_type="application/x-ndjson",

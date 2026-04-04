@@ -60,7 +60,7 @@ async def handle_admin(event: Event) -> None:
                 render_list_block(
                     t("admin.overview.commands_title"),
                     [
-                    t("admin.overview.command_status"),
+                        t("admin.overview.command_status"),
                         t("admin.overview.command_plugins"),
                         t("admin.overview.command_plugin"),
                         t("admin.overview.command_config"),

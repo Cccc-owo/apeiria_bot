@@ -69,7 +69,7 @@ def _build_main_menu_data(
     role: HelpViewRole,
 ) -> dict[str, object]:
     title = _resolve_title(config, role)
-    subtitle = config.subtitle or f"发送 {prefix}help <插件名> 查看详细命令"
+    subtitle = config.subtitle or t("help.defaults.subtitle", prefix=prefix)
 
     if config.expand_commands:
         plugin_data = [
@@ -173,11 +173,12 @@ def _build_sub_menu_data(
 
 
 def _resolve_title(config: HelpConfig, role: HelpViewRole) -> str:
+    default_title = t("help.defaults.title")
     if role == "owner":
-        return (config.owner_title or config.title or "帮助菜单").strip()
+        return (config.owner_title or config.title or default_title).strip()
     if role == "admin":
-        return (config.admin_title or config.title or "帮助菜单").strip()
-    return (config.user_title or config.title or "帮助菜单").strip()
+        return (config.admin_title or config.title or default_title).strip()
+    return (config.user_title or config.title or default_title).strip()
 
 
 def _resolve_view_label(role: HelpViewRole) -> str:

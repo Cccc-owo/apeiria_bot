@@ -2,7 +2,7 @@ help:
   meta:
     name: "Help System"
     description: "Rendered help menu and plugin details"
-    usage: "/help - View help menu\n/help <plugin> - View plugin details\n/help --admin - View admin help\n/help --all - Owner view for complete help\n/帮助 / /菜单 / /功能 - Help command aliases"
+    usage: "{prefix}help - View help menu\n{prefix}help <plugin> - View plugin details\n{prefix}help --admin - View admin help\n{prefix}help --all - Owner view for complete help\n{prefix}帮助 / {prefix}菜单 / {prefix}功能 - Help command aliases"
     help_category: "Help and Menu"
     help_introduction: "Unified help system for plugin features, commands, and descriptions."
   command:
@@ -31,3 +31,124 @@ help:
   detail_owner_help: "Owner Notes"
   detail_usage: "Usage"
   official_badge: "Official"
+  defaults:
+    title: "Help Menu"
+    subtitle: "Use {prefix}help <plugin> to view detailed commands"
+    unnamed_plugin: "Unnamed Plugin"
+  arg_display:
+    plugin_name: "plugin"
+    action: "action"
+    scope: "scope"
+    target: "target"
+    task_id: "task_id"
+  parser:
+    options_header: "Available options"
+    shortcuts_header: "Shortcuts"
+  config:
+    appearance:
+      label: "Menu Appearance"
+      help: "Controls the help menu title, accent color, and presentation style."
+      title:
+        label: "Menu Title"
+        help: "Main title shown at the top of the help menu."
+      subtitle:
+        label: "Subtitle"
+        help: "Secondary text shown below the title. Can be left empty."
+      accent_color:
+        label: "Accent Color"
+        help: "Theme color for the help menu, using a hex value such as #4e96f7."
+      expand_commands:
+        label: "Expand Commands"
+        help: "Show command lists directly instead of grouping them by plugin cards."
+    visibility:
+      label: "Visibility"
+      help: "Controls which plugins appear in the help menu."
+      show_builtin_plugins:
+        label: "Show Builtin Plugins"
+        help: "Show framework and builtin plugins; when disabled, only regular business plugins are shown."
+      hidden_plugins:
+        label: "Hidden Plugins"
+        help: "These plugins will not appear in the help menu. Fill in plugin module names such as apeiria.builtin_plugins.help."
+    roles:
+      label: "Role Views"
+      help: "Show different help menus for users, admins, and owners."
+      enabled:
+        label: "Enable Role Separation"
+        help: "Show different help menu content based on the current role."
+      mode:
+        label: "Switch Mode"
+        help: "With Auto Switch, the menu follows the current role automatically; with Manual Only, it only switches when flags like --admin are used."
+        choice_auto: "Auto Switch"
+        choice_manual_only: "Manual Only"
+      owner_sees_all:
+        label: "Owner Shows All by Default"
+        help: "When enabled, the owner sees the complete help list by default without needing --all."
+      user_title:
+        label: "User Title"
+        help: "Title override for the user view. Leave empty to use the shared title."
+      admin_title:
+        label: "Admin Title"
+        help: "Title override for the admin view. Leave empty to use the shared title."
+      owner_title:
+        label: "Owner Title"
+        help: "Title override for the owner view. Leave empty to use the shared title."
+    assets:
+      label: "Assets and Branding"
+      help: "Configure the menu banner, logo, footer, and fonts."
+      banner_image:
+        label: "Banner Image"
+        help: "Enter an image filename from the help data directory, such as banner.png; leave empty to use the default background."
+      header_logo:
+        label: "Header Logo"
+        help: "Enter a logo filename from the help data directory, such as logo.png; leave empty to hide it."
+      footer_text:
+        label: "Footer Text"
+        help: "Additional text displayed at the bottom of the menu."
+      font_urls:
+        label: "Remote Font Stylesheets"
+        help: "Enter a list of font CSS URLs such as https://example.com/font.css; usually no change is needed."
+      font_family:
+        label: "Primary Font"
+        help: "Main font used for CJK text. Keeping the default is usually fine."
+      latin_font_family:
+        label: "Latin Font"
+        help: "Font used for English text and numbers. Usually no change is needed."
+      mono_font_family:
+        label: "Monospace Font"
+        help: "Font used for commands and code text. Usually no change is needed."
+    render:
+      label: "Rendering and Cache"
+      help: "Advanced options for template loading, caching, and debugging."
+      prefer_custom_templates:
+        label: "Prefer Custom Templates"
+        help: "Load templates from the plugin data directory first, suitable for custom styling."
+      disk_cache:
+        label: "Enable Disk Cache"
+        help: "Cache rendered output on disk to reduce repeated rendering overhead."
+      debug:
+        label: "Debug Logging"
+        help: "Output debug logs for help rendering. Only enable this when troubleshooting."
+    plugin_overrides:
+      label: "Plugin Display Overrides"
+      help: "Manually supplement display names, descriptions, categories, ordering, and commands for plugins that lack complete metadata."
+      override:
+        label: "Plugin Override"
+        help: "Each item corresponds to one plugin that needs manual supplement."
+        plugin_name:
+          label: "Plugin Identifier"
+          help: "Enter the plugin module name to supplement, such as nonebot_plugin_status."
+        display_name:
+          label: "Display Name"
+          help: "Override the plugin's display name in the help menu."
+        description:
+          label: "Display Description"
+          help: "Override the plugin's description in the help menu."
+        category:
+          label: "Category Tag"
+          help: "Add a display tag for this plugin, such as System Tools."
+        order:
+          label: "Order"
+          help: "Smaller values appear earlier."
+        extra_commands:
+          label: "Extra Commands"
+          help: "Append extra commands to the plugin card. Each item should use the form command|description|prefix, for example status|View runtime status|{prefix}."
