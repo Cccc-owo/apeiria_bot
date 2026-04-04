@@ -7,6 +7,7 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.app.plugins import (
+    PluginCatalogItem,
     PluginSettingsNotConfigurableError,
     plugin_catalog_service,
     plugin_config_view_service,
@@ -19,7 +20,7 @@ from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message, resolve_plugin_catalog_query
 
 _plugins = on_alconna(
-    Alconna("plugins", meta=CommandMeta(description="查看系统插件总览")),
+    Alconna("plugins", meta=CommandMeta(description=t("admin.command.plugins"))),
     use_cmd_start=True,
     priority=5,
     block=True,
@@ -30,7 +31,7 @@ _plugin = on_alconna(
         "plugin",
         Args["action", str],
         Args["plugin_name?", str],
-        meta=CommandMeta(description="管理插件状态、详情或配置摘要"),
+        meta=CommandMeta(description=t("admin.command.plugin")),
     ),
     use_cmd_start=True,
     priority=5,
@@ -176,7 +177,7 @@ async def _render_plugin_info(module_name: str) -> str:
 
 
 async def _handle_plugin_toggle(
-    item: object,
+    item: PluginCatalogItem,
     *,
     selected_action: str,
     raw_query: str,
@@ -209,7 +210,7 @@ async def _handle_plugin_toggle(
     return t(key, name=plugin_name)
 
 
-async def _list_visible_plugins() -> list[object]:
+async def _list_visible_plugins() -> list[PluginCatalogItem]:
     items = await plugin_catalog_service.list_plugins()
     return sorted(
         [item for item in items if item.plugin_type not in {"hidden", "parent"}],
@@ -217,7 +218,7 @@ async def _list_visible_plugins() -> list[object]:
     )
 
 
-def _format_plugin_summary_line(item: object) -> str:
+def _format_plugin_summary_line(item: PluginCatalogItem) -> str:
     status = (
         t("admin.common.enabled")
         if item.is_global_enabled

@@ -20,7 +20,7 @@ from apeiria.builtin_plugins.help.renderer import (
     build_render_cache_key,
     cleanup_stale_disk_cache,
 )
-from apeiria.shared.i18n import load_locales
+from apeiria.shared.i18n import load_locales, t
 from apeiria.shared.plugin_metadata import (
     ConfigExtra,
     HelpExtra,
@@ -110,16 +110,10 @@ def _cleanup_help_disk_cache() -> None:
 
 
 __plugin_meta__ = PluginMetadata(
-    name="帮助系统",
-    description="图像化帮助菜单与插件详情",
+    name=t("help.meta.name"),
+    description=t("help.meta.description"),
     homepage="https://github.com/Cccc-owo/apeiria_bot",
-    usage=(
-        "/help - 查看帮助菜单\n"
-        "/help <插件名> - 查看插件详情\n"
-        "/help --admin - 查看管理视图帮助\n"
-        "/help --all - 主人查看完整帮助\n"
-        "/帮助 / /菜单 / /功能 - 帮助命令别名"
-    ),
+    usage=t("help.meta.usage"),
     type="application",
     config=HelpConfig,
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
@@ -129,8 +123,8 @@ __plugin_meta__ = PluginMetadata(
         plugin_type=PluginType.NORMAL,
         admin_level=0,
         help=HelpExtra(
-            category="帮助与菜单",
-            introduction="统一展示插件功能、命令与说明的帮助系统。",
+            category=t("help.meta.help_category"),
+            introduction=t("help.meta.help_introduction"),
         ),
         ui=UiExtra(order=5),
         commands=["help"],

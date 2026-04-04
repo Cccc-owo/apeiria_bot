@@ -8,13 +8,14 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.app.plugins import plugin_config_view_service
+from apeiria.app.plugins.registration_service import DriverConfigStatus
 from apeiria.shared.i18n import t
 
 from .presenter import render_block, render_list_block
 from .utils import ensure_owner_message
 
 _drivers = on_alconna(
-    Alconna("drivers", meta=CommandMeta(description="查看当前驱动器运行信息")),
+    Alconna("drivers", meta=CommandMeta(description=t("admin.command.drivers"))),
     use_cmd_start=True,
     priority=5,
     block=True,
@@ -52,7 +53,7 @@ async def handle_drivers(event: Event) -> None:
     )
 
 
-def _format_driver_line(item: object) -> str:
+def _format_driver_line(item: DriverConfigStatus) -> str:
     status = (
         t("admin.drivers.active") if item.is_active else t("admin.drivers.inactive")
     )

@@ -26,7 +26,7 @@ _help = on_alconna(
         Args["plugin_name?", MultiVar(str, "*")],
         Option("--admin"),
         Option("--all"),
-        meta=CommandMeta(description="查看帮助菜单或指定插件详情"),
+        meta=CommandMeta(description=t("help.command.help")),
     ),
     aliases={"帮助", "菜单", "功能"},
     use_cmd_start=True,
