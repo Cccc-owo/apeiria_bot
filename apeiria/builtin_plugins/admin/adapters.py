@@ -8,13 +8,14 @@ from nonebot.adapters import Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.app.plugins import plugin_config_view_service
+from apeiria.app.plugins.registration_service import AdapterConfigStatus
 from apeiria.shared.i18n import t
 
 from .presenter import render_list_block
 from .utils import ensure_owner_message
 
 _adapters = on_alconna(
-    Alconna("adapters", meta=CommandMeta(description="查看当前适配器加载状态")),
+    Alconna("adapters", meta=CommandMeta(description=t("admin.command.adapters"))),
     use_cmd_start=True,
     priority=5,
     block=True,
@@ -48,7 +49,7 @@ async def handle_adapters(event: Event) -> None:
     )
 
 
-def _format_adapter_line(item: object) -> str:
+def _format_adapter_line(item: AdapterConfigStatus) -> str:
     load_status = (
         t("admin.adapters.loaded") if item.is_loaded else t("admin.adapters.not_loaded")
     )

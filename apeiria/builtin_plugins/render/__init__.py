@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from markdown_it import MarkdownIt
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
 
+from apeiria.shared.i18n import load_locales, t
 from apeiria.shared.plugin_metadata import (
     ConfigExtra,
     PluginExtraData,
@@ -28,18 +30,14 @@ from .service import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
+
+load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
-    name="统一渲染服务",
-    description="基于 Playwright 的统一 HTML 截图渲染服务",
+    name=t("render.meta.name"),
+    description=t("render.meta.description"),
     homepage="https://github.com/Cccc-owo/apeiria_bot",
-    usage=(
-        "供官方插件调用的基础设施插件。\n"
-        "默认无聊天命令，提供 render_html / render_template / render_url API，"
-        "以及 html_to_pic / template_to_pic / url_to_pic / markdown_to_pic "
-        "兼容风格别名。"
-    ),
+    usage=t("render.meta.usage"),
     type="library",
     config=RenderConfig,
     supported_adapters=None,
@@ -54,74 +52,74 @@ __plugin_meta__ = PluginMetadata(
                 RegisterConfig(
                     key="headless",
                     default=True,
-                    help="Launch Playwright Chromium in headless mode",
+                    help=t("render.meta.config_headless"),
                     type=bool,
                 ),
                 RegisterConfig(
                     key="channel",
                     default="",
-                    help="Browser channel name such as chrome or msedge",
+                    help=t("render.meta.config_channel"),
                     type=str,
                 ),
                 RegisterConfig(
                     key="executable_path",
                     default="",
-                    help="Custom browser executable path",
+                    help=t("render.meta.config_executable_path"),
                     type=str,
                 ),
                 RegisterConfig(
                     key="launch_args",
                     default=[],
-                    help="Extra browser launch arguments",
+                    help=t("render.meta.config_launch_args"),
                     type=list,
                     item_type=str,
                 ),
                 RegisterConfig(
                     key="browser_locale",
                     default="zh-CN",
-                    help="Default browser locale for rendered pages",
+                    help=t("render.meta.config_browser_locale"),
                     type=str,
                 ),
                 RegisterConfig(
                     key="user_agent",
                     default="",
-                    help="Optional shared user agent for rendering contexts",
+                    help=t("render.meta.config_user_agent"),
                     type=str,
                 ),
                 RegisterConfig(
                     key="default_width",
                     default=960,
-                    help="Default viewport width",
+                    help=t("render.meta.config_default_width"),
                     type=int,
                 ),
                 RegisterConfig(
                     key="default_height",
                     default=540,
-                    help="Default viewport height",
+                    help=t("render.meta.config_default_height"),
                     type=int,
                 ),
                 RegisterConfig(
                     key="default_device_scale_factor",
                     default=2.0,
-                    help="Default device scale factor",
+                    help=t("render.meta.config_default_device_scale_factor"),
                     type=float,
                 ),
                 RegisterConfig(
                     key="default_timeout_ms",
                     default=15000,
-                    help="Default render timeout in milliseconds",
+                    help=t("render.meta.config_default_timeout_ms"),
                     type=int,
                 ),
                 RegisterConfig(
                     key="max_concurrency",
                     default=2,
-                    help="Maximum concurrent render tasks",
+                    help=t("render.meta.config_max_concurrency"),
                     type=int,
                 ),
                 RegisterConfig(
                     key="startup_warmup",
                     default=True,
-                    help="Start browser warmup asynchronously during startup",
+                    help=t("render.meta.config_startup_warmup"),
                     type=bool,
                 ),
             ]

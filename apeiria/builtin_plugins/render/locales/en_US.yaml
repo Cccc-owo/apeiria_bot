@@ -1,0 +1,17 @@
+render:
+  meta:
+    name: "Unified Render Service"
+    description: "Playwright-based shared HTML screenshot rendering service"
+    usage: "Infrastructure plugin used by official plugins.\nNo chat commands by default. Provides render_html / render_template / render_url APIs and compatibility aliases such as html_to_pic / template_to_pic / url_to_pic / markdown_to_pic."
+    config_headless: "Launch Playwright Chromium in headless mode"
+    config_channel: "Browser channel name such as chrome or msedge"
+    config_executable_path: "Custom browser executable path"
+    config_launch_args: "Extra browser launch arguments"
+    config_browser_locale: "Default browser locale for rendered pages"
+    config_user_agent: "Optional shared user agent for rendering contexts"
+    config_default_width: "Default viewport width"
+    config_default_height: "Default viewport height"
+    config_default_device_scale_factor: "Default device scale factor"
+    config_default_timeout_ms: "Default render timeout in milliseconds"
+    config_max_concurrency: "Maximum concurrent render tasks"
+    config_startup_warmup: "Start browser warmup asynchronously during startup"

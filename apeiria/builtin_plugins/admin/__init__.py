@@ -5,7 +5,7 @@ from pathlib import Path
 from nonebot import require
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 
-from apeiria.shared.i18n import load_locales
+from apeiria.shared.i18n import load_locales, t
 from apeiria.shared.plugin_metadata import PluginExtraData, PluginType, UiExtra
 
 require("nonebot_plugin_alconna")
@@ -16,19 +16,10 @@ require("nonebot_plugin_apscheduler")
 load_locales(Path(__file__).parent / "locales")
 
 __plugin_meta__ = PluginMetadata(
-    name="主人管理",
-    description="主人专用的管理命令集：状态、插件、访问、任务、重启",
+    name=t("admin.meta.name"),
+    description=t("admin.meta.description"),
     homepage="https://github.com/Cccc-owo/apeiria_bot",
-    usage=(
-        "/admin - 查看总览\n"
-        "/status | /sid - 查看运行与会话状态\n"
-        "/plugins | /plugin info|enable|disable|configs <插件名> - 管理插件\n"
-        "/config core|plugin ... - 查看配置摘要\n"
-        "/access plugin|rule|remove|level ... - 管理访问控制\n"
-        "/tasks | /task info|pause|resume <任务ID> - 管理任务\n"
-        "/restart - 重启 Bot\n"
-        "/adapters | /drivers - 查看运行环境"
-    ),
+    usage=t("admin.meta.usage"),
     type="application",
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
     extra=PluginExtraData(

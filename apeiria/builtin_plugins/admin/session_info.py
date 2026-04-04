@@ -12,7 +12,7 @@ from .presenter import render_block
 from .utils import ensure_owner_message
 
 _session = on_alconna(
-    Alconna("sid", meta=CommandMeta(description="查看当前会话的 SID 与 UID 信息")),
+    Alconna("sid", meta=CommandMeta(description=t("admin.command.sid"))),
     use_cmd_start=True,
     priority=5,
     block=True,

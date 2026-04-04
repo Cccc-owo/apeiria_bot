@@ -14,7 +14,7 @@ from .presenter import render_block
 from .utils import ensure_owner_message
 
 _status = on_alconna(
-    Alconna("status", meta=CommandMeta(description="查看当前 bot 运行状态摘要")),
+    Alconna("status", meta=CommandMeta(description=t("admin.command.status"))),
     use_cmd_start=True,
     priority=5,
     block=True,

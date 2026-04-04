@@ -20,7 +20,7 @@ _config = on_alconna(
         "config",
         Args["scope", str],
         Args["target?", str],
-        meta=CommandMeta(description="查看核心或插件配置摘要"),
+        meta=CommandMeta(description=t("admin.command.config")),
     ),
     use_cmd_start=True,
     priority=5,
