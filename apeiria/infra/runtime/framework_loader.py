@@ -8,17 +8,18 @@ from pathlib import Path
 
 import nonebot
 
-FRAMEWORK_PLUGIN_MODULES = (
+FRAMEWORK_PLUGIN_MODULES: tuple[str, ...] = (
     "nonebot_plugin_apscheduler",
     "nonebot_plugin_localstore",
     "nonebot_plugin_orm",
     "nonebot_plugin_alconna",
 )
 
-BUILTIN_APPLICATION_PLUGIN_MODULES = (
+BUILTIN_APPLICATION_PLUGIN_MODULES: tuple[str, ...] = (
     "apeiria.builtin_plugins.render",
     "apeiria.builtin_plugins.admin",
     "apeiria.builtin_plugins.help",
+    "apeiria.builtin_plugins.ai",
     "apeiria.builtin_plugins.web_ui",
 )
 
@@ -41,11 +42,7 @@ def get_framework_dependency_plugin_modules() -> frozenset[str]:
         if module_name in discovered:
             continue
         discovered.add(module_name)
-        pending.extend(
-            dependency
-            for dependency in _get_module_required_plugins(module_name)
-            if dependency not in discovered
-        )
+        pending.extend(list(_get_module_required_plugins(module_name)))
 
     return frozenset(
         module_name for module_name in discovered if module_name not in builtin_modules
