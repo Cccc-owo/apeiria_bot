@@ -102,14 +102,20 @@ async def handle_persona(
             t("ai.command.persona_current", persona=state.persona_name)
         )
 
-    if selected == "use":
+    if selected in {"use", "set"}:
         if not name.available:
-            await _persona.finish(t("ai.command.persona_use_usage"))
+            await _persona.finish(t("ai.command.persona_set_usage"))
         persona = get_builtin_persona(name.result)
         if persona is None:
             await _persona.finish(t("ai.command.persona_not_found", name=name.result))
         ai_window_manager.set_persona(session_key, persona.name)
         await _persona.finish(t("ai.command.persona_switched", label=persona.label))
+
+    if selected == "clear":
+        persona = get_builtin_persona("default")
+        assert persona is not None
+        ai_window_manager.set_persona(session_key, persona.name)
+        await _persona.finish(t("ai.command.persona_cleared", label=persona.label))
 
     await _persona.finish(t("ai.command.persona_usage"))
 

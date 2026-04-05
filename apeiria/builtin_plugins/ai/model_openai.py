@@ -32,6 +32,7 @@ class OpenAICompatibleModelClient(AIModelClient):
         body = json.dumps(payload).encode("utf-8")
         target = self._build_chat_completions_url()
         started_at = perf_counter()
+        method = "POST"
         req = request.Request(
             target,
             data=body,
@@ -39,15 +40,29 @@ class OpenAICompatibleModelClient(AIModelClient):
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.settings.api_key}",
             },
-            method="POST",
+            method=method,
         )
         try:
             data = await asyncio.to_thread(self._perform_request, req)
-        except (OSError, error.HTTPError, error.URLError, json.JSONDecodeError) as exc:
-            self._log_request_exception(exc, target, perf_counter() - started_at)
+        except Exception as exc:  # noqa: BLE001
+            self._log_request_exception(
+                exc=exc,
+                method=method,
+                target=target,
+                elapsed_seconds=perf_counter() - started_at,
+            )
             return None
 
-        return self._extract_content(data, target)
+        logger.info(
+            "AI plugin HTTP response success: method={} url={} provider={} model={} "
+            "elapsed_seconds={:.3f}",
+            method,
+            target,
+            self.settings.provider,
+            self.settings.model,
+            perf_counter() - started_at,
+        )
+        return self._extract_content(data, method=method, target=target)
 
     def _perform_request(self, req: request.Request) -> dict[str, object]:
         with request.urlopen(
@@ -62,12 +77,21 @@ class OpenAICompatibleModelClient(AIModelClient):
             base_url = f"{base_url}/v1"
         return f"{base_url}/chat/completions"
 
-    def _extract_content(self, data: dict[str, object], target: str) -> str | None:
+    def _extract_content(
+        self,
+        data: dict[str, object],
+        *,
+        method: str,
+        target: str,
+    ) -> str | None:
         choices = data.get("choices", [])
         if not isinstance(choices, list) or not choices:
             logger.warning(
-                "AI plugin response missing choices: url={} model={} payload_keys={}",
+                "AI plugin HTTP response invalid: method={} url={} provider={} "
+                "model={} reason=missing_choices payload_keys={}",
+                method,
                 target,
+                self.settings.provider,
                 self.settings.model,
                 sorted(data.keys()),
             )
@@ -76,8 +100,11 @@ class OpenAICompatibleModelClient(AIModelClient):
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
             logger.warning(
-                "AI plugin response invalid choice: url={} model={} choice_type={}",
+                "AI plugin HTTP response invalid: method={} url={} provider={} "
+                "model={} reason=invalid_choice choice_type={}",
+                method,
                 target,
+                self.settings.provider,
                 self.settings.model,
                 type(first_choice).__name__,
             )
@@ -87,9 +114,11 @@ class OpenAICompatibleModelClient(AIModelClient):
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
             logger.warning(
-                "AI plugin response missing text content: "
-                "url={} model={} message_keys={}",
+                "AI plugin HTTP response invalid: method={} url={} provider={} "
+                "model={} reason=missing_text_content message_keys={}",
+                method,
                 target,
+                self.settings.provider,
                 self.settings.model,
                 sorted(message.keys()) if isinstance(message, dict) else [],
             )
@@ -107,28 +136,40 @@ class OpenAICompatibleModelClient(AIModelClient):
 
     def _log_request_exception(
         self,
-        exc: OSError | error.HTTPError | error.URLError | json.JSONDecodeError,
+        exc: Exception,
+        method: str,
         target: str,
         elapsed_seconds: float,
     ) -> None:
-        details = (
-            f"url={target} model={self.settings.model} "
-            f"timeout_seconds={self.settings.timeout_seconds} "
-            f"elapsed_seconds={elapsed_seconds:.3f}"
-        )
         if isinstance(exc, error.HTTPError):
             logger.warning(
-                "AI plugin HTTP request failed: "
-                "status={} reason={} {} response_body={}",
+                "AI plugin HTTP request failed: method={} url={} provider={} "
+                "model={} status={} reason={} timeout_seconds={} "
+                "elapsed_seconds={:.3f} response_body={}",
+                method,
+                target,
+                self.settings.provider,
+                self.settings.model,
                 exc.code,
                 exc.reason,
-                details,
+                self.settings.timeout_seconds,
+                elapsed_seconds,
                 self._read_error_body(exc),
             )
             return
+
+        reason = exc.reason if isinstance(exc, error.URLError) else str(exc)
+
         logger.warning(
-            "AI plugin request failed: error_type={} error={} {}",
+            "AI plugin URL request failed: method={} url={} provider={} "
+            "model={} reason={} error_type={} timeout_seconds={} "
+            "elapsed_seconds={:.3f}",
+            method,
+            target,
+            self.settings.provider,
+            self.settings.model,
+            reason,
             type(exc).__name__,
-            exc,
-            details,
+            self.settings.timeout_seconds,
+            elapsed_seconds,
         )

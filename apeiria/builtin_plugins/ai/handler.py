@@ -24,8 +24,11 @@ async def handle_ai_message(bot: Bot, event: Event) -> str | None:
     if not state.enabled:
         return None
 
-    is_explicitly_invoked = scene.chat_mode == "private" or (
-        scene.is_mentioned or scene.matched_trigger is not None
+    private_auto_invoked = scene.chat_mode == "private" and config.private_auto_reply
+    is_explicitly_invoked = (
+        private_auto_invoked
+        or scene.is_mentioned
+        or scene.matched_trigger is not None
     )
     if not is_explicitly_invoked:
         return None

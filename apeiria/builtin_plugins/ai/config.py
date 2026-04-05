@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from apeiria.infra.config import project_config_service
 
@@ -16,6 +16,7 @@ class AIPluginConfig(BaseModel):
 
     enabled: bool = True
     persona_prompt: str = "你是一个自然、克制、简洁的聊天伙伴。"
+    private_auto_reply: bool = True
     explicit_triggers: list[str] = Field(default_factory=list)
     max_window_items: int = 5
     error_reply_text: str = ""
@@ -28,6 +29,11 @@ class AIModelSettings(BaseModel):
     api_key: str = ""
     model: str = ""
     timeout_seconds: float = 30.0
+
+    @model_validator(mode="after")
+    def normalize(self) -> "AIModelSettings":
+        self.base_url = normalize_openai_base_url(self.base_url)
+        return self
 
 
 _DEFAULT_PERSONAS: tuple[BuiltinPersona, ...] = (
@@ -64,3 +70,12 @@ def get_builtin_persona(name: str) -> BuiltinPersona | None:
         if persona.name == normalized:
             return persona
     return None
+
+
+def normalize_openai_base_url(base_url: str) -> str:
+    normalized = base_url.strip().rstrip("/")
+    if not normalized:
+        return ""
+    if normalized.endswith("/v1"):
+        return normalized
+    return f"{normalized}/v1"
