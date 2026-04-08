@@ -63,30 +63,28 @@
             </v-btn>
           </div>
           <div class="section-heading__actions">
-            <v-btn-toggle
-              v-model="pluginScopeTab"
-              :aria-label="t('plugins.scopeTabs')"
-              class="plugin-scope-tabs"
-              density="comfortable"
-              mandatory
-            >
-              <v-btn
-                class="plugin-scope-tab"
-                rounded="pill"
-                value="managed"
-                variant="text"
+            <div :aria-label="t('plugins.scopeTabs')" class="plugin-scope-tabs segmented-control" role="tablist">
+              <button
+                :aria-selected="pluginScopeTab === 'managed'"
+                class="plugin-scope-tab segmented-control__tab"
+                :class="{ 'plugin-scope-tab--active segmented-control__tab--active': pluginScopeTab === 'managed' }"
+                role="tab"
+                type="button"
+                @click="pluginScopeTab = 'managed'"
               >
                 {{ t('plugins.tabManaged') }}
-              </v-btn>
-              <v-btn
-                class="plugin-scope-tab"
-                rounded="pill"
-                value="framework"
-                variant="text"
+              </button>
+              <button
+                :aria-selected="pluginScopeTab === 'framework'"
+                class="plugin-scope-tab segmented-control__tab"
+                :class="{ 'plugin-scope-tab--active segmented-control__tab--active': pluginScopeTab === 'framework' }"
+                role="tab"
+                type="button"
+                @click="pluginScopeTab = 'framework'"
               >
                 {{ t('plugins.tabFramework') }}
-              </v-btn>
-            </v-btn-toggle>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2040,21 +2038,11 @@
 
 .plugin-scope-tabs {
   flex: 0 0 auto;
-  width: min(420px, 100%);
-  border-radius: var(--shape-pill);
-  background: rgba(var(--v-theme-surface-container-high), 0.9);
-  border: 1px solid rgba(var(--v-theme-outline), 0.24);
-  padding: 4px;
+  --segmented-max-width: 420px;
 }
 
 .plugin-scope-tab {
-  min-width: 0 !important;
-  text-transform: none !important;
-}
-
-.plugin-scope-tabs :deep(.v-btn--active) {
-  background: rgb(var(--v-theme-secondary-container));
-  color: rgb(var(--v-theme-on-secondary-container));
+  min-width: 0;
 }
 
 .plugin-search {

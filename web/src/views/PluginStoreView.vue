@@ -184,28 +184,20 @@
         </div>
 
         <div class="store-card__actions">
-          <v-btn
+          <a
             v-if="externalProjectUrl(item)"
-            class="store-card__link-btn"
-            density="comfortable"
+            class="store-card__link"
             :href="externalProjectUrl(item)"
-            prepend-icon="mdi-github"
             rel="noopener noreferrer"
             target="_blank"
-            variant="text"
           >
+            <v-icon icon="mdi-github" start />
             {{ t('pluginStore.openProject') }}
-          </v-btn>
-          <v-btn
-            v-else
-            class="store-card__link-btn"
-            density="comfortable"
-            disabled
-            prepend-icon="mdi-link-variant-off"
-            variant="text"
-          >
+          </a>
+          <span v-else class="store-card__link store-card__link--muted">
+            <v-icon icon="mdi-link-variant-off" start />
             {{ t('pluginStore.noProjectLink') }}
-          </v-btn>
+          </span>
 
           <v-btn
             color="primary"
@@ -886,20 +878,38 @@
   box-shadow: var(--focus-ring);
 }
 
-.store-card__link-btn {
+.store-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   min-height: 36px;
-  padding-inline: 12px;
-  border-radius: var(--shape-medium) !important;
+  padding: 0 12px;
+  border-radius: var(--shape-medium);
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
   font-weight: 700;
   font-size: 0.9rem;
-  letter-spacing: 0;
   transition:
     background-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease);
 }
 
-.store-card__link-btn:deep(.v-btn__content) {
-  gap: 4px;
+.store-card__link:hover {
+  background: rgba(var(--v-theme-primary), 0.14);
+}
+
+.store-card__link:focus-visible {
+  outline: none;
+  background: rgba(var(--v-theme-primary), 0.14);
+  box-shadow: var(--focus-ring);
+}
+
+.store-card__link--muted {
+  color: rgba(var(--v-theme-on-surface), 0.44);
+}
+
+.store-card__link--muted:hover {
+  background: transparent;
 }
 
 .store-empty {
