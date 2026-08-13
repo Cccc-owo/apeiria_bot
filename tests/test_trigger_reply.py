@@ -27,6 +27,32 @@ def _entry(models, *, matches, replies, **kw: object):
     return models.TriggerEntry(_id="e", matches=matches, replies=replies, **kw)
 
 
+def test_extract_input_uses_uninfo_scene_and_scope() -> None:
+    from types import SimpleNamespace
+
+    from apeiria.builtin_plugins.trigger_reply import _extract_input
+
+    event = SimpleNamespace(
+        get_type=lambda: "message",
+        get_message=lambda: "hello",
+        get_plaintext=lambda: "hello",
+        is_tome=lambda: False,
+    )
+    bot = SimpleNamespace(self_id="111")
+    session = SimpleNamespace(
+        scope="QQClient",
+        user=SimpleNamespace(id="456"),
+        scene=SimpleNamespace(is_group=True, id="123"),
+    )
+
+    trigger = _extract_input(bot, event, session)
+
+    assert trigger is not None
+    assert trigger.platform == "QQClient"
+    assert trigger.group_id == "123"
+    assert trigger.user_id == "456"
+
+
 # --------------------------------------------------------------------------
 # service._evaluate — match types
 # --------------------------------------------------------------------------

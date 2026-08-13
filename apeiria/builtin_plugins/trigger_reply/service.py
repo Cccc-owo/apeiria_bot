@@ -6,11 +6,6 @@ from random import choices, random
 from .models import IdFilter, TriggerEntry, TriggerInput, TriggerMatch, TriggerReply
 
 
-def _platform_alias(adapter_name: str) -> str:
-    aliases = {"onebotv11": "qq"}
-    return aliases.get(adapter_name, adapter_name)
-
-
 def _scoped_id(platform: str | None, value: str | None) -> str | None:
     if platform is None or value is None:
         return None

@@ -19,10 +19,13 @@ from nonebot_plugin_alconna import (
     on_alconna,
 )
 
+require("nonebot_plugin_uninfo")
+from nonebot_plugin_uninfo import Uninfo  # noqa: TC002
+
 from .config import TriggerReplyConfig, get_trigger_reply_config
 from .loader import _ensure_loaded, _refresh_rules
 from .models import TriggerEntry, TriggerInput
-from .service import _evaluate, _platform_alias
+from .service import _evaluate
 
 require("nonebot_plugin_localstore")
 
@@ -37,19 +40,25 @@ __plugin_meta__ = PluginMetadata(
 )
 
 
-def _extract_input(bot: Bot, event: Event) -> TriggerInput | None:
+def _extract_input(
+    bot: Bot,
+    event: Event,
+    session: Uninfo | None,
+) -> TriggerInput | None:
     with suppress(Exception):
         if event.get_type() != "message":
             return None
-    user_id = None
-    group_id = None
+    if session is None:
+        user_id = None
+        group_id = None
+        platform = None
+        with suppress(Exception):
+            user_id = str(event.get_user_id())
+    else:
+        user_id = session.user.id
+        group_id = session.scene.id if session.scene.is_group else None
+        platform = str(session.scope)
     bot_id = None
-    with suppress(Exception):
-        user_id = str(event.get_user_id())
-    with suppress(Exception):
-        gid = str(event.get_session_id())
-        if gid != user_id:
-            group_id = gid
     with suppress(Exception):
         bot_id = bot.self_id
     message_text = ""
@@ -61,10 +70,6 @@ def _extract_input(bot: Bot, event: Event) -> TriggerInput | None:
     is_to_me = False
     with suppress(Exception):
         is_to_me = event.is_tome()
-    adapter_name = ""
-    with suppress(Exception):
-        adapter_name = bot.adapter.get_name().split(maxsplit=1)[0].lower()
-    platform = _platform_alias(adapter_name)
     return TriggerInput(
         platform=platform,
         bot_id=str(bot_id) if bot_id else None,
@@ -76,11 +81,16 @@ def _extract_input(bot: Bot, event: Event) -> TriggerInput | None:
     )
 
 
-async def _rule_checker(bot: Bot, event: Event, state: T_State) -> bool:
+async def _rule_checker(
+    bot: Bot,
+    event: Event,
+    state: T_State,
+    session: Uninfo,
+) -> bool:
     config = get_trigger_reply_config()
     if not config.enabled:
         return False
-    trigger = _extract_input(bot, event)
+    trigger = _extract_input(bot, event, session)
     if trigger is None:
         if config.debug:
             logger.debug("触发回复跳过: 不支持的消息输入")
