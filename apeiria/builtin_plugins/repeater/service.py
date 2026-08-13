@@ -27,6 +27,7 @@ class _RoundState:
 
     def __init__(  # noqa: PLR0913
         self,
+        *,
         content_hash: str,
         message: Any,
         count: int,
@@ -60,12 +61,16 @@ class RepeaterService:
 
     def __init__(self) -> None:
         self._states: dict[str, _RoundState] = {}
+        self._last_triggered: dict[str, float] = {}
         self._call_count = 0
 
     def _cleanup_stale(self, now: float, ttl: float) -> None:
         """清除超过 ttl 秒没更新的僵死状态，防止长期不活跃的群占用内存。"""
         self._states = {
             k: v for k, v in self._states.items() if now - v.last_updated_at < ttl
+        }
+        self._last_triggered = {
+            k: v for k, v in self._last_triggered.items() if k in self._states
         }
 
     def evaluate(  # noqa: PLR0911
@@ -137,8 +142,12 @@ class RepeaterService:
             self._states[group_scope] = state
             return None
 
-        # 冷却中
-        if now - previous.last_triggered_at < config.cooldown_seconds:
+        # 冷却中：按群维度记录上一次真正触发时间，跨内容轮次也生效。
+        last_triggered = self._last_triggered.get(group_scope)
+        if (
+            last_triggered is not None
+            and now - last_triggered < config.cooldown_seconds
+        ):
             self._states[group_scope] = state
             return None
 
@@ -156,11 +165,13 @@ class RepeaterService:
             last_triggered_at=now,
             last_updated_at=now,
         )
+        self._last_triggered[group_scope] = now
         return message
 
     def reset(self, group_scope: str) -> None:
         """重置指定群的状态（测试/调试用）。"""
         self._states.pop(group_scope, None)
+        self._last_triggered.pop(group_scope, None)
 
 
 __all__ = ["RepeaterService", "hash_message"]
