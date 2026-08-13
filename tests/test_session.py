@@ -89,7 +89,52 @@ class TestResolveSuperuserTargets:
         targets = resolve_superuser_targets(bot)
         assert targets == []
 
-    def test_empty_superusers(self, monkeypatch) -> None:
+
+def _meta_session(scope="QQClient", scene_type="GROUP", scene_id="123"):
+    return SimpleNamespace(
+        scope=scope,
+        scene=SimpleNamespace(type=SimpleNamespace(name=scene_type), id=scene_id),
+    )
+
+
+def test_extract_session_meta_group_uses_uninfo() -> None:
+    from apeiria.bootstrap.steps import _extract_session_meta
+
+    event = SimpleNamespace()
+    session = _meta_session()
+
+    assert _extract_session_meta(event, "group_123_456", session) == (
+        "QQClient",
+        "group",
+        "123",
+    )
+
+
+def test_extract_session_meta_private_uses_uninfo() -> None:
+    from apeiria.bootstrap.steps import _extract_session_meta
+
+    event = SimpleNamespace()
+    session = _meta_session(scene_type="PRIVATE", scene_id="456")
+
+    assert _extract_session_meta(event, "private_456", session) == (
+        "QQClient",
+        "private",
+        "456",
+    )
+
+
+def test_extract_session_meta_fallback_fixes_precedence() -> None:
+    from apeiria.bootstrap.steps import _extract_session_meta
+
+    event = SimpleNamespace(message_type="private")
+
+    assert _extract_session_meta(event, "private_456", None) == (
+        "unknown",
+        "private",
+        "456",
+    )
+
+    def test_empty_superusers(self, monkeypatch) -> None:  # noqa: ARG001
         monkeypatch.setattr(
             "apeiria.utils.session.get_driver",
             lambda: SimpleNamespace(config=SimpleNamespace(superusers=set())),

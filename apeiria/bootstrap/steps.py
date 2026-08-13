@@ -5,6 +5,8 @@ from pathlib import Path
 import nonebot
 from nonebot.log import logger
 from nonebot.message import event_postprocessor
+from nonebot.params import Depends
+from nonebot_plugin_uninfo import Session, get_session
 
 from apeiria.access.control import AccessControl
 from apeiria.env.ensure import ensure_apeiria_env
@@ -140,7 +142,10 @@ def step_load_pypi() -> None:
 
 
 @event_postprocessor
-async def _persist_inbound(event: nonebot.adapters.Event) -> None:  # pyright: ignore[reportAttributeAccessIssue]
+async def _persist_inbound(
+    event: nonebot.adapters.Event,  # pyright: ignore[reportAttributeAccessIssue]
+    session: Session | None = Depends(get_session),
+) -> None:
     from apeiria.conversation.store import append_message, ensure_session
 
     if event.get_type() != "message":
@@ -149,9 +154,11 @@ async def _persist_inbound(event: nonebot.adapters.Event) -> None:  # pyright: i
         session_id = event.get_session_id()
         if session_id.startswith("webchat:"):
             return
-        user_id = event.get_user_id()
+        user_id = session.user.id if session is not None else event.get_user_id()
         text = event.get_plaintext()
-        platform, scene_type, scene_id = _extract_session_meta(event, session_id)
+        platform, scene_type, scene_id = _extract_session_meta(
+            event, session_id, session
+        )
         await ensure_session(session_id, platform, scene_type, scene_id)
         await append_message(
             session_id=session_id,
@@ -166,18 +173,18 @@ async def _persist_inbound(event: nonebot.adapters.Event) -> None:  # pyright: i
 def _extract_session_meta(
     event: nonebot.adapters.Event,  # pyright: ignore[reportAttributeAccessIssue]
     session_id: str,
+    session: Session | None,
 ) -> tuple[str, str, str]:
+    if session is not None:
+        return str(session.scope), session.scene.type.name.lower(), session.scene.id
+
     platform = _try_attr(event, "platform") or "unknown"
     scene_type = (
         _try_attr(event, "detail_type") or _try_attr(event, "message_type") or "unknown"
     ).lower()
-    scene_id = (
-        _try_attr(event, "group_id")
-        or _try_attr(event, "scene_id")
-        or session_id.rsplit("_", 1)[-1]
-        if "_" in session_id
-        else session_id
-    )
+    scene_id = _try_attr(event, "group_id") or _try_attr(event, "scene_id")
+    if scene_id is None:
+        scene_id = session_id.rsplit("_", 1)[-1] if "_" in session_id else session_id
     return platform, scene_type, scene_id
 
 
