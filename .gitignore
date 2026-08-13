@@ -141,6 +141,7 @@ dmypy.json
 
 .beyond-code/
 .claude/
+.codebase-memory/
 .codex
 .omx/
 .planning/
