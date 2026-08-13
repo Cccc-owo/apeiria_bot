@@ -5,6 +5,7 @@ from typing import Protocol
 
 from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot.log import logger
+from nonebot_plugin_alconna import Target, UniMessage
 
 from .models import PendingRequest, ProcResult, RequestInfo
 
@@ -23,6 +24,10 @@ class RequestProvider(Protocol):
     async def reject(
         self, bot: Bot, pending: PendingRequest, reason: str = ""
     ) -> ProcResult: ...
+
+    async def notify(
+        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
+    ) -> str | None: ...
 
 
 def _safe_str(obj: object, attr: str) -> str:
@@ -112,6 +117,15 @@ class OneBotV11FriendshipProvider:
             logger.warning("reject request failed: {}", exc)
             return ProcResult(success=False, message=str(exc))
 
+    async def notify(
+        self, bot: Bot, _pending: PendingRequest, target_id: str, message: str
+    ) -> str | None:
+        result = await bot.send_private_msg(user_id=int(target_id), message=message)
+        if isinstance(result, dict):
+            msg_id = result.get("message_id", "")
+            return str(msg_id) if msg_id else None
+        return None
+
 
 _SATORI_APPROVE_API = "handle_friend_request"
 _SATORI_GUILD_API = "handle_guild_request"
@@ -183,6 +197,23 @@ class SatoriFriendshipProvider:
         except Exception as exc:  # noqa: BLE001
             logger.warning("satori reject failed: {}", exc)
             return ProcResult(success=False, message=str(exc))
+
+    async def notify(
+        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
+    ) -> str | None:
+        try:
+            target = Target(
+                id=target_id,
+                private=True,
+                self_id=str(getattr(bot, "self_id", "")),
+                scope=pending.scope,
+                adapter=bot.adapter.get_name(),
+            )
+            receipt = await UniMessage(message).send(target=target, bot=bot)
+            return str(receipt.msg_ids[0]) if receipt.msg_ids else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("satori notify failed: {}", exc)
+            return None
 
 
 class MilkyFriendshipProvider:
@@ -268,6 +299,23 @@ class MilkyFriendshipProvider:
         except Exception as exc:  # noqa: BLE001
             logger.warning("milky reject failed: {}", exc)
             return ProcResult(success=False, message=str(exc))
+
+    async def notify(
+        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
+    ) -> str | None:
+        try:
+            target = Target(
+                id=target_id,
+                private=True,
+                self_id=str(getattr(bot, "self_id", "")),
+                scope=pending.scope,
+                adapter=bot.adapter.get_name(),
+            )
+            receipt = await UniMessage(message).send(target=target, bot=bot)
+            return str(receipt.msg_ids[0]) if receipt.msg_ids else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("milky notify failed: {}", exc)
+            return None
 
 
 _providers: list[RequestProvider] = [

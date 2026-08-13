@@ -10,6 +10,8 @@ from nonebot.log import logger
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata, on_message
 from nonebot.rule import Rule
+
+require("nonebot_plugin_alconna")
 from nonebot_plugin_alconna import Alconna, AlconnaMatches, MultiVar, on_alconna
 
 require("nonebot_plugin_uninfo")
@@ -148,15 +150,9 @@ async def handle_request(
         msg = format_notification(pending, title)
 
         for target_id in targets:
-            try:
-                result = await bot.send_private_msg(user_id=int(target_id), message=msg)
-                if isinstance(result, dict):
-                    msg_id = str(result.get("message_id", ""))
-                else:
-                    msg_id = ""
-                await update_notified(pending.id, target_id, msg_id)
-            except Exception:  # noqa: BLE001
-                pass
+            msg_id = await provider.notify(bot, pending, target_id, msg)
+            with suppress(Exception):
+                await update_notified(pending.id, target_id, msg_id or "")
 
 
 async def handle_list_pending() -> None:
