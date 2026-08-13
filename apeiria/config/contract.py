@@ -19,6 +19,14 @@ def _find_loaded_plugin(identifier: str):
     )
 
 
+def _build_aliases(config_model: type[BaseModel]) -> dict[str, str]:
+    return {
+        name: field_info.alias
+        for name, field_info in config_model.model_fields.items()
+        if getattr(field_info, "alias", None) is not None
+    }
+
+
 def resolve_config_namespace_contract(module_name: str) -> ConfigContract:
     plugin = _find_loaded_plugin(module_name)
 
@@ -44,6 +52,7 @@ def resolve_config_namespace_contract(module_name: str) -> ConfigContract:
                 source="pydantic",
                 fields=fields,
                 json_schema=json_schema,
+                aliases=_build_aliases(config_model),
             )
 
     return ConfigContract(
@@ -54,4 +63,5 @@ def resolve_config_namespace_contract(module_name: str) -> ConfigContract:
         source="none",
         fields=[],
         json_schema={},
+        aliases={},
     )

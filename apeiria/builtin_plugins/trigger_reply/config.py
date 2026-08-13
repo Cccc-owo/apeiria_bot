@@ -5,9 +5,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TriggerReplyConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    enabled: bool = Field(default=True, description="是否启用触发回复")
+    enabled: bool = Field(
+        default=True,
+        alias="trigger_reply__enabled",
+        description="是否启用触发回复",
+    )
     rules_file: str = Field(default="rules.toml", description="规则文件路径")
     debug: bool = Field(default=False, description="启用调试日志")
 

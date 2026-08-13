@@ -132,6 +132,7 @@ class ConfigContract:
     source: Literal["pydantic", "extra_only", "none"]
     fields: list[FieldNode]
     json_schema: dict[str, Any]
+    aliases: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -142,4 +143,5 @@ class ConfigContract:
             "source": self.source,
             "fields": [f.to_dict() for f in self.fields],
             "json_schema": self.json_schema,
+            "aliases": self.aliases,
         }

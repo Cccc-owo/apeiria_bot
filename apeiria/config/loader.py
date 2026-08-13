@@ -67,6 +67,42 @@ def _try_resolve_adapter_contract(name: str):
         return None
 
 
+_PLUGIN_FIELD_ALIASES: dict[str, dict[str, str]] = {
+    "trigger_reply": {"enabled": "trigger_reply__enabled"},
+    "friendship": {"enabled": "friendship__enabled"},
+}
+
+
+def _field_alias(contract: Any, plugin_name: str, key: str) -> str | None:
+    if contract is not None:
+        alias = contract.aliases.get(key)
+        if alias is not None:
+            return alias
+    return _PLUGIN_FIELD_ALIASES.get(plugin_name, {}).get(key)
+
+
+def _inject_plugin_config(
+    entries: dict[str, dict],
+    set_driver_attr: object | None = None,
+    skipped: list[str] | None = None,
+    skip_existing: bool = False,  # noqa: FBT001, FBT002
+) -> None:
+    for name, cfg in entries.items():
+        if not cfg:
+            continue
+        contract = _try_resolve_plugin_contract(name)
+        for key, val in cfg.items():
+            field_name = _field_alias(contract, name, key) or key
+            env_key = field_name.upper()
+            if skip_existing and env_key in os.environ:
+                if skipped is not None and os.environ[env_key] != to_env_value(val):
+                    skipped.append(env_key)
+            else:
+                os.environ[env_key] = to_env_value(val)
+            if set_driver_attr is not None:
+                setattr(set_driver_attr, field_name, val)
+
+
 def _inject_section_config(
     entries: dict[str, dict],
     resolve_fn: Callable[[str], Any],
@@ -116,9 +152,8 @@ def expand_config(app: AppConfig) -> None:
         else:
             os.environ[env_key] = env_value
 
-    _inject_section_config(
+    _inject_plugin_config(
         app.plugins,
-        _try_resolve_plugin_contract,
         skipped=skipped_keys,
         skip_existing=True,
     )
@@ -215,9 +250,7 @@ def update_runtime_config(app: AppConfig) -> None:
     driver = get_driver()
     config = driver.config
 
-    _inject_section_config(
-        app.plugins, _try_resolve_plugin_contract, set_driver_attr=config
-    )
+    _inject_plugin_config(app.plugins, set_driver_attr=config)
     _inject_section_config(
         app.adapters, _try_resolve_adapter_contract, set_driver_attr=config
     )

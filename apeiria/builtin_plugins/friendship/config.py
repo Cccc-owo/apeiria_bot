@@ -5,9 +5,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FriendshipConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    enabled: bool = Field(default=True, description="是否启用好友请求通知和处理")
+    enabled: bool = Field(
+        default=True,
+        alias="friendship__enabled",
+        description="是否启用好友请求通知和处理",
+    )
     notify_superusers: bool = Field(default=True, description="是否通知超级用户")
     auto_approve: bool = Field(
         default=False, description="自动通过白名单请求（未实现）"
