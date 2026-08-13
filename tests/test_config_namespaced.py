@@ -67,3 +67,26 @@ def test_update_runtime_config_sets_aliased_driver_attrs(monkeypatch) -> None:
 
     assert fake_config.trigger_reply__enabled is False
     assert fake_config.friendship__enabled is True
+
+
+def test_get_plugin_config_reads_aliased_env(monkeypatch) -> None:
+    from apeiria.builtin_plugins.friendship.config import get_friendship_config
+    from apeiria.builtin_plugins.trigger_reply.config import get_trigger_reply_config
+    from apeiria.config.loader import expand_config
+    from apeiria.config.models import AppConfig
+
+    _isolate_env(monkeypatch)
+    app = AppConfig(
+        plugins={
+            "trigger_reply": {"enabled": False, "debug": True},
+            "friendship": {"enabled": True},
+        }
+    )
+    expand_config(app)
+
+    trigger_cfg = get_trigger_reply_config()
+    friendship_cfg = get_friendship_config()
+
+    assert trigger_cfg.enabled is False
+    assert trigger_cfg.debug is True
+    assert friendship_cfg.enabled is True
