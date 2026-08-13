@@ -2,9 +2,14 @@ import asyncio
 
 import apeiria.db.models  # noqa: F401
 from alembic import context
+from apeiria.config.loader import load_config
 from apeiria.db.base import Base
+from apeiria.db.url import build_db_url
 
 config = context.config
+
+db_path = load_config("data/config.yaml").apeiria.database.path
+config.set_main_option("sqlalchemy.url", build_db_url(db_path))
 
 target_metadata = Base.metadata
 

@@ -25,6 +25,7 @@ from apeiria.bootstrap.steps import (
 )
 from apeiria.config.loader import expand_config, load_config
 from apeiria.db.engine import init_db
+from apeiria.db.url import build_db_url
 
 GRACEFUL_SHUTDOWN_TIMEOUT = 3
 
@@ -53,7 +54,7 @@ def run_cmd(reload: bool) -> None:  # noqa: FBT001
     db_path = app.apeiria.database.path
     import asyncio
 
-    asyncio.run(init_db(f"sqlite+aiosqlite:///{db_path}"))
+    asyncio.run(init_db(build_db_url(db_path)))
 
     plan = BootstrapPlan()
     plan.add_step("db_migrate", step_db_migrate)
