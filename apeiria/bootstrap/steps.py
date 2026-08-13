@@ -5,8 +5,6 @@ from pathlib import Path
 import nonebot
 from nonebot.log import logger
 from nonebot.message import event_postprocessor
-from nonebot.params import Depends
-from nonebot_plugin_uninfo import Session, get_session
 
 from apeiria.access.control import AccessControl
 from apeiria.env.ensure import ensure_apeiria_env
@@ -21,6 +19,7 @@ from apeiria.plugin.scanner import (
 )
 
 _access_control: AccessControl | None = None
+_conversation_hook_installed = False
 
 
 def get_access_control() -> AccessControl:
@@ -141,10 +140,9 @@ def step_load_pypi() -> None:
         logger.success("Loaded {} PyPI plugin(s)", loaded)
 
 
-@event_postprocessor
 async def _persist_inbound(
     event: nonebot.adapters.Event,  # pyright: ignore[reportAttributeAccessIssue]
-    session: Session | None = Depends(get_session),
+    session: object | None,
 ) -> None:
     from apeiria.conversation.store import append_message, ensure_session
 
@@ -173,7 +171,7 @@ async def _persist_inbound(
 def _extract_session_meta(
     event: nonebot.adapters.Event,  # pyright: ignore[reportAttributeAccessIssue]
     session_id: str,
-    session: Session | None,
+    session: object | None,
 ) -> tuple[str, str, str]:
     if session is not None:
         return str(session.scope), session.scene.type.name.lower(), session.scene.id
@@ -197,6 +195,21 @@ def _try_attr(obj: object, name: str) -> str | None:
 
 
 def step_conversation() -> None:
+    global _conversation_hook_installed  # noqa: PLW0603
+    if _conversation_hook_installed:
+        return
+
+    from nonebot.params import Depends
+    from nonebot_plugin_uninfo import Session, get_session
+
+    async def persist(
+        event: nonebot.adapters.Event,
+        session: Session | None = Depends(get_session),
+    ) -> None:
+        await _persist_inbound(event, session)
+
+    event_postprocessor(persist)
+    _conversation_hook_installed = True
     logger.success("Message persistence hook installed")
 
 
