@@ -306,6 +306,10 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class ForceChangePasswordRequest(BaseModel):
+    new_password: str
+
+
 auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -348,6 +352,25 @@ async def change_password(data: ChangePasswordRequest) -> JSONResponse:
     password_hash = await _require_password_hash()
     if not verify_dashboard_password(password_hash, data.old_password):
         raise HTTPException(status_code=400, detail="Old password incorrect")
+    try:
+        validate_dashboard_password(data.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await _set_setting(
+        _SETTING_PASSWORD_HASH, hash_dashboard_password(data.new_password)
+    )
+    await _set_setting(_SETTING_PASSWORD_MUST_CHANGE, "0")
+    return JSONResponse(content={"ok": True})
+
+
+@auth_router.post(
+    "/change-password-force", dependencies=[Depends(verify_token)]
+)
+async def force_change_password(data: ForceChangePasswordRequest) -> JSONResponse:
+    """首次登录强制改密：无需旧密码，仅在必须改密时允许。"""
+    must_change = await _get_setting(_SETTING_PASSWORD_MUST_CHANGE) == "1"
+    if not must_change:
+        raise HTTPException(status_code=400, detail="Password change not required")
     try:
         validate_dashboard_password(data.new_password)
     except ValueError as exc:
