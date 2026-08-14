@@ -32,6 +32,7 @@ _JWT_ALGORITHM = "HS256"
 _JWT_SECRET_BYTES = 48
 _SETTING_PASSWORD_HASH = "password_hash"
 _SETTING_JWT_SECRET = "jwt_secret"
+_SETTING_PASSWORD_MUST_CHANGE = "password_must_change"
 
 _FAIL_THRESHOLD = 5
 _BASE_DELAY = 2.0
@@ -154,6 +155,7 @@ def ensure_credentials() -> None:
         _run_async(
             _set_setting(_SETTING_PASSWORD_HASH, hash_dashboard_password(plaintext))
         )
+        _run_async(_set_setting(_SETTING_PASSWORD_MUST_CHANGE, "1"))
 
     existing_jwt = _run_async(_get_setting(_SETTING_JWT_SECRET))
     if not existing_jwt and legacy_jwt:
@@ -174,6 +176,7 @@ def ensure_credentials() -> None:
 def reset_password(new_password: str | None = None) -> str:
     plaintext = new_password or generate_dashboard_password()
     _run_async(_set_setting(_SETTING_PASSWORD_HASH, hash_dashboard_password(plaintext)))
+    _run_async(_set_setting(_SETTING_PASSWORD_MUST_CHANGE, "1"))
     return plaintext
 
 
@@ -330,7 +333,14 @@ async def login(data: LoginRequest, request: Request) -> JSONResponse:
         _reset_failures(key)
     jwt_secret = await _require_jwt_secret()
     token = _issue_token(web.username, jwt_secret)
-    return JSONResponse(content={"token": token, "username": web.username})
+    must_change = await _get_setting(_SETTING_PASSWORD_MUST_CHANGE) == "1"
+    return JSONResponse(
+        content={
+            "token": token,
+            "username": web.username,
+            "must_change_password": must_change,
+        }
+    )
 
 
 @auth_router.post("/change-password", dependencies=[Depends(verify_token)])
@@ -345,4 +355,5 @@ async def change_password(data: ChangePasswordRequest) -> JSONResponse:
     await _set_setting(
         _SETTING_PASSWORD_HASH, hash_dashboard_password(data.new_password)
     )
+    await _set_setting(_SETTING_PASSWORD_MUST_CHANGE, "0")
     return JSONResponse(content={"ok": True})

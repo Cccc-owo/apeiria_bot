@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import re
 import secrets
 import string
 
@@ -15,7 +14,7 @@ _SCRYPT_MAXMEM = 64 * 1024 * 1024
 _SCRYPT_SALT_BYTES = 16
 _HASH_PARTS = 6
 
-_PASSWORD_MIN_LENGTH = 8
+_PASSWORD_MIN_LENGTH = 6
 _GENERATED_PASSWORD_LENGTH = 24
 
 
@@ -77,19 +76,10 @@ def generate_dashboard_password() -> str:
 
 
 def validate_dashboard_password(raw_password: str) -> None:
-    """Raise ``ValueError`` if the password fails the complexity policy."""
+    """Raise ``ValueError`` if the password fails the length policy."""
     if not raw_password:
         msg = "Password cannot be empty"
         raise ValueError(msg)
     if len(raw_password) < _PASSWORD_MIN_LENGTH:
         msg = f"Password must be at least {_PASSWORD_MIN_LENGTH} characters long"
-        raise ValueError(msg)
-    if not re.search(r"[A-Z]", raw_password):
-        msg = "Password must include at least one uppercase letter"
-        raise ValueError(msg)
-    if not re.search(r"[a-z]", raw_password):
-        msg = "Password must include at least one lowercase letter"
-        raise ValueError(msg)
-    if not re.search(r"\d", raw_password):
-        msg = "Password must include at least one digit"
         raise ValueError(msg)
