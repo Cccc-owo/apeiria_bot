@@ -7,16 +7,22 @@ defineEmits<{ retry: [] }>();
 </script>
 
 <template>
-  <div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-    <div class="flex items-center gap-2">
-      <AlertCircle class="size-4 text-destructive" aria-hidden="true" />
-      <p class="text-sm font-medium text-destructive">
-        {{ $t("error.loadFailed") }}
-      </p>
+  <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+    <div class="flex items-start gap-3">
+      <div
+        class="flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10"
+      >
+        <AlertCircle class="size-4 text-destructive" aria-hidden="true" />
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium">{{ $t("error.loadFailed") }}</p>
+        <p v-if="message" class="mt-0.5 break-words text-sm text-muted-foreground">
+          {{ message }}
+        </p>
+        <Button variant="outline" size="sm" class="mt-3" @click="$emit('retry')">
+          {{ $t("error.retry") }}
+        </Button>
+      </div>
     </div>
-    <p v-if="message" class="mt-1 text-sm text-destructive/80">{{ message }}</p>
-    <Button variant="outline" size="sm" class="mt-2" @click="$emit('retry')">
-      {{ $t("error.retry") }}
-    </Button>
   </div>
 </template>
