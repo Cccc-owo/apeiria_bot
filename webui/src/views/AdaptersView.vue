@@ -10,6 +10,7 @@ import PageHeader from "@/components/PageHeader.vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -286,8 +287,10 @@ function confirmUninstall() {
         </TableHeader>
         <TableBody>
           <TableRow v-if="isLoading">
-            <TableCell colspan="5" class="text-center text-muted-foreground">
-              {{ $t("adapters.loading") }}
+            <TableCell colspan="5" class="py-4">
+              <div class="space-y-2">
+                <Skeleton v-for="i in 4" :key="i" class="h-9 w-full" />
+              </div>
             </TableCell>
           </TableRow>
           <TableRow v-else-if="!data || !data.adapters.length">

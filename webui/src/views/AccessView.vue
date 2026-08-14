@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
@@ -228,8 +229,10 @@ const pluginComboboxOpen = ref(false);
         </TableHeader>
         <TableBody>
           <TableRow v-if="isLoading">
-            <TableCell colspan="7" class="text-center text-muted-foreground py-8">
-              {{ t("common.loading") }}
+            <TableCell colspan="7" class="py-4">
+              <div class="space-y-2">
+                <Skeleton v-for="i in 4" :key="i" class="h-9 w-full" />
+              </div>
             </TableCell>
           </TableRow>
           <TableRow v-else-if="rules.length === 0">
