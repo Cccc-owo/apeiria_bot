@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, watch } from "vue";
 import { Toaster } from "@/components/ui/sonner";
+import ForceChangePasswordDialog from "@/components/ForceChangePasswordDialog.vue";
 import { useUiStore } from "@/stores/ui";
 
 const ui = useUiStore();
@@ -36,5 +37,6 @@ watch(() => ui.theme, applyTheme);
 
 <template>
   <RouterView />
+  <ForceChangePasswordDialog />
   <Toaster position="top-center" rich-colors :theme="resolveActiveTheme()" />
 </template>

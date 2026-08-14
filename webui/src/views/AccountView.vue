@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { AlertCircle } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import PageHeader from "@/components/PageHeader.vue";
@@ -10,12 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useChangePasswordMutation } from "@/composables/useAuth";
-import { useAuthStore } from "@/stores/auth";
 
 const form = reactive({ oldPassword: "", newPassword: "", confirm: "" });
 const { t } = useI18n();
-const auth = useAuthStore();
-const router = useRouter();
 const { mutate, isPending, isError, error, reset } =
   useChangePasswordMutation();
 
@@ -24,19 +20,14 @@ function onSubmit() {
     toast.error(t("account.passwordMismatch"));
     return;
   }
-  const wasForced = auth.mustChangePassword;
   mutate(
     { old_password: form.oldPassword, new_password: form.newPassword },
     {
       onSuccess: () => {
-        auth.clearMustChangePassword();
         toast.success(t("account.success"));
         form.oldPassword = "";
         form.newPassword = "";
         form.confirm = "";
-        if (wasForced) {
-          void router.push({ name: "dashboard" });
-        }
       },
       onError: (e: Error) =>
         toast.error(e.message || t("account.changeFailed")),
@@ -51,13 +42,6 @@ function onSubmit() {
       :title="$t('account.title')"
       :subtitle="$t('account.description')"
     />
-    <div
-      v-if="auth.mustChangePassword"
-      class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3"
-    >
-      <AlertCircle class="size-4 shrink-0 text-amber-600" />
-      <p class="text-sm">{{ $t("account.mustChange") }}</p>
-    </div>
     <Card class="max-w-md">
       <CardHeader>
         <CardTitle class="text-base">{{

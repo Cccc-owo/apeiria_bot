@@ -71,6 +71,8 @@ export const api = {
       request<LoginResponse>("POST", "/auth/login", data),
     changePassword: (data: { old_password: string; new_password: string }) =>
       request<{ ok: boolean }>("POST", "/auth/change-password", data),
+    changePasswordForce: (data: { new_password: string }) =>
+      request<{ ok: boolean }>("POST", "/auth/change-password-force", data),
   },
   status: {
     get: () => request<StatusInfo>("GET", "/status"),
