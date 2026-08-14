@@ -5,9 +5,14 @@
 
 @theme inline {
   --font-sans:
-    "Inter", "Noto Sans SC", system-ui, -apple-system, "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
   --font-heading: var(--font-sans);
+  --font-mono:
+    "SF Mono", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono",
+    Menlo, Courier, "PingFang SC", "Microsoft YaHei", monospace;
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,20 +50,47 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * Elevation shadows (DeepSeek-style: low contrast + large blur + a hairline
+ * 1px ring). These override Tailwind's defaults and map onto the four tiers
+ * the shadcn-vue components already use: xs (inputs) → sm (cards) →
+ * md (popovers/menus) → lg (dialogs/sheets).
+ */
+@theme {
+  --shadow-xs: 0 1px 2px 0 rgb(31 41 51 / 0.04);
+  --shadow-sm:
+    0 2px 8px 0 rgb(31 41 51 / 0.04), 0 4px 12px 0 rgb(31 41 51 / 0.02);
+  --shadow-md:
+    0 0 1px 0 rgb(31 41 51 / 0.16), 0 4px 12px 0 rgb(31 41 51 / 0.06),
+    0 12px 32px 0 rgb(31 41 51 / 0.08);
+  --shadow-lg:
+    0 0 1px 0 rgb(31 41 51 / 0.18), 0 8px 16px -4px rgb(31 41 51 / 0.08),
+    0 24px 48px -12px rgb(31 41 51 / 0.12);
+  --default-transition-duration: 200ms;
+}
+
+/*
+ * Design tokens. Colors keep the original Material-blue palette (#1565c0);
+ * the "visual treatment" layer below (hairline borders, layered surfaces,
+ * system font stack) moves the look toward DeepSeek Harness.
+ */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.625rem;
+
   --background: #f4f6f8;
   --foreground: #1f2933;
   --card: #ffffff;
   --card-foreground: #1f2933;
   --popover: #ffffff;
   --popover-foreground: #1f2933;
+
   --primary: #1565c0;
   --primary-foreground: #ffffff;
   --secondary: #f1f3f5;
@@ -67,40 +99,48 @@
   --muted-foreground: #6b7280;
   --accent: #e3f2fd;
   --accent-foreground: #1565c0;
+
   --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
+  /* hairline: same blue-grey family (#1f2933), lowered to a faint tint */
+  --border: rgb(31 41 51 / 0.1);
+  --input: rgb(31 41 51 / 0.14);
   --ring: #2196f3;
+
   --chart-1: #2196f3;
   --chart-2: #7c3aed;
   --chart-3: #10b981;
   --chart-4: #f59e0b;
   --chart-5: #ef4444;
+
   --log-debug: #6b7280;
   --log-info: #2196f3;
   --log-success: #10b981;
   --log-warning: #f59e0b;
   --log-error: #ef4444;
   --log-critical: #d11149;
+
   --sidebar: #ffffff;
   --sidebar-foreground: #1f2933;
   --sidebar-primary: #1565c0;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e3f2fd;
   --sidebar-accent-foreground: #1565c0;
-  --sidebar-border: #e5e7eb;
+  --sidebar-border: rgb(31 41 51 / 0.08);
   --sidebar-ring: #2196f3;
-  --scrollbar-thumb: #00000018;
-  --scrollbar-thumb-hover: #00000040;
+
+  --scrollbar-thumb: rgb(31 41 51 / 0.14);
+  --scrollbar-thumb-hover: rgb(31 41 51 / 0.26);
 }
 
 .dark {
+  /* three-tier surface ladder: base < card < popover */
   --background: #0f1620;
   --foreground: #e6e9ee;
   --card: #161e2b;
   --card-foreground: #e6e9ee;
-  --popover: #161e2b;
+  --popover: #1c2736;
   --popover-foreground: #e6e9ee;
+
   --primary: #2196f3;
   --primary-foreground: #0b1220;
   --secondary: #1f2937;
@@ -109,31 +149,36 @@
   --muted-foreground: #9aa4b2;
   --accent: #18324a;
   --accent-foreground: #90caf9;
+
   --destructive: #ef4444;
-  --border: #ffffff1a;
-  --input: #ffffff26;
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.14);
   --ring: #2196f3;
+
   --chart-1: #42a5f5;
   --chart-2: #a78bfa;
   --chart-3: #34d399;
   --chart-4: #fbbf24;
   --chart-5: #f87171;
+
   --log-debug: #9aa4b2;
   --log-info: #42a5f5;
   --log-success: #34d399;
   --log-warning: #fbbf24;
   --log-error: #f87171;
   --log-critical: #f472b6;
+
   --sidebar: #131a26;
   --sidebar-foreground: #e6e9ee;
   --sidebar-primary: #2196f3;
   --sidebar-primary-foreground: #0b1220;
   --sidebar-accent: #18324a;
   --sidebar-accent-foreground: #90caf9;
-  --sidebar-border: #ffffff1a;
+  --sidebar-border: rgb(255 255 255 / 0.06);
   --sidebar-ring: #2196f3;
-  --scrollbar-thumb: #ffffff1a;
-  --scrollbar-thumb-hover: #ffffff40;
+
+  --scrollbar-thumb: rgb(255 255 255 / 0.14);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 0.26);
 }
 
 @layer base {
@@ -141,7 +186,9 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
   }
 
   html {
@@ -171,6 +218,23 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
   }
+}
+
+/* vue-sonner toasts: align normal toasts with the design tokens */
+[data-sonner-toaster] {
+  --border-radius: var(--radius-lg);
+}
+
+[data-sonner-toaster][data-sonner-theme="light"] {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--foreground);
+}
+
+[data-sonner-toaster][data-sonner-theme="dark"] {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--foreground);
 }
 
 @media (prefers-reduced-motion: reduce) {
