@@ -9,7 +9,11 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: api.auth.login,
     onSuccess: (data) => {
-      auth.setSession(data.token, data.username);
+      auth.setSession(data.token, data.username, data.must_change_password ?? false);
+      if (data.must_change_password) {
+        void router.push({ name: "account" });
+        return;
+      }
       const redirect = router.currentRoute.value.query.redirect as string | undefined;
       if (redirect) {
         void router.push(redirect);

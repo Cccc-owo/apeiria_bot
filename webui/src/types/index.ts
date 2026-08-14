@@ -158,6 +158,7 @@ export interface LogHistory {
 export interface LoginResponse {
   token: string;
   username: string;
+  must_change_password?: boolean;
 }
 
 export interface InstallTaskResponse {

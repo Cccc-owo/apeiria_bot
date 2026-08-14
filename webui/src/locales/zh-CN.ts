@@ -81,6 +81,7 @@ export default {
     operationFailed: "操作失败",
     logout: "退出登录",
     admin: "管理员",
+    mustChange: "首次登录请先修改初始密码",
   },
   settings: {
     title: "设置",

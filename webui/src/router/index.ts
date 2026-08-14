@@ -68,6 +68,9 @@ router.beforeEach((to, _from) => {
   if (to.name === "login" && auth.token) {
     return { name: "dashboard" };
   }
+  if (needsAuth && auth.mustChangePassword && to.name !== "account") {
+    return { name: "account" };
+  }
 });
 
 export default router;
