@@ -15,8 +15,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.2.8",
-    "@fontsource/noto-sans-sc": "^5.2.9",
     "@lucide/vue": "^1.21.0",
     "@monaco-editor/loader": "^1.7.0",
     "@tailwindcss/vite": "^4.3.1",
