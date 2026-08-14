@@ -1,11 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#f4f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1620" media="(prefers-color-scheme: dark)" />
     <title>Apeiria WebUI</title>
+    <script>
+      // 在首屏渲染前套用持久化主题，消除暗色用户的「白闪」。
+      (function () {
+        try {
+          var raw = localStorage.getItem("ui");
+          var theme = raw ? JSON.parse(raw).theme : "system";
+          var dark =
+            theme === "dark" ||
+            (theme !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {
+          document.documentElement.classList.toggle(
+            "dark",
+            window.matchMedia("(prefers-color-scheme: dark)").matches,
+          );
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
