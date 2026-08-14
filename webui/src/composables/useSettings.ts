@@ -4,8 +4,6 @@ import type { ComputedRef } from "vue";
 import { api } from "@/lib/api";
 import { useConfigQuery } from "./useConfig";
 
-const qc = () => useQueryClient();
-
 export function useConfigSchema(section: string) {
   return useQuery({
     queryKey: ["configSchema", section],
@@ -39,23 +37,25 @@ export function useApeiriaConfig() {
 }
 
 export function useSaveNonebotConfig() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       await api.config.update("nonebot", data);
     },
     onSuccess: () => {
-      qc().invalidateQueries({ queryKey: ["config"] });
+      qc.invalidateQueries({ queryKey: ["config"] });
     },
   });
 }
 
 export function useSaveApeiriaConfig() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       await api.config.update("apeiria", data);
     },
     onSuccess: () => {
-      qc().invalidateQueries({ queryKey: ["config"] });
+      qc.invalidateQueries({ queryKey: ["config"] });
     },
   });
 }
