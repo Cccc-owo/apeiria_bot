@@ -107,6 +107,7 @@ export default {
     add: "添加",
     remove: "删除",
     immutable: "只读",
+    editorFallback: "代码编辑器加载失败，已切换为纯文本编辑",
   },
   theme: {
     label: "切换主题",
