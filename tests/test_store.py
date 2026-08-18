@@ -146,3 +146,32 @@ async def test_search_adapters_uses_adapters_kind(monkeypatch) -> None:
     assert seen["kind"] == "adapters"
     assert len(items) == 1
     assert items[0].pypi_name == "nonebot-adapter-onebot"
+
+
+def test_adapter_display_name_uses_get_name() -> None:
+    from types import SimpleNamespace
+
+    from apeiria.web.store import _adapter_display_name
+
+    adapter = SimpleNamespace(get_name=lambda: "OneBot V11")
+    assert _adapter_display_name(adapter) == "OneBot V11"
+
+
+def test_adapter_display_name_falls_back_to_class_name() -> None:
+    from apeiria.web.store import _adapter_display_name
+
+    class NoNameAdapter:
+        pass
+
+    assert _adapter_display_name(NoNameAdapter()) == "NoNameAdapter"
+
+
+def test_adapter_display_name_falls_back_on_error() -> None:
+    from apeiria.web.store import _adapter_display_name
+
+    class BrokenAdapter:
+        def get_name(self) -> str:
+            msg = "boom"
+            raise RuntimeError(msg)
+
+    assert _adapter_display_name(BrokenAdapter()) == "BrokenAdapter"

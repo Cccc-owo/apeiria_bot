@@ -33,7 +33,7 @@ class StoreItem:
         "version",
     )
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         name: str,
         version: str = "",
@@ -211,11 +211,23 @@ def get_uptime() -> float:
     return time.monotonic() - _start_time
 
 
+def _adapter_display_name(adapter: object) -> str:
+    get_name = getattr(adapter, "get_name", None)
+    if callable(get_name):
+        try:
+            name = get_name()
+            if isinstance(name, str) and name:
+                return name
+        except Exception:  # noqa: BLE001
+            pass
+    return type(adapter).__name__
+
+
 def get_status() -> dict[str, Any]:
     import nonebot
 
     return {
         "uptime": get_uptime(),
         "plugin_count": len(nonebot.get_loaded_plugins()),
-        "adapters": [type(a).__name__ for a in nonebot.get_adapters().values()],
+        "adapters": [_adapter_display_name(a) for a in nonebot.get_adapters().values()],
     }
