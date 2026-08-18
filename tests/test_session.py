@@ -98,7 +98,7 @@ def _meta_session(scope="QQClient", scene_type="GROUP", scene_id="123"):
 
 
 def test_extract_session_meta_group_uses_uninfo() -> None:
-    from apeiria.bootstrap.steps import _extract_session_meta
+    from apeiria.conversation.hook import _extract_session_meta
 
     event = SimpleNamespace()
     session = _meta_session()
@@ -111,7 +111,7 @@ def test_extract_session_meta_group_uses_uninfo() -> None:
 
 
 def test_extract_session_meta_private_uses_uninfo() -> None:
-    from apeiria.bootstrap.steps import _extract_session_meta
+    from apeiria.conversation.hook import _extract_session_meta
 
     event = SimpleNamespace()
     session = _meta_session(scene_type="PRIVATE", scene_id="456")
@@ -124,7 +124,7 @@ def test_extract_session_meta_private_uses_uninfo() -> None:
 
 
 def test_extract_session_meta_fallback_fixes_precedence() -> None:
-    from apeiria.bootstrap.steps import _extract_session_meta
+    from apeiria.conversation.hook import _extract_session_meta
 
     event = SimpleNamespace(message_type="private")
 
