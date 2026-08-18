@@ -177,7 +177,7 @@ class LogHub:
         finally:
             self.unsubscribe(queue)
 
-    def read_history(  # noqa: PLR0913
+    def read_history(  # noqa: PLR0913, PLR0917
         self,
         level: str = "",
         query: str = "",
@@ -271,7 +271,7 @@ async def stream(request: Request) -> StreamingResponse:
 
 
 @logs_router.get("/history", dependencies=[Depends(verify_token)])
-async def history(  # noqa: PLR0913
+async def history(  # noqa: PLR0913, PLR0917
     level: str = "",
     q: str = "",
     source: str = "",
