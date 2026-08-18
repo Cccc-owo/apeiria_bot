@@ -20,6 +20,7 @@ from apeiria.bootstrap.steps import (
     step_load_builtins,
     step_load_local,
     step_load_pypi,
+    step_require_tracker,
     step_web,
     step_webchat,
 )
@@ -68,20 +69,21 @@ def run_cmd(reload: bool) -> None:  # noqa: FBT001
         depends=["apeiria_ensure"],
     )
     plan.add_step("load_adapters", step_load_adapters, depends=["apeiria_inject"])
+    plan.add_step("require_tracker", step_require_tracker, depends=["apeiria_inject"])
     plan.add_step(
         "load_builtins",
         step_load_builtins,
-        depends=["load_adapters", "load_builtin_adapters"],
+        depends=["load_adapters", "load_builtin_adapters", "require_tracker"],
     )
     plan.add_step(
         "load_local",
         step_load_local,
-        depends=["load_adapters", "load_builtin_adapters"],
+        depends=["load_adapters", "load_builtin_adapters", "require_tracker"],
     )
     plan.add_step(
         "load_pypi",
         step_load_pypi,
-        depends=["load_adapters", "load_builtin_adapters"],
+        depends=["load_adapters", "load_builtin_adapters", "require_tracker"],
     )
     plan.add_step(
         "conversation",

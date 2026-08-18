@@ -21,6 +21,7 @@ from apeiria.plugin.scanner import (
 
 _access_control: AccessControl | None = None
 _conversation_hook_installed = False
+_require_tracker_installed = False
 
 
 def get_access_control() -> AccessControl:
@@ -71,6 +72,46 @@ def _read_adapter_states() -> dict[str, dict]:
         return {}
     data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
     return data.get("states") or {}
+
+
+def step_require_tracker() -> None:
+    global _require_tracker_installed  # noqa: PLW0603
+    if _require_tracker_installed:
+        return
+
+    import inspect
+
+    from nonebot.plugin import get_plugin, get_plugin_by_module_name
+    from nonebot.plugin import load as plugin_load
+    from nonebot.plugin.load import require as original_require
+
+    from apeiria.plugin.dependency_graph import record_dependency
+
+    def _tracking_require(name: str):
+        module = original_require(name)
+        frame = inspect.currentframe()
+        try:
+            caller = frame.f_back if frame is not None else None
+            if caller is None:
+                return module
+            caller_module = caller.f_globals.get("__name__")
+            if not caller_module:
+                return module
+            current = get_plugin_by_module_name(caller_module)
+            if current is None:
+                return module
+            dep = get_plugin(name) or get_plugin_by_module_name(name)
+            if dep is not None:
+                record_dependency(current.name, dep.name)
+        finally:
+            del frame
+        return module
+
+    nonebot.require = _tracking_require
+    nonebot.plugin.require = _tracking_require
+    plugin_load.require = _tracking_require
+    _require_tracker_installed = True
+    logger.success("Require dependency tracker installed")
 
 
 def step_load_builtin_adapters() -> None:

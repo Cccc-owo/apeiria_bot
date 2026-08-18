@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import ast
 from collections.abc import Collection
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING
-
-from nonebot.log import logger
 
 if TYPE_CHECKING:
     from nonebot.plugin.model import Plugin
@@ -23,32 +19,18 @@ class _Cache:
     value: DepGraph | None = None
 
 
-def _normalize_name(name: str) -> str:
-    return name.rsplit(".", 1)[-1]
+_runtime_edges: set[tuple[str, str]] = set()
 
 
-def _parse_require_calls(source: str) -> set[str]:
-    result: set[str] = set()
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return result
+def record_dependency(plugin_name: str, dep_name: str) -> None:
+    """Record a runtime dependency discovered through ``require()``."""
+    _runtime_edges.add((plugin_name, dep_name))
 
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        if not (isinstance(node.func, ast.Name) and node.func.id == "require"):
-            continue
-        if not node.args:
-            continue
-        arg = node.args[0]
-        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-            result.add(_normalize_name(arg.value))
-        else:
-            logger.warning(
-                "Skipping dynamic require() call — argument is not a string literal"
-            )
-    return result
+
+def reset_dependency_graph() -> None:
+    """Clear runtime edges and cached graph (mainly for tests)."""
+    _runtime_edges.clear()
+    _Cache.value = None
 
 
 def build_dependency_graph(plugins: Collection["Plugin"]) -> DepGraph:
@@ -57,21 +39,13 @@ def build_dependency_graph(plugins: Collection["Plugin"]) -> DepGraph:
 
     for plugin in plugins:
         graph.setdefault(plugin.name, set())
-
-        module_file = getattr(plugin.module, "__file__", None)
-        if module_file and module_file.endswith(".py"):
-            try:
-                with Path(module_file).open(encoding="utf-8") as f:
-                    source = f.read()
-            except OSError:
-                pass
-            else:
-                for dep in _parse_require_calls(source):
-                    graph[plugin.name].add(dep)
-
         for sub in plugin.sub_plugins:
             graph.setdefault(plugin.name, set()).add(sub.name)
             nesting.add((plugin.name, sub.name))
+
+    for src, dst in _runtime_edges:
+        graph.setdefault(src, set()).add(dst)
+        graph.setdefault(dst, set())
 
     reverse: dict[str, set[str]] = {}
     for node, deps in graph.items():

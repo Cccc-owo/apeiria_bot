@@ -3,10 +3,17 @@ from __future__ import annotations
 from types import ModuleType
 from unittest.mock import MagicMock
 
+import pytest
 
-def _make_module(name: str, filepath: str) -> ModuleType:
+from apeiria.plugin.dependency_graph import (
+    build_dependency_graph,
+    record_dependency,
+    reset_dependency_graph,
+)
+
+
+def _make_module(name: str) -> ModuleType:
     mod = ModuleType(name)
-    mod.__file__ = filepath
     mod.__name__ = name
     return mod
 
@@ -31,126 +38,63 @@ def _make_plugin(
     )
 
 
-class TestBuildDependencyGraph:
-    def test_require_constant_parsed(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+@pytest.fixture(autouse=True)
+def _clean_runtime_edges():
+    reset_dependency_graph()
+    yield
+    reset_dependency_graph()
 
-        source = """
-from nonebot import require
-require("nonebot_plugin_alconna")
-"""
-        f = tmp_path / "admin.py"
-        f.write_text(source, encoding="utf-8")
-        plugin = _make_plugin("admin", _make_module("admin", str(f)))
 
-        graph = build_dependency_graph([plugin])
-        assert "nonebot_plugin_alconna" in graph.graph["admin"]
+def test_recorded_require_edges_are_used() -> None:
+    record_dependency("plugin_a", "dep_a")
+    a = _make_plugin("plugin_a", _make_module("plugin_a"))
+    b = _make_plugin("dep_a", _make_module("dep_a"))
 
-    def test_require_dotted_module_normalized(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+    graph = build_dependency_graph([a, b])
 
-        source = """
-from nonebot import require
-require("nonebot.plugin.alconna")
-"""
-        f = tmp_path / "admin.py"
-        f.write_text(source, encoding="utf-8")
-        plugin = _make_plugin("admin", _make_module("admin", str(f)))
+    assert graph.graph["plugin_a"] == {"dep_a"}
+    assert graph.reverse["dep_a"] == {"plugin_a"}
 
-        graph = build_dependency_graph([plugin])
-        assert "alconna" in graph.graph["admin"]
 
-    def test_require_variable_skipped(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+def test_multiple_recorded_edges() -> None:
+    record_dependency("plugin_a", "dep_a")
+    record_dependency("plugin_a", "dep_b")
+    a = _make_plugin("plugin_a", _make_module("plugin_a"))
 
-        source = """
-from nonebot import require
-dep = "some_plugin"
-require(dep)
-"""
-        f = tmp_path / "admin.py"
-        f.write_text(source, encoding="utf-8")
-        plugin = _make_plugin("admin", _make_module("admin", str(f)))
+    graph = build_dependency_graph([a])
 
-        graph = build_dependency_graph([plugin])
-        assert graph.graph.get("admin", set()) == set()
+    assert graph.graph["plugin_a"] == {"dep_a", "dep_b"}
+    assert graph.reverse["dep_a"] == {"plugin_a"}
+    assert graph.reverse["dep_b"] == {"plugin_a"}
 
-    def test_multiple_require_in_one_file(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
 
-        source = """
-from nonebot import require
-require("nonebot_plugin_alconna")
-require("nonebot_plugin_foo")
-"""
-        f = tmp_path / "admin.py"
-        f.write_text(source, encoding="utf-8")
-        plugin = _make_plugin("admin", _make_module("admin", str(f)))
+def test_no_recorded_edges_keeps_loaded_plugin_keys() -> None:
+    a = _make_plugin("plugin_a", _make_module("plugin_a"))
 
-        graph = build_dependency_graph([plugin])
-        assert graph.graph["admin"] == {"nonebot_plugin_alconna", "nonebot_plugin_foo"}
+    graph = build_dependency_graph([a])
 
-    def test_no_require_no_edges(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+    assert graph.graph["plugin_a"] == set()
+    assert graph.reverse == {"plugin_a": set()}
 
-        source = "x = 1"
-        f = tmp_path / "admin.py"
-        f.write_text(source, encoding="utf-8")
-        plugin = _make_plugin("admin", _make_module("admin", str(f)))
 
-        graph = build_dependency_graph([plugin])
-        assert graph.graph.get("admin", set()) == set()
+def test_nesting_still_creates_edges() -> None:
+    child = _make_plugin("child", _make_module("parent.child"))
+    parent = _make_plugin("parent", _make_module("parent"), sub_plugins={child})
 
-    def test_reverse_graph_built(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+    graph = build_dependency_graph([parent, child])
 
-        a_source = """
-from nonebot import require
-require("dep_a")
-"""
-        fa = tmp_path / "plugin_a.py"
-        fa.write_text(a_source, encoding="utf-8")
-        fb = tmp_path / "dep_a.py"
-        fb.write_text("x = 1", encoding="utf-8")
-        a = _make_plugin("plugin_a", _make_module("plugin_a", str(fa)))
-        b = _make_plugin("dep_a", _make_module("dep_a", str(fb)))
+    assert "child" in graph.graph["parent"]
+    assert "parent" in graph.reverse["child"]
+    assert ("parent", "child") in graph.nesting
 
-        graph = build_dependency_graph([a, b])
-        assert graph.graph["plugin_a"] == {"dep_a"}
-        assert graph.reverse["dep_a"] == {"plugin_a"}
 
-    def test_nesting_creates_edges(self, tmp_path) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
+def test_get_cached_graph_uses_runtime_edges() -> None:
+    from apeiria.plugin.dependency_graph import get_cached_graph
 
-        fp = tmp_path / "parent.py"
-        fp.write_text("x = 1", encoding="utf-8")
-        fc = tmp_path / "child.py"
-        fc.write_text("y = 2", encoding="utf-8")
-        child = _make_plugin("child", _make_module("parent.child", str(fc)))
-        parent = _make_plugin(
-            "parent", _make_module("parent", str(fp)), sub_plugins={child}
-        )
+    record_dependency("plugin_a", "dep_a")
+    a = _make_plugin("plugin_a", _make_module("plugin_a"))
+    b = _make_plugin("dep_a", _make_module("dep_a"))
 
-        graph = build_dependency_graph([parent, child])
-        assert "child" in graph.graph["parent"]
-        assert "parent" in graph.reverse["child"]
-        assert ("parent", "child") in graph.nesting
+    graph = get_cached_graph([a, b])
 
-    def test_no_file_skips_ast(self) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
-
-        mod = ModuleType("no_file_mod")
-        mod.__file__ = None
-        plugin = _make_plugin("no_file", mod)
-
-        graph = build_dependency_graph([plugin])
-        assert graph.graph.get("no_file", set()) == set()
-
-    def test_non_py_file_skips_ast(self) -> None:
-        from apeiria.plugin.dependency_graph import build_dependency_graph
-
-        mod = _make_module("compiled", "/fake/path.so")
-        plugin = _make_plugin("compiled", mod)
-
-        graph = build_dependency_graph([plugin])
-        assert graph.graph.get("compiled", set()) == set()
+    assert graph.graph["plugin_a"] == {"dep_a"}

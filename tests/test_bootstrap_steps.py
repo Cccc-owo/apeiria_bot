@@ -29,3 +29,77 @@ def test_step_load_pypi_loads_enabled_packages_by_module(tmp_path, monkeypatch) 
     steps.step_load_pypi()
 
     assert loaded == ["nonebot_plugin_status"]
+
+
+def test_step_require_tracker_patches_require_entries(monkeypatch) -> None:
+    import nonebot
+    from nonebot.plugin import load as plugin_load
+
+    from apeiria.bootstrap import steps
+
+    monkeypatch.setattr(steps, "_require_tracker_installed", False)
+    monkeypatch.setattr(nonebot, "require", nonebot.require)
+    monkeypatch.setattr(nonebot.plugin, "require", nonebot.plugin.require)
+    monkeypatch.setattr(plugin_load, "require", plugin_load.require)
+
+    original_nb = nonebot.require
+    steps.step_require_tracker()
+
+    assert nonebot.require is not original_nb
+    assert nonebot.plugin.require is nonebot.require
+    assert plugin_load.require is nonebot.require
+
+    current = nonebot.require
+    steps.step_require_tracker()
+    assert nonebot.require is current
+
+
+def test_step_require_tracker_records_runtime_dependency(monkeypatch) -> None:
+    from types import ModuleType, SimpleNamespace
+
+    import nonebot
+    from nonebot.plugin import load as plugin_load
+
+    from apeiria.bootstrap import steps
+    from apeiria.plugin import dependency_graph
+
+    monkeypatch.setattr(steps, "_require_tracker_installed", False)
+    monkeypatch.setattr(nonebot, "require", nonebot.require)
+    monkeypatch.setattr(nonebot.plugin, "require", nonebot.plugin.require)
+    monkeypatch.setattr(plugin_load, "require", plugin_load.require)
+
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        dependency_graph,
+        "record_dependency",
+        lambda a, b: calls.append((a, b)),
+    )
+
+    def _fake_require(_name: str) -> ModuleType:
+        return ModuleType(_name)
+
+    monkeypatch.setattr(plugin_load, "require", _fake_require)
+
+    current = SimpleNamespace(name="foo")
+    dep = SimpleNamespace(name="dep")
+
+    monkeypatch.setattr(
+        nonebot.plugin,
+        "get_plugin_by_module_name",
+        lambda module_name: current if module_name == "plugins.foo" else None,
+    )
+    monkeypatch.setattr(
+        nonebot.plugin,
+        "get_plugin",
+        lambda name: dep if name == "dep" else None,
+    )
+
+    steps.step_require_tracker()
+
+    tracking = nonebot.require
+    exec(
+        "require('dep')",
+        {"__name__": "plugins.foo", "require": tracking},
+    )
+
+    assert calls == [("foo", "dep")]
