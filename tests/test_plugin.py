@@ -78,11 +78,11 @@ def test_manifest_module_candidate_by_source() -> None:
 
     local = PluginManifest(
         name="myplugin",
-        path_or_module="/abs/path/myplugin",
+        path_or_module="/abs/plugins/myplugin",
         enabled=True,
         source="local",
     )
-    assert manifest_module_candidate(local) == "myplugin"
+    assert manifest_module_candidate(local) == "plugins.myplugin"
 
 
 def test_resolve_pypi_module_prefers_config_module() -> None:

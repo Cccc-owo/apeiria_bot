@@ -14,6 +14,7 @@ from apeiria.plugin.scanner import (
     BUILTIN_LIST,
     _is_enabled,
     _load_plugins_yaml,
+    local_plugin_module_name,
     manifest_module_candidate,
     scan_plugins,
 )
@@ -98,21 +99,45 @@ def step_load_builtins() -> None:
 
 
 def step_load_local() -> None:
-    data = _load_plugins_yaml()
-    plugins_dir = Path(".apeiria/plugins")
-    if not plugins_dir.is_dir():
-        return
-    for entry in sorted(plugins_dir.iterdir()):
-        if not entry.is_dir() or entry.name.startswith("_"):
+    import sys
+
+    loaded = 0
+    for manifest in scan_plugins():
+        if manifest.source != "local":
             continue
-        if not (entry / "__init__.py").is_file():
+        if not manifest.enabled:
+            logger.debug("Skipped disabled local plugin: {}", manifest.name)
             continue
-        name = entry.name
-        if _is_enabled(name, data):
-            nonebot.load_plugin(str(entry.resolve()))
-            logger.debug("Loaded local plugin: {}", name)
-        else:
-            logger.debug("Skipped disabled local plugin: {}", name)
+
+        plugin_dir = Path(manifest.path_or_module)
+        if not plugin_dir.is_dir():
+            logger.warning("Skipped local plugin missing directory: {}", plugin_dir)
+            continue
+
+        module = local_plugin_module_name(plugin_dir)
+        if module is None:
+            logger.warning(
+                "Skipped local plugin with invalid module name: {}", plugin_dir
+            )
+            continue
+
+        package_root = plugin_dir.parent.parent
+        package_root_key = str(package_root.resolve())
+        if package_root_key not in sys.path:
+            sys.path.insert(0, package_root_key)
+
+        try:
+            nonebot.load_plugin(module)
+        except Exception:  # noqa: BLE001
+            logger.opt(exception=True).warning(
+                "Failed to load local plugin: {}", module
+            )
+            continue
+        loaded += 1
+        logger.debug("Loaded local plugin: {}", module)
+
+    if loaded:
+        logger.success("Loaded {} local plugin(s)", loaded)
 
 
 def step_load_pypi() -> None:

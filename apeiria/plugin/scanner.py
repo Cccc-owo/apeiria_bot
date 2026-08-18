@@ -135,11 +135,26 @@ def read_installed_version(requirement: str) -> str | None:
     return None
 
 
+def local_plugin_module_name(plugin_dir: Path) -> str | None:
+    """Return a valid import module name for a local plugin directory.
+
+    The plugin directory's parent name is used as the top-level package, so
+    ``.apeiria/plugins/foo`` becomes ``plugins.foo``. Returns ``None`` when
+    either segment is not a valid Python identifier.
+    """
+    parent = plugin_dir.parent.name
+    name = plugin_dir.name
+    if not parent.isidentifier() or not name.isidentifier():
+        return None
+    return f"{parent}.{name}"
+
+
 def manifest_module_candidate(manifest: PluginManifest) -> str:
     if manifest.source == "pypi":
         return resolve_pypi_module(manifest.path_or_module, manifest.config_module)
     if manifest.source == "local":
-        return Path(manifest.path_or_module).name
+        path = Path(manifest.path_or_module)
+        return local_plugin_module_name(path) or path.name
     return manifest.path_or_module.rsplit(".", 1)[-1]
 
 

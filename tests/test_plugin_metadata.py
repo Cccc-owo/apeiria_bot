@@ -109,7 +109,7 @@ def test_merge_includes_consistent_module_identifier() -> None:
     manifests = [
         _manifest("admin", "apeiria.builtin_plugins.admin", source="builtin"),
         _manifest("服务器状态查看", "nonebot-plugin-status>=0.9.0", source="pypi"),
-        _manifest("localp", "/abs/path/localp", source="local"),
+        _manifest("localp", "/abs/plugins/localp", source="local"),
     ]
 
     rows = merge_plugin_metadata(manifests, {})
@@ -117,7 +117,7 @@ def test_merge_includes_consistent_module_identifier() -> None:
     by_name = {r["name"]: r for r in rows}
     assert by_name["admin"]["module"] == "admin"
     assert by_name["服务器状态查看"]["module"] == "nonebot_plugin_status"
-    assert by_name["localp"]["module"] == "localp"
+    assert by_name["localp"]["module"] == "plugins.localp"
 
 
 def test_merge_matches_pypi_requirement_with_version_specifier() -> None:
