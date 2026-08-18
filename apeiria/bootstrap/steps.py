@@ -11,9 +11,6 @@ from apeiria.env.ensure import ensure_apeiria_env
 from apeiria.env.inject import inject_apeiria_paths
 from apeiria.env.sync import sync_apeiria_env
 from apeiria.plugin.scanner import (
-    BUILTIN_LIST,
-    _is_enabled,
-    _load_plugins_yaml,
     local_plugin_module_name,
     manifest_module_candidate,
     scan_plugins,
@@ -129,14 +126,19 @@ def step_load_adapters() -> None:
 
 
 def step_load_builtins() -> None:
-    data = _load_plugins_yaml()
-    for name in BUILTIN_LIST:
-        if _is_enabled(name, data):
-            module = f"apeiria.builtin_plugins.{name}"
-            nonebot.load_plugin(module)
-            logger.debug("Loaded builtin plugin: {}", name)
-        else:
-            logger.debug("Skipped disabled builtin plugin: {}", name)
+    loaded = 0
+    for manifest in scan_plugins():
+        if manifest.source != "builtin":
+            continue
+        if not manifest.enabled:
+            logger.debug("Skipped disabled builtin plugin: {}", manifest.name)
+            continue
+        nonebot.load_plugin(manifest.path_or_module)
+        loaded += 1
+        logger.debug("Loaded builtin plugin: {}", manifest.name)
+
+    if loaded:
+        logger.success("Loaded {} builtin plugin(s)", loaded)
 
 
 def step_load_local() -> None:

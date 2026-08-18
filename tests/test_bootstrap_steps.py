@@ -31,6 +31,29 @@ def test_step_load_pypi_loads_enabled_packages_by_module(tmp_path, monkeypatch) 
     assert loaded == ["nonebot_plugin_status"]
 
 
+def test_step_load_builtins_uses_scan_plugins_and_respects_disabled(
+    tmp_path, monkeypatch
+) -> None:
+    import nonebot
+
+    from apeiria.bootstrap import steps
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".apeiria").mkdir()
+    (tmp_path / ".apeiria" / "plugins.yaml").write_text(
+        "dirs: []\npackages: {}\nstates:\n  admin:\n    enabled: false\n",
+        encoding="utf-8",
+    )
+
+    loaded: list[str] = []
+    monkeypatch.setattr(nonebot, "load_plugin", loaded.append)
+
+    steps.step_load_builtins()
+
+    assert "apeiria.builtin_plugins.admin" not in loaded
+    assert "apeiria.builtin_plugins.help" in loaded
+
+
 def test_step_require_tracker_patches_require_entries(monkeypatch) -> None:
     import nonebot
     from nonebot.plugin import load as plugin_load
