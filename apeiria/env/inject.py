@@ -32,9 +32,3 @@ def inject_apeiria_paths() -> None:
     site.addsitedir(site_packages_str)
     _injected.add(site_packages_str)
     logger.info("Injected plugin path: {}", site_packages_str)
-
-    import nonebot
-
-    pyproject = Path(".apeiria/pyproject.toml")
-    if pyproject.exists():
-        nonebot.load_from_toml(str(pyproject))
