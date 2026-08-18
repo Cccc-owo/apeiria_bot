@@ -31,7 +31,7 @@ _access = on_alconna(
 
 
 @_access.handle()
-async def handle_access(  # noqa: PLR0913
+async def handle_access(  # noqa: PLR0913, PLR0917
     event: Event,
     action: Match[str],
     arg1: Match[str],
@@ -86,6 +86,12 @@ async def _list_rules() -> str:
     return "权限规则:\n\n" + "\n".join(lines)
 
 
+async def _reload_access() -> None:
+    from apeiria.bootstrap.steps import get_access_control
+
+    await get_access_control().load_snapshot()
+
+
 async def _add_rule(
     effect: str,
     subject_type: str,
@@ -118,6 +124,7 @@ async def _add_rule(
         )
         sess.add(rule)
         await sess.flush()
+    await _reload_access()
     target = plugin_name or "全局"
     return f"已添加: {normalized_effect} {normalized_type}:{subject_id} → {target}"
 
@@ -146,4 +153,5 @@ async def _del_rule(
         for rule in rules:
             await sess.delete(rule)
         await sess.flush()
+    await _reload_access()
     return f"已移除 {len(rules)} 条权限规则"
