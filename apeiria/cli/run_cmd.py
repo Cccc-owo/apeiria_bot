@@ -102,15 +102,25 @@ def run_cmd(reload: bool) -> None:  # noqa: FBT001
         sys.exit(1)
 
     if reload:
+        import threading
+
         import watchfiles
 
+        def _watch_and_restart() -> None:
+            for _changes in watchfiles.watch(
+                Path("apeiria"),
+                Path(".apeiria/plugins"),
+                Path("data/config.yaml"),
+                Path("webui/src"),
+                Path("alembic"),
+            ):
+                click.echo("Changes detected — restarting...")
+                sys.stdout.flush()
+                sys.stderr.flush()
+                os.execv(sys.executable, [sys.executable, *sys.argv])
+
         click.echo("Hot reload enabled — watching for changes...")
-        for _changes in watchfiles.watch(
-            Path("apeiria"),
-            Path(".apeiria/plugins"),
-            Path("data/config.yaml"),
-        ):
-            click.echo("Changes detected — restart with 'apeiria run' again")
-            break
+        threading.Thread(target=_watch_and_restart, daemon=True).start()
+        nonebot.run(timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_TIMEOUT)
     else:
         nonebot.run(timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_TIMEOUT)
