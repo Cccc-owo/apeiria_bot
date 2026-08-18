@@ -24,7 +24,7 @@ from apeiria.plugin.scanner import (
     scan_plugins,
 )
 from apeiria.web import pypi
-from apeiria.web.auth import verify_token
+from apeiria.web.auth import _clear_web_cache, verify_token
 from apeiria.web.plugin_metadata import merge_plugin_metadata
 from apeiria.web.store import get_status, get_store, paginate
 from apeiria.web.tasks import get_task_runner
@@ -423,7 +423,11 @@ async def api_config_adapters(data: dict) -> JSONResponse:
 
 @router.put("/config/apeiria")
 async def api_config_apeiria(data: dict) -> JSONResponse:
+    before = load_config("data/config.yaml").apeiria.web.model_dump()
     _patch_config("apeiria", data)
+    after = load_config("data/config.yaml").apeiria.web.model_dump()
+    if before != after:
+        _clear_web_cache()
     return JSONResponse(content={"ok": True})
 
 

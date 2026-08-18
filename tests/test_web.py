@@ -220,6 +220,74 @@ async def test_config_nonebot_driver_changed_blocked(tmp_path, monkeypatch) -> N
     assert "driver" in exc.value.detail
 
 
+async def test_config_apeiria_clears_web_cache_when_web_changed(
+    tmp_path, monkeypatch
+) -> None:
+    import yaml
+
+    from apeiria.web.routes import api_config_apeiria
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    cfg = tmp_path / "data" / "config.yaml"
+    cfg.write_text(
+        yaml.dump(
+            {
+                "apeiria": {
+                    "web": {"username": "old", "token_expire_days": 7},
+                    "database": {"path": "data/apeiria.db"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        "apeiria.web.routes._clear_web_cache", lambda: cleared.append("x")
+    )
+
+    resp = await api_config_apeiria(
+        {"web": {"username": "new", "token_expire_days": 7}}
+    )
+
+    assert resp.status_code == 200
+    assert cleared == ["x"]
+
+
+async def test_config_apeiria_keeps_web_cache_when_web_unchanged(
+    tmp_path, monkeypatch
+) -> None:
+    import yaml
+
+    from apeiria.web.routes import api_config_apeiria
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+    cfg = tmp_path / "data" / "config.yaml"
+    cfg.write_text(
+        yaml.dump(
+            {
+                "apeiria": {
+                    "web": {"username": "admin", "token_expire_days": 7},
+                    "database": {"path": "data/apeiria.db"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        "apeiria.web.routes._clear_web_cache", lambda: cleared.append("x")
+    )
+
+    resp = await api_config_apeiria({"database": {"path": "data/other.db"}})
+
+    assert resp.status_code == 200
+    assert cleared == []
+
+
 # --------------------------------------------------------------------------
 # _scanned_name_to_module
 # --------------------------------------------------------------------------
