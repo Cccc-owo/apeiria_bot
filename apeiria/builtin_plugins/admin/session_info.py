@@ -17,7 +17,7 @@ _session = on_alconna(
 
 @_session.handle()
 async def handle_session(bot: Bot, event: Event) -> None:
-    owner_error = ensure_owner_message(event)
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _session.finish(owner_error)
 

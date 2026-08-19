@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
-from nonebot.adapters import Event  # noqa: TC002
+from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.plugin.manager import set_plugin_state
@@ -31,8 +31,8 @@ _plugin = on_alconna(
 
 
 @_plugins.handle()
-async def handle_plugins(event: Event) -> None:
-    owner_error = ensure_owner_message(event)
+async def handle_plugins(bot: Bot, event: Event) -> None:
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _plugins.finish(owner_error)
 
@@ -58,11 +58,12 @@ async def handle_plugins(event: Event) -> None:
 
 @_plugin.handle()
 async def handle_plugin(
+    bot: Bot,
     event: Event,
     action: Match[str],
     plugin_name: Match[str],
 ) -> None:
-    owner_error = ensure_owner_message(event)
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _plugin.finish(owner_error)
 

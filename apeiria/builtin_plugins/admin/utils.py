@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import nonebot
-from nonebot.adapters import Event  # noqa: TC002
+from nonebot.adapters import Bot, Event  # noqa: TC002
+from nonebot.permission import SUPERUSER
 
 
 def resolve_plugin_query(
@@ -40,18 +41,11 @@ def resolve_plugin_query(
     return resolved, candidates
 
 
-def is_owner_event(event: Event) -> bool:
-    try:
-        user_id = str(event.get_user_id())
-    except Exception:  # noqa: BLE001
-        return False
-    superusers = nonebot.get_driver().config.superusers
-    return user_id in superusers or any(
-        isinstance(s, str) and s.endswith(f":{user_id}") for s in superusers
-    )
+async def is_owner_event(bot: Bot, event: Event) -> bool:
+    return await SUPERUSER(bot, event)
 
 
-def ensure_owner_message(event: Event) -> str | None:
-    if is_owner_event(event):
+async def ensure_owner_message(bot: Bot, event: Event) -> str | None:
+    if await is_owner_event(bot, event):
         return None
     return "仅限超级用户使用"

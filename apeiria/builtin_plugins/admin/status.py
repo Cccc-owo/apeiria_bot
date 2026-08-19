@@ -4,7 +4,7 @@ import time
 
 import nonebot
 from arclet.alconna import CommandMeta
-from nonebot.adapters import Event  # noqa: TC002
+from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from .presenter import render_block
@@ -21,8 +21,8 @@ _status = on_alconna(
 
 
 @_status.handle()
-async def handle_status(event: Event) -> None:
-    owner_error = ensure_owner_message(event)
+async def handle_status(bot: Bot, event: Event) -> None:
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _status.finish(owner_error)
 

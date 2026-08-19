@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
-from nonebot.adapters import Event  # noqa: TC002
+from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 
 from apeiria.plugin.adapter_manager import set_adapter_state
@@ -31,8 +31,8 @@ _adapter = on_alconna(
 
 
 @_adapters.handle()
-async def handle_adapters(event: Event) -> None:
-    owner_error = ensure_owner_message(event)
+async def handle_adapters(bot: Bot, event: Event) -> None:
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _adapters.finish(owner_error)
 
@@ -58,11 +58,12 @@ async def handle_adapters(event: Event) -> None:
 
 @_adapter.handle()
 async def handle_adapter(
+    bot: Bot,
     event: Event,
     action: Match[str],
     adapter_name: Match[str],
 ) -> None:
-    owner_error = ensure_owner_message(event)
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _adapter.finish(owner_error)
 

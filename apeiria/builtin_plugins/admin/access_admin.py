@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
-from nonebot.adapters import Event  # noqa: TC002
+from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot_plugin_alconna import Alconna, Match, on_alconna
 from sqlalchemy import select
 
@@ -32,6 +32,7 @@ _access = on_alconna(
 
 @_access.handle()
 async def handle_access(  # noqa: PLR0913, PLR0917
+    bot: Bot,
     event: Event,
     action: Match[str],
     arg1: Match[str],
@@ -40,7 +41,7 @@ async def handle_access(  # noqa: PLR0913, PLR0917
     arg4: Match[str],
     arg5: Match[str],
 ) -> None:
-    owner_error = ensure_owner_message(event)
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _access.finish(owner_error)
 

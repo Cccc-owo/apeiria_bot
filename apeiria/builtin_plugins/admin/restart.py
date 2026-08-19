@@ -30,7 +30,7 @@ _restart = on_alconna(
 
 @_restart.handle()
 async def handle_restart(bot: Bot, event: Event) -> None:
-    owner_error = ensure_owner_message(event)
+    owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _restart.finish(owner_error)
 
