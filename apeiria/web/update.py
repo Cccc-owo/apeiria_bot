@@ -82,6 +82,10 @@ async def update_status() -> JSONResponse:
     is_dirty = bool(dirty_output)
     dirty_files = dirty_output.splitlines() if dirty_output else []
 
+    rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--prune", "--tags")
+    if rc_fetch != 0:
+        logger.warning("Failed to refresh remote refs: {}", fetch_err)
+
     _, branches_output, _ = await _run_git("branch", "-r")
     all_branches = _branch_list(branches_output)
     _allowed = {"main", "dev"}
@@ -108,14 +112,18 @@ async def update_preview(
     ref: str,
     ref_type: Annotated[str, Query(alias="type", pattern="^(branch|tag)$")] = "branch",
 ) -> JSONResponse:
+    fetch_warning = ""
     if ref_type == "tag":
-        rc, _, stderr = await _run_git("fetch", "origin", "--tags")
-        if rc != 0:
-            raise HTTPException(status_code=500, detail=f"Fetch tags 失败: {stderr}")
+        rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--tags")
+        if rc_fetch != 0:
+            fetch_warning = f"Fetch tags 失败: {fetch_err}"
+            logger.warning("{}", fetch_warning)
 
         tag_ref = ref
-        rc, _, stderr = await _run_git("rev-parse", "--short", tag_ref)
+        rc, _, _ = await _run_git("rev-parse", "--short", tag_ref)
         if rc != 0:
+            if fetch_warning:
+                raise HTTPException(status_code=500, detail=fetch_warning)
             raise HTTPException(status_code=404, detail=f"标签 '{ref}' 不存在")
 
         _, remote_hash, _ = await _run_git("rev-parse", "--short", tag_ref)
@@ -123,13 +131,16 @@ async def update_preview(
         log_ref = tag_ref
         commits_behind = 0
     else:
-        rc, _, stderr = await _run_git("fetch", "origin", ref)
-        if rc != 0:
-            raise HTTPException(status_code=500, detail=f"Fetch 失败: {stderr}")
+        rc_fetch, _, fetch_err = await _run_git("fetch", "origin", ref)
+        if rc_fetch != 0:
+            fetch_warning = f"Fetch 失败: {fetch_err}"
+            logger.warning("{}", fetch_warning)
 
         remote_ref = f"origin/{ref}"
-        rc, _, stderr = await _run_git("rev-parse", "--short", remote_ref)
+        rc, _, _ = await _run_git("rev-parse", "--short", remote_ref)
         if rc != 0:
+            if fetch_warning:
+                raise HTTPException(status_code=500, detail=fetch_warning)
             raise HTTPException(status_code=404, detail=f"远端不存在分支 '{ref}'")
 
         _, remote_hash, _ = await _run_git("rev-parse", "--short", remote_ref)
@@ -182,6 +193,7 @@ async def update_preview(
             "remote_commit_message": remote_msg,
             "commits_behind": commits_behind,
             "commits": commits,
+            "fetch_warning": fetch_warning,
         }
     )
 

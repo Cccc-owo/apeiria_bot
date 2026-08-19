@@ -268,6 +268,7 @@ export interface UpdatePreviewResponse {
   remote_commit_message: string;
   commits_behind: number;
   commits: GitCommit[];
+  fetch_warning?: string;
 }
 
 export interface GitCommit {
