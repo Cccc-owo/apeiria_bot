@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing
 from enum import Enum
-from typing import Any, Literal, get_args, get_origin
+from typing import Any, Literal, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -87,10 +87,8 @@ def _extract_choices(annotation: type) -> list[dict[str, str]] | None:
         args = get_args(annotation)
         return [{"value": str(a), "label": str(a)} for a in args]
     if _is_enum_type(annotation):
-        return [
-            {"value": member.value, "label": member.name}
-            for member in annotation  # type: ignore[var-annotated]
-        ]
+        members = cast("type[Enum]", annotation).__members__.values()
+        return [{"value": member.value, "label": member.name} for member in members]
     return None
 
 

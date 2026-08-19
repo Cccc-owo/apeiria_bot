@@ -146,6 +146,7 @@ uv sync                # 安装依赖
 uv run apeiria init    # 项目初始化
 uv run apeiria run     # 启动 (--reload 热重载)
 uv run ruff check .    # 代码检查
+uv run ty check --exclude tests  # 类型检查
 uv run pytest          # 运行测试 (nonebug)
 uv run alembic upgrade head  # 数据库迁移
 uv run alembic revision --autogenerate -m "desc"  # 生成迁移

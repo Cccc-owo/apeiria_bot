@@ -4,17 +4,19 @@ import asyncio
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from arclet.alconna import CommandMeta
 from nonebot import get_driver
-from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot.log import logger
 from nonebot_plugin_alconna import Alconna, on_alconna
 
 from apeiria.utils.restart import graceful_restart
 
 from .utils import ensure_owner_message
+
+if TYPE_CHECKING:
+    from nonebot.adapters import Bot, Event
 
 _CONTEXT_PATH = Path("data/.restart_context.json")
 _MAX_RETRIES = 3
@@ -133,7 +135,7 @@ async def _try_send(
     bot: Bot, event: _RestartNotifyEvent, message: str
 ) -> BaseException | None:
     try:
-        await bot.send(event, message)
+        await bot.send(cast("Event", event), message)
     except (RuntimeError, OSError, ValueError, TypeError) as exc:
         return exc
     return None

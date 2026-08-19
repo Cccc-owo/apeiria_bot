@@ -4,15 +4,17 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from nonebot.adapters import Bot as BaseBot
+from nonebot.adapters import Message as BaseMessage
+from nonebot.adapters import MessageSegment as BaseMessageSegment
 from nonebot.log import logger
 
 from apeiria.db.base import _now_iso
 from apeiria.webchat import protocol
 from apeiria.webchat.event import WebChatMessageEvent
-from apeiria.webchat.message import Message
+from apeiria.webchat.message import Message, MessageSegment
 
 if TYPE_CHECKING:
-    from nonebot.adapters import Adapter, Event, MessageSegment
+    from nonebot.adapters import Adapter, Event
 
     from apeiria.webchat.connection import ConnectionManager
 
@@ -29,15 +31,18 @@ class WebChatBot(BaseBot):
         super().__init__(adapter, self_id)
         self.connections = connections
 
-    async def send(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def send(
         self,
         event: Event,
-        message: str | Message | MessageSegment,
+        message: str | BaseMessage | BaseMessageSegment,
         **kwargs: Any,  # noqa: ARG002
     ) -> Any:
-        msg = (
-            message if isinstance(message, Message) else Message(message)  # pyright: ignore[reportArgumentType]
-        )
+        if isinstance(message, Message):
+            msg = message
+        elif isinstance(message, MessageSegment):
+            msg = Message([message])
+        else:
+            msg = Message(str(message))
         segments = protocol.message_to_wire(msg)
         message_id = uuid4().hex
         session_id = event.get_session_id()

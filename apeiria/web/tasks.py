@@ -55,7 +55,9 @@ class TaskRunner:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        async for line in proc.stdout:  # type: ignore[union-attr]
+        if proc.stdout is None:
+            return None
+        async for line in proc.stdout:
             text = line.decode("utf-8", errors="replace").rstrip()
             await self._emit(queue, "output", text)
         await proc.wait()

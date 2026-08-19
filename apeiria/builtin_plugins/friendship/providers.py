@@ -48,7 +48,7 @@ class OneBotV11FriendshipProvider:
             return event.get_type() == "request"
         return False
 
-    def extract(self, _bot: Bot, event: Event) -> RequestInfo | None:
+    def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
         request_type = _safe_str(event, "request_type")
         sub_type = _safe_str(event, "sub_type")
 
@@ -118,7 +118,11 @@ class OneBotV11FriendshipProvider:
             return ProcResult(success=False, message=str(exc))
 
     async def notify(
-        self, bot: Bot, _pending: PendingRequest, target_id: str, message: str
+        self,
+        bot: Bot,
+        pending: PendingRequest,  # noqa: ARG002
+        target_id: str,
+        message: str,
     ) -> str | None:
         result = await bot.send_private_msg(user_id=int(target_id), message=message)
         if isinstance(result, dict):
@@ -141,7 +145,7 @@ class SatoriFriendshipProvider:
             return event.get_type() == "request"
         return False
 
-    def extract(self, _bot: Bot, event: Event) -> RequestInfo | None:
+    def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
         request_type = _safe_str(event, "request_type")
         if request_type == "friend":
             kind = "friend"
@@ -226,7 +230,7 @@ class MilkyFriendshipProvider:
             return event.get_type() == "request"
         return False
 
-    def extract(self, _bot: Bot, event: Event) -> RequestInfo | None:
+    def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
         request_type = _safe_str(event, "request_type")
         sub_type = _safe_str(event, "sub_type")
         if request_type == "friend":

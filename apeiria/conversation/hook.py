@@ -10,7 +10,7 @@ from apeiria.conversation.store import append_message, ensure_session
 
 async def _persist_inbound(
     event: Event,
-    session: object | None,
+    session: Session | None,
 ) -> None:
     if event.get_type() != "message":
         return
@@ -37,7 +37,7 @@ async def _persist_inbound(
 def _extract_session_meta(
     event: Event,
     session_id: str,
-    session: object | None,
+    session: Session | None,
 ) -> tuple[str, str, str]:
     if session is not None:
         return str(session.scope), session.scene.type.name.lower(), session.scene.id

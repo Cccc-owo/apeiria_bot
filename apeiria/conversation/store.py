@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from typing import cast
+
+from sqlalchemy import CursorResult, delete, select
 
 from apeiria.db.base import _now_iso
 from apeiria.db.engine import get_db
@@ -127,7 +129,7 @@ async def delete_session_messages(session_id: str) -> int:
         result = await sess.execute(
             delete(Message).where(Message.session_id == session.id)
         )
-        return result.rowcount or 0  # pyright: ignore[reportAttributeAccessIssue]
+        return cast("CursorResult", result).rowcount or 0
 
 
 async def delete_message(message_id: str) -> int:
@@ -137,4 +139,4 @@ async def delete_message(message_id: str) -> int:
         result = await sess.execute(
             delete(Message).where(Message.message_id == message_id)
         )
-        return result.rowcount or 0  # pyright: ignore[reportAttributeAccessIssue]
+        return cast("CursorResult", result).rowcount or 0

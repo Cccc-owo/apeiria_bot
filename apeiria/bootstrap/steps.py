@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import ModuleType
 
 import nonebot
 from nonebot.log import logger
@@ -84,7 +85,7 @@ def step_require_tracker() -> None:
 
     from apeiria.plugin.dependency_graph import record_dependency
 
-    def _tracking_require(name: str):
+    def _tracking_require(name: str) -> ModuleType:
         module = original_require(name)
         frame = inspect.currentframe()
         try:
@@ -104,9 +105,9 @@ def step_require_tracker() -> None:
             del frame
         return module
 
-    nonebot.require = _tracking_require
-    nonebot.plugin.require = _tracking_require
-    plugin_load.require = _tracking_require
+    nonebot.require = _tracking_require  # ty: ignore[invalid-assignment]
+    nonebot.plugin.require = _tracking_require  # ty: ignore[invalid-assignment]
+    plugin_load.require = _tracking_require  # ty: ignore[invalid-assignment]
     _require_tracker_installed = True
     logger.success("Require dependency tracker installed")
 

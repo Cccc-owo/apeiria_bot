@@ -363,9 +363,7 @@ async def change_password(data: ChangePasswordRequest) -> JSONResponse:
     return JSONResponse(content={"ok": True})
 
 
-@auth_router.post(
-    "/change-password-force", dependencies=[Depends(verify_token)]
-)
+@auth_router.post("/change-password-force", dependencies=[Depends(verify_token)])
 async def force_change_password(data: ForceChangePasswordRequest) -> JSONResponse:
     """首次登录强制改密：无需旧密码，仅在必须改密时允许。"""
     must_change = await _get_setting(_SETTING_PASSWORD_MUST_CHANGE) == "1"

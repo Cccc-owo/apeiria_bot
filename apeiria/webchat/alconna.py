@@ -2,6 +2,7 @@ import base64
 from typing import Any, cast
 
 from nonebot.adapters import Bot, Event
+from nonebot.adapters import Message as BaseMessage
 from nonebot.log import logger
 from nonebot_plugin_alconna.uniseg.builder import MessageBuilder, build
 from nonebot_plugin_alconna.uniseg.constraint import SupportAdapter
@@ -40,15 +41,15 @@ class WebChatExporter(MessageExporter[Message]):
         encoded = base64.b64encode(raw).decode()
         return MessageSegment.image(base64=f"data:{mime};base64,{encoded}")
 
-    async def send_to(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def send_to(
         self,
         target: Target | Event,
         bot: Bot,
-        message: Message,
+        message: BaseMessage,
         **kwargs: Any,
     ) -> Any:
         if isinstance(target, Event):
-            return await bot.send(target, message, **kwargs)
+            return await bot.send(target, cast("Message", message), **kwargs)
         logger.warning("WebChat: proactive send_to without event is unsupported")
         return None
 

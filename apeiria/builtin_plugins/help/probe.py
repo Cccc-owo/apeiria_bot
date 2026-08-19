@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import nonebot
 from nonebot.log import logger
+from nonebot.matcher import matchers
 from nonebot.permission import SUPERUSER as SUPERUSER_PERM
 from nonebot.rule import CommandRule
 
@@ -85,7 +86,7 @@ def probe_commands(plugin: Any) -> list[HelpCommandItem]:
     added: set[str] = set()
     admin_only = False
 
-    for mgroup in nonebot.matcher.matchers.values():
+    for mgroup in matchers.values():
         for matcher in mgroup:
             pid = getattr(matcher, "plugin_id", None)
             if not pid or pid != plugin.id_:
@@ -145,7 +146,7 @@ def _probe_alconna(matcher: Any) -> list[HelpCommandItem]:
     cmd_path = getattr(matcher, "_command_path", "")
     name = cmd_path.split("::", maxsplit=1)[-1].strip() if cmd_path else ""
     if not name:
-        name = ac.command
+        name = getattr(ac, "command", "") or ""
     if not name:
         return []
 

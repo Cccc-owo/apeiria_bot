@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from collections.abc import Mapping, Sequence
 from math import isfinite
 from pathlib import Path
-from typing import Any, cast
 
 from nonebot import require
 from nonebot.log import logger
@@ -26,20 +26,12 @@ _rules_cache: tuple[TriggerEntry, ...] | None = None
 _rules_cache_count: int = 0
 
 
-def _load_toml() -> Any:
-    try:
-        import tomllib as mod
-    except ImportError:
-        import tomli as mod  # type: ignore[no-redef]
-    return mod.loads
-
-
 def _load_rules(file_path: Path) -> tuple[tuple[TriggerEntry, ...], list[str]]:
     if not file_path.exists():
         return (), []
     raw_text = file_path.read_text(encoding="utf-8")
     try:
-        payload = _load_toml()(raw_text)
+        payload = tomllib.loads(raw_text)
     except Exception as exc:  # noqa: BLE001
         return (), [f"TOML 解析失败: {exc}"]
     if not isinstance(payload, Mapping):
@@ -208,7 +200,7 @@ def _parse_scene_filter(raw: object) -> frozenset[TriggerScene]:
     valid: set[TriggerScene] = set()
     for s in scenes:
         if s in {"group", "private"}:
-            valid.add(cast("TriggerScene", s))
+            valid.add(s)
     return frozenset(valid)
 
 
@@ -289,10 +281,18 @@ def _bool_val(value: object, *, fallback: bool) -> bool:
 def _int_val(value: object, *, fallback: int, minimum: int) -> int:
     if isinstance(value, bool):
         return fallback
-    try:
-        return max(int(value), minimum)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, float):
+        parsed = int(value)
+    elif isinstance(value, str):
+        try:
+            parsed = int(value)
+        except ValueError:
+            return fallback
+    else:
         return fallback
+    return max(parsed, minimum)
 
 
 def _float_val(
@@ -304,9 +304,14 @@ def _float_val(
 ) -> float:
     if isinstance(value, bool):
         return fallback
-    try:
-        result = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if isinstance(value, (int, float)):
+        result = float(value)
+    elif isinstance(value, str):
+        try:
+            result = float(value)
+        except ValueError:
+            return fallback
+    else:
         return fallback
     if not isfinite(result):
         return fallback

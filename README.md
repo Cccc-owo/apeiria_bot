@@ -59,7 +59,7 @@ Docker 部署前，请确保 `data/config.yaml` 已正确配置。
 uv run ruff check .
 
 # 类型检查
-uv run pyright
+uv run ty check --exclude tests
 
 # 运行测试
 uv run pytest
