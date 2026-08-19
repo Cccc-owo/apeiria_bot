@@ -120,6 +120,55 @@ async def _call_api(bot: Bot, api: str, **data: object) -> RevokeActionResult:
         return RevokeActionResult.failed(str(exc))
 
 
+class BaseApiRevokeProvider:
+    """共享撤回 API 调用逻辑的基类。
+
+    子类需要提供：
+    - ``adapter_name``：适配器名称
+    - ``revoke_api``：撤回 API 名，可用 ``{message_id}`` 作为路径模板
+    - ``_delete_kwargs(event, message_id)``：构造撤回请求参数
+    """
+
+    adapter_name: ClassVar[str]
+    revoke_api: ClassVar[str]
+    missing_delete_data_reason: ClassVar[str] = "chat_id_missing"
+
+    def supports(self, bot: Bot, event: Event) -> bool:
+        return bot.adapter.get_name() == self.adapter_name
+
+    async def revoke_message(
+        self, bot: Bot, event: Event, target: RevokeTarget
+    ) -> RevokeActionResult:
+        kwargs = self._delete_kwargs(event, target.message_id)
+        if kwargs is None:
+            return RevokeActionResult.unsupported(self.missing_delete_data_reason)
+        api = self.revoke_api.format(message_id=target.message_id)
+        return await _call_api(bot, api, **kwargs)
+
+    async def revoke_trigger_message(
+        self, bot: Bot, event: Event
+    ) -> RevokeActionResult:
+        message_id = self._trigger_message_id(event)
+        if message_id is None:
+            return RevokeActionResult.unsupported("trigger_message_id_missing")
+        kwargs = self._delete_kwargs(event, message_id)
+        if kwargs is None:
+            return RevokeActionResult.unsupported(self.missing_delete_data_reason)
+        api = self.revoke_api.format(message_id=message_id)
+        return await _call_api(bot, api, **kwargs)
+
+    def _trigger_message_id(self, event: Event) -> str | None:
+        return _event_message_id(event)
+
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object] | None:
+        raise NotImplementedError
+
+    async def apply_feedback(
+        self, bot: Bot, event: Event, *, kind: FeedbackKind
+    ) -> RevokeActionResult:
+        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+
+
 # -- OneBot V11 provider --
 
 _ONEBOT_V11_NAME = "OneBot V11"
@@ -127,7 +176,9 @@ _ONEBOT_SUCCESS_EMOJI = "124"
 _ONEBOT_FAILURE_EMOJI = "424"
 
 
-class OneBotV11RevokeProvider:
+class OneBotV11RevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _ONEBOT_V11_NAME
+    revoke_api = "delete_msg"
     _EMOJI_MAP: ClassVar[dict[FeedbackKind, str]] = {
         "success": _ONEBOT_SUCCESS_EMOJI,
         "failure": _ONEBOT_FAILURE_EMOJI,
@@ -164,26 +215,8 @@ class OneBotV11RevokeProvider:
         }
         return target.author_id is not None and target.author_id in bot_ids
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
-        return await _call_api(
-            bot,
-            "delete_msg",
-            message_id=_message_id_value(target.message_id),
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        message_id = _event_message_id(event)
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot,
-            "delete_msg",
-            message_id=_message_id_value(message_id),
-        )
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object]:
+        return {"message_id": _message_id_value(message_id)}
 
     async def apply_feedback(
         self, bot: Bot, event: Event, *, kind: FeedbackKind
@@ -207,7 +240,10 @@ _register_provider(OneBotV11RevokeProvider())
 _ONEBOT_V12_NAME = "OneBot V12"
 
 
-class OneBotV12RevokeProvider:
+class OneBotV12RevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _ONEBOT_V12_NAME
+    revoke_api = "delete_message"
+
     def supports(self, bot: Bot, event: Event) -> bool:
         if bot.adapter.get_name() != _ONEBOT_V12_NAME:
             return False
@@ -237,23 +273,8 @@ class OneBotV12RevokeProvider:
             and bot_self_id == event_self_id == target.author_id
         )
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
-        return await _call_api(bot, "delete_message", message_id=target.message_id)
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        message_id = _event_message_id(event)
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(bot, "delete_message", message_id=message_id)
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object]:
+        return {"message_id": message_id}
 
 
 _register_provider(OneBotV12RevokeProvider())
@@ -263,7 +284,10 @@ _register_provider(OneBotV12RevokeProvider())
 _TELEGRAM_NAME = "Telegram"
 
 
-class TelegramRevokeProvider:
+class TelegramRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _TELEGRAM_NAME
+    revoke_api = "delete_message"
+
     def supports(self, bot: Bot, event: Event) -> bool:
         if bot.adapter.get_name() != _TELEGRAM_NAME:
             return False
@@ -299,39 +323,14 @@ class TelegramRevokeProvider:
             and target.author_id == bot_id
         )
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object] | None:
         chat_id = _nested_string_attr(event, "chat", "id")
         if chat_id is None:
-            return RevokeActionResult.unsupported("chat_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            chat_id=_message_id_value(chat_id),
-            message_id=_message_id_value(target.message_id),
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        chat_id = _nested_string_attr(event, "chat", "id")
-        message_id = _event_message_id(event)
-        if chat_id is None:
-            return RevokeActionResult.unsupported("chat_id_missing")
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            chat_id=_message_id_value(chat_id),
-            message_id=_message_id_value(message_id),
-        )
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+            return None
+        return {
+            "chat_id": _message_id_value(chat_id),
+            "message_id": _message_id_value(message_id),
+        }
 
 
 _register_provider(TelegramRevokeProvider())
@@ -341,7 +340,10 @@ _register_provider(TelegramRevokeProvider())
 _DISCORD_NAME = "Discord"
 
 
-class DiscordRevokeProvider:
+class DiscordRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _DISCORD_NAME
+    revoke_api = "delete_message"
+
     def supports(self, bot: Bot, event: Event) -> bool:
         if bot.adapter.get_name() != _DISCORD_NAME:
             return False
@@ -377,39 +379,11 @@ class DiscordRevokeProvider:
         }
         return target.author_id is not None and target.author_id in bot_ids
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object] | None:
         channel_id = _string_attr(event, "channel_id")
         if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            channel_id=channel_id,
-            message_id=target.message_id,
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        channel_id = _string_attr(event, "channel_id")
-        message_id = _event_message_id(event)
-        if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            channel_id=channel_id,
-            message_id=message_id,
-        )
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+            return None
+        return {"channel_id": channel_id, "message_id": message_id}
 
 
 _register_provider(DiscordRevokeProvider())
@@ -419,7 +393,10 @@ _register_provider(DiscordRevokeProvider())
 _FEISHU_NAME = "Feishu"
 
 
-class FeishuRevokeProvider:
+class FeishuRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _FEISHU_NAME
+    revoke_api = "im/v1/messages/{message_id}"
+
     def _bot_app_id(self, bot: Bot) -> str | None:
         return _nested_string_attr(bot, "bot_config", "app_id") or _string_attr(
             bot, "self_id"
@@ -461,25 +438,8 @@ class FeishuRevokeProvider:
             and target.author_id == bot_app_id
         )
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
-        return await _call_api(
-            bot, f"im/v1/messages/{target.message_id}", method="DELETE"
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        message_id = _event_message_id(event)
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(bot, f"im/v1/messages/{message_id}", method="DELETE")
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object]:
+        return {"method": "DELETE"}
 
 
 _register_provider(FeishuRevokeProvider())
@@ -489,7 +449,10 @@ _register_provider(FeishuRevokeProvider())
 _SATORI_NAME = "Satori"
 
 
-class SatoriRevokeProvider:
+class SatoriRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _SATORI_NAME
+    revoke_api = "message_delete"
+
     def _channel_id(self, event: Event) -> str | None:
         return _nested_string_attr(event, "channel", "id")
 
@@ -597,39 +560,14 @@ class SatoriRevokeProvider:
         }
         return target.author_id is not None and target.author_id in bot_id_set
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
+    def _trigger_message_id(self, event: Event) -> str | None:
+        return self._msg_id(event)
+
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object] | None:
         channel_id = self._channel_id(event)
         if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        return await _call_api(
-            bot,
-            "message_delete",
-            channel_id=channel_id,
-            message_id=target.message_id,
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        channel_id = self._channel_id(event)
-        message_id = self._msg_id(event)
-        if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot,
-            "message_delete",
-            channel_id=channel_id,
-            message_id=message_id,
-        )
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+            return None
+        return {"channel_id": channel_id, "message_id": message_id}
 
 
 _register_provider(SatoriRevokeProvider())
@@ -639,7 +577,10 @@ _register_provider(SatoriRevokeProvider())
 _QQ_NAME = "QQ"
 
 
-class QQGuildRevokeProvider:
+class QQGuildRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _QQ_NAME
+    revoke_api = "delete_message"
+
     def _event_type_name(self, event: Event) -> str:
         value = getattr(event, "__type__", None)
         if value is None:
@@ -684,39 +625,11 @@ class QQGuildRevokeProvider:
         }
         return target.author_id is not None and target.author_id in bot_ids
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object] | None:
         channel_id = _string_attr(event, "channel_id")
         if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            channel_id=channel_id,
-            message_id=target.message_id,
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        channel_id = _string_attr(event, "channel_id")
-        message_id = _event_message_id(event)
-        if channel_id is None:
-            return RevokeActionResult.unsupported("channel_id_missing")
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot,
-            "delete_message",
-            channel_id=channel_id,
-            message_id=message_id,
-        )
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+            return None
+        return {"channel_id": channel_id, "message_id": message_id}
 
 
 _register_provider(QQGuildRevokeProvider())
@@ -726,7 +639,10 @@ _register_provider(QQGuildRevokeProvider())
 _MILKY_NAME = "nonebot-adapter-milky"
 
 
-class MilkyRevokeProvider:
+class MilkyRevokeProvider(BaseApiRevokeProvider):
+    adapter_name = _MILKY_NAME
+    revoke_api = "delete_msg"
+
     def supports(self, bot: Bot, event: Event) -> bool:
         if bot.adapter.get_name() != _MILKY_NAME:
             return False
@@ -758,29 +674,8 @@ class MilkyRevokeProvider:
         }
         return target.author_id is not None and target.author_id in bot_ids
 
-    async def revoke_message(
-        self, bot: Bot, event: Event, target: RevokeTarget
-    ) -> RevokeActionResult:
-        return await _call_api(
-            bot,
-            "delete_msg",
-            message_id=_message_id_value(target.message_id),
-        )
-
-    async def revoke_trigger_message(
-        self, bot: Bot, event: Event
-    ) -> RevokeActionResult:
-        message_id = _event_message_id(event)
-        if message_id is None:
-            return RevokeActionResult.unsupported("trigger_message_id_missing")
-        return await _call_api(
-            bot, "delete_msg", message_id=_message_id_value(message_id)
-        )
-
-    async def apply_feedback(
-        self, bot: Bot, event: Event, *, kind: FeedbackKind
-    ) -> RevokeActionResult:
-        return RevokeActionResult.unsupported("reaction_feedback_unsupported")
+    def _delete_kwargs(self, event: Event, message_id: str) -> dict[str, object]:
+        return {"message_id": _message_id_value(message_id)}
 
 
 _register_provider(MilkyRevokeProvider())
