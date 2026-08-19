@@ -12,12 +12,6 @@ from nonebot.log import logger
 FeedbackKind = Literal["success", "failure"]
 
 
-def _adapter_name(bot: Bot) -> str:
-    with suppress(Exception):
-        return bot.adapter.get_name().split(maxsplit=1)[0].lower()
-    return ""
-
-
 def _string_attr(obj: object, name: str) -> str | None:
     with suppress(Exception):
         value = getattr(obj, name, None)
@@ -44,7 +38,8 @@ def _event_message_id(event: Event) -> str | None:
             value = getter()
             if value is not None:
                 return str(value)
-    return None
+    # QQ Guild / Discord 等适配器的消息 ID 直接放在 id 字段。
+    return _string_attr(event, "id")
 
 
 def _message_id_value(message_id: str) -> int | str:
