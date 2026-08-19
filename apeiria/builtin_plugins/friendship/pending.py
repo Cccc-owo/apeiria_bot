@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -25,25 +26,14 @@ def _store_path() -> Path:
     return _STORE_FILE
 
 
-def _generate_id(pending_list: list[PendingRequest]) -> str:
+def _generate_id(pending_list: list[PendingRequest], kind: str) -> str:
     kind_prefixes = {"friend": "f", "group_add": "g", "group_invite": "g"}
-    existing_nums: dict[str, int] = {}
-    for p in pending_list:
-        if not p.id:
-            continue
-        prefix = p.id[0]
-        try:
-            n = int(p.id[1:])
-        except (ValueError, IndexError):
-            continue
-        existing_nums[prefix] = max(existing_nums.get(prefix, 0), n)
-    prefix = "f"
-    for p in pending_list:
-        if p.status == "pending":
-            prefix = kind_prefixes.get(p.kind, "f")
-            break
-    n = existing_nums.get(prefix, 0) + 1
-    return f"{prefix}{n}"
+    prefix = kind_prefixes.get(kind, "f")
+    existing_ids = {p.id for p in pending_list if p.id}
+    while True:
+        request_id = f"{prefix}-{uuid.uuid4().hex[:4]}"
+        if request_id not in existing_ids:
+            return request_id
 
 
 def _load() -> list[dict]:
@@ -113,7 +103,7 @@ async def load_all() -> list[PendingRequest]:
 async def add_pending(pending: PendingRequest) -> None:
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
-        pending.id = _generate_id([*items, pending])
+        pending.id = _generate_id(items, pending.kind)
         items.append(pending)
         _cleanup(items)
         _save(items)
