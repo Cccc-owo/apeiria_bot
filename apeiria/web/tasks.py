@@ -5,6 +5,8 @@ import shutil
 import uuid
 from typing import Any
 
+from nonebot.log import logger
+
 _TASK_CLEANUP_DELAY = 60.0
 
 
@@ -33,13 +35,33 @@ class TaskRunner:
             coro = self._do_uninstall(queue, kind, name, keep_config=keep_config)
         else:
             coro = self._do_install(queue, kind, name, pkg_requirement, module_name)
-        task = asyncio.create_task(coro)
+        task = asyncio.create_task(self._run_task(queue, coro))
         self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+
+        def _on_task_done(done_task: asyncio.Task[Any]) -> None:
+            self._tasks.discard(done_task)
+            done_task.get_loop().call_later(
+                _TASK_CLEANUP_DELAY, self._queues.pop, task_id, None
+            )
+
+        task.add_done_callback(_on_task_done)
         return task_id
 
     async def subscribe(self, task_id: str) -> asyncio.Queue[dict[str, Any]] | None:
         return self._queues.get(task_id)
+
+    async def _run_task(
+        self,
+        queue: asyncio.Queue[dict[str, Any]],
+        coro: Any,
+    ) -> None:
+        try:
+            await coro
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Background task failed")
+            await queue.put({"type": "error", "ok": False, "message": str(exc)})
 
     async def _run_subprocess(
         self,
@@ -63,6 +85,62 @@ class TaskRunner:
         await proc.wait()
         return proc.returncode
 
+    async def _require_uv(self, queue: asyncio.Queue[dict[str, Any]]) -> str | None:
+        uv = shutil.which("uv")
+        if uv is None:
+            await queue.put({"type": "error", "ok": False, "message": "uv not found"})
+        return uv
+
+    @staticmethod
+    def _read_manifest(kind: str) -> dict:
+        if kind == "plugin":
+            from apeiria.plugin.manager import _read_plugins_yaml
+
+            return _read_plugins_yaml()
+        from apeiria.plugin.adapter_manager import _read_adapters_yaml
+
+        return _read_adapters_yaml()
+
+    @staticmethod
+    def _write_manifest(kind: str, data: dict) -> None:
+        if kind == "plugin":
+            from apeiria.plugin.manager import _write_plugins_yaml
+
+            _write_plugins_yaml(data)
+            return
+        from apeiria.plugin.adapter_manager import _write_adapters_yaml
+
+        _write_adapters_yaml(data)
+
+    @staticmethod
+    def _remove_config(kind: str, name: str) -> None:
+        if kind == "plugin":
+            from apeiria.plugin.manager import _remove_plugin_config
+
+            _remove_plugin_config(name)
+            return
+        from apeiria.plugin.adapter_manager import _remove_adapter_config
+
+        _remove_adapter_config(name)
+
+    @staticmethod
+    def _toml_add_adapter(name: str, module_name: str | None) -> None:
+        from apeiria.plugin.adapter_manager import _toml_add_adapter
+
+        _toml_add_adapter(name, module_name or name)
+
+    @staticmethod
+    def _toml_remove_adapter(name: str) -> None:
+        from apeiria.plugin.adapter_manager import _toml_remove_adapter
+
+        _toml_remove_adapter(name)
+
+    async def _sync_manifest_env(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        from apeiria.env.sync import sync_apeiria_env
+
+        await self._emit(queue, "output", "> uv sync")
+        sync_apeiria_env()
+
     async def _do_install(
         self,
         queue: asyncio.Queue[dict[str, Any]],
@@ -71,9 +149,8 @@ class TaskRunner:
         pkg_requirement: str,
         module_name: str | None,
     ) -> None:
-        uv = shutil.which("uv")
+        uv = await self._require_uv(queue)
         if uv is None:
-            await queue.put({"type": "error", "ok": False, "message": "uv not found"})
             return
 
         await self._emit(queue, "output", f"> uv add {pkg_requirement}")
@@ -84,35 +161,17 @@ class TaskRunner:
             )
             return
 
-        if kind == "plugin":
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.manager import _read_plugins_yaml, _write_plugins_yaml
+        if kind in ("plugin", "adapter"):
+            if kind == "adapter":
+                self._toml_add_adapter(name, module_name)
 
-            data = _read_plugins_yaml()
+            data = self._read_manifest(kind)
             packages = data.setdefault("packages", {})
             packages[name] = pkg_requirement
             states = data.setdefault("states", {})
             states[name] = {"enabled": True}
-            _write_plugins_yaml(data)
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
-        elif kind == "adapter":
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.adapter_manager import (
-                _read_adapters_yaml,
-                _toml_add_adapter,
-                _write_adapters_yaml,
-            )
-
-            _toml_add_adapter(name, module_name or name)
-            data = _read_adapters_yaml()
-            packages = data.setdefault("packages", {})
-            packages[name] = pkg_requirement
-            states = data.setdefault("states", {})
-            states[name] = {"enabled": True}
-            _write_adapters_yaml(data)
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
+            self._write_manifest(kind, data)
+            await self._sync_manifest_env(queue)
 
         await queue.put(
             {
@@ -123,7 +182,7 @@ class TaskRunner:
             }
         )
 
-    async def _do_uninstall(  # noqa: PLR0915
+    async def _do_uninstall(
         self,
         queue: asyncio.Queue[dict[str, Any]],
         kind: str,
@@ -131,25 +190,16 @@ class TaskRunner:
         *,
         keep_config: bool,
     ) -> None:
-        uv = shutil.which("uv")
+        uv = await self._require_uv(queue)
         if uv is None:
-            await queue.put({"type": "error", "ok": False, "message": "uv not found"})
             return
 
-        if kind == "plugin":
-            from apeiria.plugin.manager import _read_plugins_yaml
-
-            data = _read_plugins_yaml()
-            packages = data.get("packages") or {}
-            pkg_req = packages.get(name) or name
-        elif kind == "adapter":
-            from apeiria.plugin.adapter_manager import _read_adapters_yaml
-
-            data = _read_adapters_yaml()
-            packages = data.get("packages") or {}
-            pkg_req = packages.get(name) or name
-        else:
+        if kind not in ("plugin", "adapter"):
             pkg_req = name
+        else:
+            data = self._read_manifest(kind)
+            packages = data.get("packages") or {}
+            pkg_req = packages.get(name) or name
 
         await self._emit(queue, "output", f"> uv remove {pkg_req}")
         rc = await self._run_subprocess(queue, uv, "remove", pkg_req)
@@ -159,56 +209,29 @@ class TaskRunner:
             )
             return
 
-        if kind == "plugin":
-            from pathlib import Path
+        if kind in ("plugin", "adapter"):
+            if kind == "plugin":
+                from pathlib import Path
 
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.manager import (
-                _read_plugins_yaml,
-                _remove_plugin_config,
-                _write_plugins_yaml,
-            )
+                local_path = Path(f".apeiria/plugins/{name}")
+                if local_path.is_dir():
+                    import shutil as _shutil
 
-            data = _read_plugins_yaml()
+                    _shutil.rmtree(local_path, ignore_errors=True)
+            else:
+                self._toml_remove_adapter(name)
+
+            data = self._read_manifest(kind)
             packages = data.get("packages") or {}
             packages.pop(name, None)
             states = data.get("states") or {}
             states.pop(name, None)
-            _write_plugins_yaml(data)
-
-            local_path = Path(f".apeiria/plugins/{name}")
-            if local_path.is_dir():
-                import shutil as _shutil
-
-                _shutil.rmtree(local_path, ignore_errors=True)
+            self._write_manifest(kind, data)
 
             if not keep_config:
-                _remove_plugin_config(name)
+                self._remove_config(kind, name)
 
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
-        elif kind == "adapter":
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.adapter_manager import (
-                _read_adapters_yaml,
-                _remove_adapter_config,
-                _toml_remove_adapter,
-                _write_adapters_yaml,
-            )
-
-            _toml_remove_adapter(name)
-            data = _read_adapters_yaml()
-            packages = data.get("packages") or {}
-            packages.pop(name, None)
-            states = data.get("states") or {}
-            states.pop(name, None)
-            _write_adapters_yaml(data)
-
-            if not keep_config:
-                _remove_adapter_config(name)
-
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
+            await self._sync_manifest_env(queue)
 
         await queue.put(
             {
@@ -226,9 +249,8 @@ class TaskRunner:
         name: str,
         pkg_requirement: str,
     ) -> None:
-        uv = shutil.which("uv")
+        uv = await self._require_uv(queue)
         if uv is None:
-            await queue.put({"type": "error", "ok": False, "message": "uv not found"})
             return
 
         await self._emit(queue, "output", f"> uv add {pkg_requirement}")
@@ -239,27 +261,11 @@ class TaskRunner:
             )
             return
 
-        if kind == "plugin":
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.manager import _read_plugins_yaml, _write_plugins_yaml
-
-            data = _read_plugins_yaml()
+        if kind in ("plugin", "adapter"):
+            data = self._read_manifest(kind)
             data.setdefault("packages", {})[name] = pkg_requirement
-            _write_plugins_yaml(data)
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
-        elif kind == "adapter":
-            from apeiria.env.sync import sync_apeiria_env
-            from apeiria.plugin.adapter_manager import (
-                _read_adapters_yaml,
-                _write_adapters_yaml,
-            )
-
-            data = _read_adapters_yaml()
-            data.setdefault("packages", {})[name] = pkg_requirement
-            _write_adapters_yaml(data)
-            await self._emit(queue, "output", "> uv sync")
-            sync_apeiria_env()
+            self._write_manifest(kind, data)
+            await self._sync_manifest_env(queue)
 
         await queue.put(
             {
