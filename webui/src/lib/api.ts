@@ -1,5 +1,7 @@
 import router from "@/router";
 import { useAuthStore } from "@/stores/auth";
+import { createSseClient } from "@/lib/sse";
+import type { SseClient } from "@/lib/sse";
 import type {
   AccessPreviewResult,
   AccessRulesList,
@@ -133,14 +135,28 @@ export const api = {
   },
   store: {
     searchPlugins: (q: string, limit = 60, offset = 0, sort = "") => {
-      const sp = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+      const sp = new URLSearchParams({
+        q,
+        limit: String(limit),
+        offset: String(offset),
+      });
       if (sort) sp.set("sort", sort);
-      return request<StoreSearchResult>("GET", `/store/plugins?${sp.toString()}`);
+      return request<StoreSearchResult>(
+        "GET",
+        `/store/plugins?${sp.toString()}`,
+      );
     },
     searchAdapters: (q: string, limit = 60, offset = 0, sort = "") => {
-      const sp = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+      const sp = new URLSearchParams({
+        q,
+        limit: String(limit),
+        offset: String(offset),
+      });
       if (sort) sp.set("sort", sort);
-      return request<StoreSearchResult>("GET", `/store/adapters?${sp.toString()}`);
+      return request<StoreSearchResult>(
+        "GET",
+        `/store/adapters?${sp.toString()}`,
+      );
     },
   },
   logs: {
@@ -185,14 +201,19 @@ export const api = {
       plugin_name: string;
     }) => {
       const sp = new URLSearchParams(params);
-      return request<AccessPreviewResult>("GET", `/access/rules/preview?${sp.toString()}`);
+      return request<AccessPreviewResult>(
+        "GET",
+        `/access/rules/preview?${sp.toString()}`,
+      );
     },
     subjectsSearch: (q: string, type: string) => {
       const sp = new URLSearchParams({ q, type });
-      return request<AccessSubjectsResult>("GET", `/access/subjects/search?${sp.toString()}`);
+      return request<AccessSubjectsResult>(
+        "GET",
+        `/access/subjects/search?${sp.toString()}`,
+      );
     },
-    pluginsNames: () =>
-      request<{ names: string[] }>("GET", "/plugins/names"),
+    pluginsNames: () => request<{ names: string[] }>("GET", "/plugins/names"),
   },
   update: {
     status: () => request<UpdateStatusResponse>("GET", "/update/status"),
@@ -201,17 +222,25 @@ export const api = {
         "GET",
         `/update/preview/${ref}?type=${type}`,
       ),
-    execute: (ref: string, commit?: string, type: string = "branch") => {
+    execute: (
+      ref: string,
+      commit: string | undefined,
+      type: string,
+      onMessage: (data: string) => void,
+      onError?: (err: Error) => void,
+    ): SseClient => {
       const auth = useAuthStore();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
-      return fetch(`${BASE}/update/execute`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ branch: ref, commit: commit ?? undefined, type }),
-      });
+      return createSseClient(
+        `${BASE}/update/execute`,
+        auth.token ?? "",
+        onMessage,
+        onError,
+        {
+          method: "POST",
+          body: { branch: ref, commit: commit ?? undefined, type },
+          autoReconnect: false,
+        },
+      );
     },
   },
 };

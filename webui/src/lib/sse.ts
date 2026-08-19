@@ -1,17 +1,52 @@
+export interface SseClientOptions {
+  method?: "GET" | "POST";
+  body?: unknown;
+  headers?: Record<string, string>;
+  autoReconnect?: boolean;
+}
+
+export interface SseClient {
+  close: () => void;
+  done: Promise<void>;
+}
+
 export function createSseClient(
   url: string,
   token: string,
   onMessage: (data: string) => void,
   onError?: (err: Error) => void,
-): { close: () => void } {
+  options: SseClientOptions = {},
+): SseClient {
+  const { method = "GET", body, headers, autoReconnect = true } = options;
   const controller = new AbortController();
   let stopped = false;
+  let resolveDone!: () => void;
+  let settled = false;
+
+  const done = new Promise<void>((resolve) => {
+    resolveDone = resolve;
+  });
+
+  function finish() {
+    if (!settled) {
+      settled = true;
+      resolveDone();
+    }
+  }
 
   async function connect() {
-    while (!stopped) {
+    do {
       try {
         const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(body !== undefined
+              ? { "Content-Type": "application/json" }
+              : {}),
+            ...headers,
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
           signal: controller.signal,
         });
 
@@ -25,8 +60,8 @@ export function createSseClient(
 
         let buffer = "";
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { done: readerDone, value } = await reader.read();
+          if (readerDone) break;
 
           buffer += value;
           const lines = buffer.split("\n");
@@ -39,14 +74,23 @@ export function createSseClient(
           }
         }
       } catch (err: unknown) {
-        if ((err as Error).name === "AbortError" || stopped) break;
+        if ((err as Error).name === "AbortError" || stopped) {
+          finish();
+          break;
+        }
         onError?.(err as Error);
+        if (!autoReconnect) {
+          finish();
+          break;
+        }
       }
 
-      if (!stopped) {
+      if (!stopped && autoReconnect) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
+      } else {
+        finish();
       }
-    }
+    } while (!stopped && autoReconnect);
   }
 
   connect();
@@ -55,6 +99,8 @@ export function createSseClient(
     close: () => {
       stopped = true;
       controller.abort();
+      finish();
     },
+    done,
   };
 }

@@ -11,6 +11,7 @@ import {
   Terminal,
 } from "@lucide/vue";
 import { api } from "@/lib/api";
+import type { SseClient } from "@/lib/sse";
 import ErrorState from "@/components/ErrorState.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +51,7 @@ const updateFailed = ref(false);
 const updateDone = ref(false);
 const polling = ref(false);
 const terminalEl = ref<HTMLElement | null>(null);
-let abortController: AbortController | null = null;
+let updateClient: SseClient | null = null;
 
 async function fetchStatus() {
   statusLoading.value = true;
@@ -86,9 +87,15 @@ async function fetchPreview() {
 watch(selectedRef, () => fetchPreview());
 watch(sourceType, () => {
   if (status.value) {
-    if (sourceType.value === "branch" && status.value.available_branches.length > 0) {
+    if (
+      sourceType.value === "branch" &&
+      status.value.available_branches.length > 0
+    ) {
       selectedRef.value = status.value.available_branches[0];
-    } else if (sourceType.value === "tag" && status.value.available_tags.length > 0) {
+    } else if (
+      sourceType.value === "tag" &&
+      status.value.available_tags.length > 0
+    ) {
       selectedRef.value = status.value.available_tags[0];
     }
   }
@@ -149,61 +156,37 @@ async function executeUpdate(commit: string) {
   terminalLines.value = [];
   stage.value = "";
 
-  abortController = new AbortController();
+  updateClient = api.update.execute(
+    selectedRef.value,
+    commit,
+    sourceType.value,
+    (data) => {
+      try {
+        const event: UpdateEvent = JSON.parse(data);
+        stage.value = event.stage;
+        terminalLines.value.push(event.line);
+        void scrollTerminal();
 
-  try {
-    const res = await api.update.execute(
-      selectedRef.value,
-      commit,
-      sourceType.value,
-    );
-    if (!res.ok || !res.body) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const reader = res.body
-      .pipeThrough(new TextDecoderStream())
-      .getReader();
-
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += value;
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const event: UpdateEvent = JSON.parse(line.slice(6));
-          stage.value = event.stage;
-          terminalLines.value.push(event.line);
-          await scrollTerminal();
-
-          if (event.stage === "error") {
-            updateFailed.value = true;
-          }
-          if (event.stage === "done") {
-            updateDone.value = true;
-            pollUntilUp();
-          }
-        } catch {
-          // skip unparseable
+        if (event.stage === "error") {
+          updateFailed.value = true;
         }
+        if (event.stage === "done") {
+          updateDone.value = true;
+          pollUntilUp();
+        }
+      } catch {
+        // skip unparseable
       }
-    }
-  } catch (err: unknown) {
-    const msg = (err as Error).message;
-    if (msg !== "AbortError") {
-      terminalLines.value.push(`Connection lost: ${msg}`);
+    },
+    (err) => {
+      terminalLines.value.push(`Connection lost: ${err.message}`);
       updateFailed.value = true;
-    }
-  } finally {
-    executing.value = false;
-    abortController = null;
-  }
+    },
+  );
+
+  await updateClient.done;
+  executing.value = false;
+  updateClient = null;
 }
 
 function pollUntilUp() {
@@ -229,10 +212,8 @@ function pollUntilUp() {
 }
 
 function cancelUpdate() {
-  if (abortController) {
-    abortController.abort();
-    abortController = null;
-  }
+  updateClient?.close();
+  updateClient = null;
   executing.value = false;
 }
 
@@ -285,7 +266,9 @@ fetchStatus();
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{{ status.branch }}</Badge>
               <GitCommitIcon class="size-3.5 text-muted-foreground" />
-              <code class="text-sm text-muted-foreground">{{ status.commit_hash }}</code>
+              <code class="text-sm text-muted-foreground">{{
+                status.commit_hash
+              }}</code>
               <span class="text-sm text-muted-foreground truncate max-w-md">
                 {{ status.commit_message }}
               </span>
@@ -343,7 +326,11 @@ fetchStatus();
         <CardContent class="space-y-4">
           <div class="flex items-center gap-3">
             <label class="text-sm font-medium text-muted-foreground shrink-0">
-              {{ sourceType === "branch" ? t("update.selectBranch") : t("update.selectTag") }}:
+              {{
+                sourceType === "branch"
+                  ? t("update.selectBranch")
+                  : t("update.selectTag")
+              }}:
             </label>
             <Select
               v-if="sourceOptions.length > 0"
@@ -354,7 +341,11 @@ fetchStatus();
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="opt in sourceOptions" :key="opt" :value="opt">
+                <SelectItem
+                  v-for="opt in sourceOptions"
+                  :key="opt"
+                  :value="opt"
+                >
                   {{ opt }}
                 </SelectItem>
               </SelectContent>
@@ -380,9 +371,15 @@ fetchStatus();
                   <tr class="text-left text-muted-foreground">
                     <th class="px-3 py-2">Commit</th>
                     <th class="px-3 py-2">{{ t("update.commitMessage") }}</th>
-                    <th class="hidden px-3 py-2 sm:table-cell">{{ t("update.commitAuthor") }}</th>
-                    <th class="hidden px-3 py-2 sm:table-cell">{{ t("update.commitDate") }}</th>
-                    <th class="w-24 px-3 py-2 text-center">{{ t("update.action") }}</th>
+                    <th class="hidden px-3 py-2 sm:table-cell">
+                      {{ t("update.commitAuthor") }}
+                    </th>
+                    <th class="hidden px-3 py-2 sm:table-cell">
+                      {{ t("update.commitDate") }}
+                    </th>
+                    <th class="w-24 px-3 py-2 text-center">
+                      {{ t("update.action") }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -391,7 +388,9 @@ fetchStatus();
                     :key="c.hash"
                     :class="[
                       'border-t transition-colors',
-                      isCurrentCommit(c.hash) ? 'bg-emerald-500/5' : 'hover:bg-muted/30',
+                      isCurrentCommit(c.hash)
+                        ? 'bg-emerald-500/5'
+                        : 'hover:bg-muted/30',
                     ]"
                   >
                     <td class="whitespace-nowrap px-3 py-2 font-mono">
@@ -405,10 +404,14 @@ fetchStatus();
                       </Badge>
                     </td>
                     <td class="max-w-64 truncate px-3 py-2">{{ c.message }}</td>
-                    <td class="hidden px-3 py-2 text-muted-foreground sm:table-cell">
+                    <td
+                      class="hidden px-3 py-2 text-muted-foreground sm:table-cell"
+                    >
                       {{ c.author }}
                     </td>
-                    <td class="hidden whitespace-nowrap px-3 py-2 text-muted-foreground sm:table-cell">
+                    <td
+                      class="hidden whitespace-nowrap px-3 py-2 text-muted-foreground sm:table-cell"
+                    >
                       {{ formatDate(c.date) }}
                     </td>
                     <td class="px-2 py-1 text-center">
@@ -435,11 +438,7 @@ fetchStatus();
 
       <!-- Execute Controls -->
       <div class="flex-none">
-        <Button
-          v-if="executing"
-          variant="destructive"
-          @click="cancelUpdate()"
-        >
+        <Button v-if="executing" variant="destructive" @click="cancelUpdate()">
           {{ $t("common.cancel") }}
         </Button>
         <Button v-else-if="polling" disabled>
