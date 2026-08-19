@@ -107,9 +107,9 @@ async def _terminate_descendants() -> None:
 
 async def _shutdown_render_safe() -> None:
     try:
-        from nonebot_plugin_htmlrender.bootstrap.plugin import run_shutdown
+        from nonebot_plugin_htmlrender import shutdown_render
 
-        await run_shutdown()
+        await shutdown_render()
     except Exception:  # noqa: BLE001
         logger.opt(exception=True).debug("shutdown_render skipped during restart")
 
