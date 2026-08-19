@@ -82,9 +82,7 @@ async def update_status() -> JSONResponse:
     is_dirty = bool(dirty_output)
     dirty_files = dirty_output.splitlines() if dirty_output else []
 
-    rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--prune", "--tags")
-    if rc_fetch != 0:
-        logger.warning("Failed to refresh remote refs: {}", fetch_err)
+    await _fetch_with_warning("origin", "--prune", "--tags", label="刷新远端引用")
 
     _, branches_output, _ = await _run_git("branch", "-r")
     all_branches = _branch_list(branches_output)
@@ -112,13 +110,56 @@ async def update_preview(
     ref: str,
     ref_type: Annotated[str, Query(alias="type", pattern="^(branch|tag)$")] = "branch",
 ) -> JSONResponse:
-    fetch_warning = ""
-    if ref_type == "tag":
-        rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--tags")
-        if rc_fetch != 0:
-            fetch_warning = f"Fetch tags 失败: {fetch_err}"
-            logger.warning("{}", fetch_warning)
+    (
+        log_ref,
+        remote_hash,
+        remote_msg,
+        commits_behind,
+        fetch_warning,
+    ) = await _resolve_preview_ref(ref, ref_type)
+    commits = await _build_commit_list(log_ref)
 
+    return JSONResponse(
+        content={
+            "ref": ref,
+            "type": ref_type,
+            "remote_commit_hash": remote_hash,
+            "remote_commit_message": remote_msg,
+            "commits_behind": commits_behind,
+            "commits": commits,
+            "fetch_warning": fetch_warning,
+        }
+    )
+
+
+async def _do_rollback(
+    original_branch: str,
+    original_commit: str,
+    cwd: Path,
+) -> None:
+    logger.warning("Rolling back to {} ({})", original_branch, original_commit[:7])
+    await _run_git("checkout", original_branch, cwd=cwd)
+    await _run_git("reset", "--hard", original_commit, cwd=cwd)
+    logger.info("Rollback complete")
+
+
+async def _fetch_with_warning(*args: str, label: str = "Fetch") -> str:
+    rc, _, stderr = await _run_git("fetch", *args)
+    if rc != 0:
+        message = f"{label} 失败: {stderr}"
+        logger.warning("{}", message)
+        return message
+    return ""
+
+
+async def _resolve_preview_ref(
+    ref: str,
+    ref_type: str,
+) -> tuple[str, str, str, int, str]:
+    if ref_type == "tag":
+        fetch_warning = await _fetch_with_warning(
+            "origin", "--tags", label="Fetch tags"
+        )
         tag_ref = ref
         rc, _, _ = await _run_git("rev-parse", "--short", tag_ref)
         if rc != 0:
@@ -128,28 +169,24 @@ async def update_preview(
 
         _, remote_hash, _ = await _run_git("rev-parse", "--short", tag_ref)
         _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", tag_ref)
-        log_ref = tag_ref
-        commits_behind = 0
-    else:
-        rc_fetch, _, fetch_err = await _run_git("fetch", "origin", ref)
-        if rc_fetch != 0:
-            fetch_warning = f"Fetch 失败: {fetch_err}"
-            logger.warning("{}", fetch_warning)
+        return tag_ref, remote_hash, remote_msg, 0, fetch_warning
 
-        remote_ref = f"origin/{ref}"
-        rc, _, _ = await _run_git("rev-parse", "--short", remote_ref)
-        if rc != 0:
-            if fetch_warning:
-                raise HTTPException(status_code=500, detail=fetch_warning)
-            raise HTTPException(status_code=404, detail=f"远端不存在分支 '{ref}'")
+    fetch_warning = await _fetch_with_warning("origin", ref)
+    remote_ref = f"origin/{ref}"
+    rc, _, _ = await _run_git("rev-parse", "--short", remote_ref)
+    if rc != 0:
+        if fetch_warning:
+            raise HTTPException(status_code=500, detail=fetch_warning)
+        raise HTTPException(status_code=404, detail=f"远端不存在分支 '{ref}'")
 
-        _, remote_hash, _ = await _run_git("rev-parse", "--short", remote_ref)
-        _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", remote_ref)
-        log_ref = remote_ref
+    _, remote_hash, _ = await _run_git("rev-parse", "--short", remote_ref)
+    _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", remote_ref)
+    _, behind_str, _ = await _run_git("rev-list", "--count", f"HEAD..{remote_ref}")
+    commits_behind = int(behind_str) if behind_str else 0
+    return remote_ref, remote_hash, remote_msg, commits_behind, fetch_warning
 
-        _, behind_str, _ = await _run_git("rev-list", "--count", f"HEAD..{remote_ref}")
-        commits_behind = int(behind_str) if behind_str else 0
 
+async def _build_commit_list(log_ref: str) -> list[dict[str, str]]:
     _, log_out, _ = await _run_git(
         "log",
         log_ref,
@@ -157,7 +194,7 @@ async def update_preview(
         "-n",
         "20",
     )
-    commits = []
+    commits: list[dict[str, str]] = []
     _parts_count = 5
     for line in log_out.splitlines():
         parts = line.split("|", 4)
@@ -184,32 +221,51 @@ async def update_preview(
             "date": local_date,
         },
     )
-
-    return JSONResponse(
-        content={
-            "ref": ref,
-            "type": ref_type,
-            "remote_commit_hash": remote_hash,
-            "remote_commit_message": remote_msg,
-            "commits_behind": commits_behind,
-            "commits": commits,
-            "fetch_warning": fetch_warning,
-        }
-    )
+    return commits
 
 
-async def _do_rollback(
+async def _rollback_and_error(
     original_branch: str,
     original_commit: str,
-    cwd: Path,
-) -> None:
-    logger.warning("Rolling back to {} ({})", original_branch, original_commit[:7])
-    await _run_git("checkout", original_branch, cwd=cwd)
-    await _run_git("reset", "--hard", original_commit, cwd=cwd)
-    logger.info("Rollback complete")
+    project_root: Path,
+    message: str,
+) -> AsyncIterator[str]:
+    await _do_rollback(original_branch, original_commit, project_root)
+    yield _sse({"stage": "error", "line": message})
 
 
-async def _execute_update(  # noqa: C901, PLR0911, PLR0912, PLR0915
+async def _sync_and_restart(
+    project_root: Path,
+    ref_type: str,
+    branch: str,
+    original_branch: str,
+    original_commit: str,
+) -> AsyncIterator[str]:
+    uv = shutil.which("uv")
+    if uv is None:
+        async for event in _rollback_and_error(
+            original_branch,
+            original_commit,
+            project_root,
+            "系统中未找到 uv 命令",
+        ):
+            yield event
+        return
+
+    yield _sse({"stage": "sync", "line": "$ uv sync"})
+    async for line in _run_stream(uv, "sync", cwd=project_root):
+        yield _sse({"stage": "sync", "line": line})
+
+    yield _sse({"stage": "done", "line": "更新完成，即将重启..."})
+    logger.success("Git update to {} '{}' completed. Restarting...", ref_type, branch)
+
+    from apeiria.utils.restart import graceful_restart
+
+    await asyncio.sleep(0.8)
+    await graceful_restart()
+
+
+async def _execute_update(  # noqa: C901, PLR0912
     branch: str,
     commit: str | None = None,
     ref_type: str = "branch",
@@ -243,8 +299,13 @@ async def _execute_update(  # noqa: C901, PLR0911, PLR0912, PLR0915
         yield _sse({"stage": "checkout", "line": f"$ git checkout {target}"})
         rc2, out, err = await _run_git("checkout", target)
         if rc2 != 0:
-            await _do_rollback(original_branch, original_commit, project_root)
-            yield _sse({"stage": "error", "line": f"Checkout 失败: {err}"})
+            async for event in _rollback_and_error(
+                original_branch,
+                original_commit,
+                project_root,
+                f"Checkout 失败: {err}",
+            ):
+                yield event
             return
         for line in out.splitlines():
             if line.strip():
@@ -272,8 +333,13 @@ async def _execute_update(  # noqa: C901, PLR0911, PLR0912, PLR0915
         yield _sse({"stage": "pull", "line": f"$ git fetch origin {branch}"})
         rc3, _, fetch_err = await _run_git("fetch", "origin", branch)
         if rc3 != 0:
-            await _do_rollback(original_branch, original_commit, project_root)
-            yield _sse({"stage": "error", "line": f"Fetch 失败: {fetch_err}"})
+            async for event in _rollback_and_error(
+                original_branch,
+                original_commit,
+                project_root,
+                f"Fetch 失败: {fetch_err}",
+            ):
+                yield event
             return
 
         target_ref = commit or f"origin/{branch}"
@@ -286,27 +352,23 @@ async def _execute_update(  # noqa: C901, PLR0911, PLR0912, PLR0915
             if line.strip():
                 yield _sse({"stage": "pull", "line": line})
         if rc4 != 0:
-            await _do_rollback(original_branch, original_commit, project_root)
-            yield _sse({"stage": "error", "line": f"Reset 失败: {reset_err}"})
+            async for event in _rollback_and_error(
+                original_branch,
+                original_commit,
+                project_root,
+                f"Reset 失败: {reset_err}",
+            ):
+                yield event
             return
 
-    uv = shutil.which("uv")
-    if uv is None:
-        await _do_rollback(original_branch, original_commit, project_root)
-        yield _sse({"stage": "error", "line": "系统中未找到 uv 命令"})
-        return
-
-    yield _sse({"stage": "sync", "line": "$ uv sync"})
-    async for line in _run_stream(uv, "sync", cwd=project_root):
-        yield _sse({"stage": "sync", "line": line})
-
-    yield _sse({"stage": "done", "line": "更新完成，即将重启..."})
-    logger.success("Git update to {} '{}' completed. Restarting...", ref_type, branch)
-
-    from apeiria.utils.restart import graceful_restart
-
-    await asyncio.sleep(0.8)
-    await graceful_restart()
+    async for event in _sync_and_restart(
+        project_root,
+        ref_type,
+        branch,
+        original_branch,
+        original_commit,
+    ):
+        yield event
 
 
 @router.post("/execute")

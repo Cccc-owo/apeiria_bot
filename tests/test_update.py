@@ -57,3 +57,83 @@ async def test_update_preview_falls_back_to_cached_ref(monkeypatch) -> None:
     data = json.loads(resp.body)
     assert data["remote_commit_hash"] == "cafe123"
     assert data["fetch_warning"] == "Fetch 失败: offline"
+
+
+@pytest.mark.asyncio
+async def test_resolve_preview_ref_tag_falls_back_to_cached_tag(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "fetch origin --tags": (1, "", "offline"),
+        "rev-parse --short v1": (0, "beef123", ""),
+        "log -1 --format=%s v1": (0, "tag msg", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    result = await update._resolve_preview_ref("v1", "tag")
+
+    assert result == (
+        "v1",
+        "beef123",
+        "tag msg",
+        0,
+        "Fetch tags 失败: offline",
+    )
+
+
+@pytest.mark.asyncio
+async def test_build_commit_list_parses_and_inserts_local_head(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "log origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "fullhash|abc123|remote msg|author|2026-01-01T00:00:00+08:00",
+            "",
+        ),
+        "rev-parse --short HEAD": (0, "def456", ""),
+        "log -1 --format=%s": (0, "local msg", ""),
+        "log -1 --format=%an": (0, "local author", ""),
+        "log -1 --format=%aI": (0, "2026-01-02T00:00:00+08:00", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    commits = await update._build_commit_list("origin/main")
+
+    assert len(commits) == 2
+    assert commits[0]["hash"] == "def456"
+    assert commits[0]["message"] == "local msg (当前)"
+    assert commits[1]["hash"] == "abc123"
+    assert commits[1]["message"] == "remote msg"
+
+
+@pytest.mark.asyncio
+async def test_execute_update_reset_failure_rolls_back(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "status --porcelain": (0, "", ""),
+        "rev-parse HEAD": (0, "originalcommit", ""),
+        "branch --show-current": (0, "main", ""),
+        "checkout main": (0, "Already on 'main'", ""),
+        "fetch origin main": (0, "", ""),
+        "reset --hard origin/main": (1, "", "reset failed"),
+        "reset --hard originalcommit": (0, "", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    events = [event async for event in update._execute_update("main")]
+
+    assert any('"Reset 失败: reset failed"' in event for event in events)
