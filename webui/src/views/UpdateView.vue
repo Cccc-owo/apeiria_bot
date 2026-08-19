@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type {
+  GitCommit,
   UpdateEvent,
   UpdatePreviewResponse,
   UpdateStatusResponse,
@@ -123,11 +124,15 @@ function canExecuteRow(hash: string): boolean {
   );
 }
 
-function buttonLabel(index: number): string {
-  const behind = preview.value?.commits_behind ?? 0;
-  if (index === 0) return "";
-  if (index <= behind) return t("update.execute");
-  return t("update.rollbackTo");
+function buttonLabel(commit: GitCommit): string {
+  switch (commit.direction) {
+    case "ahead":
+      return t("update.execute");
+    case "behind":
+      return t("update.rollbackTo");
+    default:
+      return "";
+  }
 }
 
 function stageLabel(s: string): string {
@@ -365,6 +370,31 @@ fetchStatus();
             <p class="text-sm font-medium text-muted-foreground">
               {{ t("update.selectCommit") }} ({{ preview.commits.length }})
             </p>
+            <div
+              v-if="
+                preview.has_diverged || preview.local_only_commits.length > 0
+              "
+              class="flex items-start gap-2 rounded-md border border-yellow-600/40 bg-yellow-600/10 p-3"
+            >
+              <AlertTriangle class="mt-0.5 size-4 shrink-0 text-yellow-500" />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-yellow-500">
+                  {{ t("update.divergedWarning") }}
+                </p>
+                <ul
+                  v-if="preview.local_only_commits.length > 0"
+                  class="mt-1 list-inside list-disc space-y-0.5"
+                >
+                  <li
+                    v-for="c in preview.local_only_commits"
+                    :key="c.hash"
+                    class="truncate font-mono text-xs text-yellow-300/80"
+                  >
+                    {{ c.hash }} {{ c.message }}
+                  </li>
+                </ul>
+              </div>
+            </div>
             <div class="max-h-80 overflow-auto rounded-md border">
               <table class="w-full text-xs">
                 <thead class="sticky top-0 bg-muted">
@@ -384,7 +414,7 @@ fetchStatus();
                 </thead>
                 <tbody>
                   <tr
-                    v-for="(c, i) in preview.commits"
+                    v-for="c in preview.commits"
                     :key="c.hash"
                     :class="[
                       'border-t transition-colors',
@@ -422,7 +452,7 @@ fetchStatus();
                         :disabled="!canExecuteRow(c.hash)"
                         @click.stop="executeUpdate(c.hash)"
                       >
-                        {{ buttonLabel(i) }}
+                        {{ buttonLabel(c) }}
                       </Button>
                     </td>
                   </tr>

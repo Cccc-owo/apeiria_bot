@@ -86,19 +86,23 @@ async def test_resolve_preview_ref_tag_falls_back_to_cached_tag(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
-async def test_build_commit_list_parses_and_inserts_local_head(monkeypatch) -> None:
+async def test_build_commit_list_marks_ahead_and_current(monkeypatch) -> None:
     from apeiria.web import update
 
     responses: dict[str, tuple[int, str, str]] = {
         "log origin/main --format=%H|%h|%s|%an|%aI -n 20": (
             0,
-            "fullhash|abc123|remote msg|author|2026-01-01T00:00:00+08:00",
+            "full_abc|abc123|remote msg|author|2026-01-01T00:00:00+08:00\n"
+            "full_def|def456|local msg|author|2026-01-02T00:00:00+08:00",
             "",
         ),
-        "rev-parse --short HEAD": (0, "def456", ""),
-        "log -1 --format=%s": (0, "local msg", ""),
-        "log -1 --format=%an": (0, "local author", ""),
-        "log -1 --format=%aI": (0, "2026-01-02T00:00:00+08:00", ""),
+        "rev-parse HEAD": (0, "full_def", ""),
+        "rev-list origin/main --not HEAD": (0, "full_abc", ""),
+        "log HEAD --not origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "",
+            "",
+        ),
     }
 
     async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
@@ -106,13 +110,51 @@ async def test_build_commit_list_parses_and_inserts_local_head(monkeypatch) -> N
 
     monkeypatch.setattr(update, "_run_git", fake_run_git)
 
-    commits = await update._build_commit_list("origin/main")
+    commits, local_only, has_diverged = await update._build_commit_list("origin/main")
 
     assert len(commits) == 2
-    assert commits[0]["hash"] == "def456"
-    assert commits[0]["message"] == "local msg (当前)"
-    assert commits[1]["hash"] == "abc123"
-    assert commits[1]["message"] == "remote msg"
+    assert commits[0]["hash"] == "abc123"
+    assert commits[0]["direction"] == "ahead"
+    assert commits[0]["is_current"] is False
+    assert commits[1]["hash"] == "def456"
+    assert commits[1]["direction"] == "current"
+    assert commits[1]["is_current"] is True
+    assert local_only == []
+    assert has_diverged is False
+
+
+@pytest.mark.asyncio
+async def test_build_commit_list_detects_diverged_local_only(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "log origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "full_abc|abc123|remote msg|author|2026-01-01T00:00:00+08:00",
+            "",
+        ),
+        "rev-parse HEAD": (0, "full_def", ""),
+        "rev-list origin/main --not HEAD": (0, "full_abc", ""),
+        "log HEAD --not origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "full_def|def456|local msg|author|2026-01-02T00:00:00+08:00",
+            "",
+        ),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    commits, local_only, has_diverged = await update._build_commit_list("origin/main")
+
+    assert len(commits) == 1
+    assert commits[0]["direction"] == "ahead"
+    assert len(local_only) == 1
+    assert local_only[0]["hash"] == "def456"
+    assert local_only[0]["direction"] == "local_only"
+    assert has_diverged is True
 
 
 @pytest.mark.asyncio

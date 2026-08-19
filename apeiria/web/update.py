@@ -117,7 +117,7 @@ async def update_preview(
         commits_behind,
         fetch_warning,
     ) = await _resolve_preview_ref(ref, ref_type)
-    commits = await _build_commit_list(log_ref)
+    commits, local_only_commits, has_diverged = await _build_commit_list(log_ref)
 
     return JSONResponse(
         content={
@@ -127,6 +127,8 @@ async def update_preview(
             "remote_commit_message": remote_msg,
             "commits_behind": commits_behind,
             "commits": commits,
+            "local_only_commits": local_only_commits,
+            "has_diverged": has_diverged,
             "fetch_warning": fetch_warning,
         }
     )
@@ -169,24 +171,27 @@ async def _resolve_preview_ref(
 
         _, remote_hash, _ = await _run_git("rev-parse", "--short", tag_ref)
         _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", tag_ref)
-        return tag_ref, remote_hash, remote_msg, 0, fetch_warning
+    else:
+        fetch_warning = await _fetch_with_warning("origin", ref)
+        remote_ref = f"origin/{ref}"
+        rc, _, _ = await _run_git("rev-parse", "--short", remote_ref)
+        if rc != 0:
+            if fetch_warning:
+                raise HTTPException(status_code=500, detail=fetch_warning)
+            raise HTTPException(status_code=404, detail=f"远端不存在分支 '{ref}'")
 
-    fetch_warning = await _fetch_with_warning("origin", ref)
-    remote_ref = f"origin/{ref}"
-    rc, _, _ = await _run_git("rev-parse", "--short", remote_ref)
-    if rc != 0:
-        if fetch_warning:
-            raise HTTPException(status_code=500, detail=fetch_warning)
-        raise HTTPException(status_code=404, detail=f"远端不存在分支 '{ref}'")
+        _, remote_hash, _ = await _run_git("rev-parse", "--short", remote_ref)
+        _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", remote_ref)
+        tag_ref = remote_ref
 
-    _, remote_hash, _ = await _run_git("rev-parse", "--short", remote_ref)
-    _, remote_msg, _ = await _run_git("log", "-1", "--format=%s", remote_ref)
-    _, behind_str, _ = await _run_git("rev-list", "--count", f"HEAD..{remote_ref}")
+    _, behind_str, _ = await _run_git("rev-list", "--count", f"HEAD..{tag_ref}")
     commits_behind = int(behind_str) if behind_str else 0
-    return remote_ref, remote_hash, remote_msg, commits_behind, fetch_warning
+    return tag_ref, remote_hash, remote_msg, commits_behind, fetch_warning
 
 
-async def _build_commit_list(log_ref: str) -> list[dict[str, str]]:
+async def _build_commit_list(
+    log_ref: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], bool]:
     _, log_out, _ = await _run_git(
         "log",
         log_ref,
@@ -194,13 +199,15 @@ async def _build_commit_list(log_ref: str) -> list[dict[str, str]]:
         "-n",
         "20",
     )
-    commits: list[dict[str, str]] = []
+
+    commits: list[dict[str, object]] = []
     _parts_count = 5
     for line in log_out.splitlines():
         parts = line.split("|", 4)
         if len(parts) == _parts_count:
             commits.append(
                 {
+                    "full_hash": parts[0],
                     "hash": parts[1],
                     "message": parts[2],
                     "author": parts[3],
@@ -208,20 +215,47 @@ async def _build_commit_list(log_ref: str) -> list[dict[str, str]]:
                 }
             )
 
-    _, local_hash, _ = await _run_git("rev-parse", "--short", "HEAD")
-    _, local_msg, _ = await _run_git("log", "-1", "--format=%s")
-    _, local_author, _ = await _run_git("log", "-1", "--format=%an")
-    _, local_date, _ = await _run_git("log", "-1", "--format=%aI")
-    commits.insert(
-        0,
-        {
-            "hash": local_hash,
-            "message": local_msg + " (当前)",
-            "author": local_author,
-            "date": local_date,
-        },
+    _, local_full, _ = await _run_git("rev-parse", "HEAD")
+
+    _, ahead_out, _ = await _run_git("rev-list", log_ref, "--not", "HEAD")
+    ahead_hashes = set(ahead_out.splitlines())
+    _, local_only_out, _ = await _run_git(
+        "log",
+        "HEAD",
+        "--not",
+        log_ref,
+        "--format=%H|%h|%s|%an|%aI",
+        "-n",
+        "20",
     )
-    return commits
+
+    for commit in commits:
+        full_hash = commit.pop("full_hash")
+        if full_hash in ahead_hashes:
+            commit["direction"] = "ahead"
+        elif full_hash == local_full:
+            commit["direction"] = "current"
+        else:
+            commit["direction"] = "behind"
+        commit["is_current"] = full_hash == local_full
+
+    local_only_commits: list[dict[str, object]] = []
+    for line in local_only_out.splitlines():
+        parts = line.split("|", 4)
+        if len(parts) == _parts_count:
+            local_only_commits.append(
+                {
+                    "hash": parts[1],
+                    "message": parts[2],
+                    "author": parts[3],
+                    "date": parts[4],
+                    "direction": "local_only",
+                    "is_current": False,
+                }
+            )
+
+    has_diverged = bool(ahead_hashes) and bool(local_only_out.strip())
+    return commits, local_only_commits, has_diverged
 
 
 async def _rollback_and_error(

@@ -268,6 +268,8 @@ export interface UpdatePreviewResponse {
   remote_commit_message: string;
   commits_behind: number;
   commits: GitCommit[];
+  local_only_commits: GitCommit[];
+  has_diverged: boolean;
   fetch_warning?: string;
 }
 
@@ -276,6 +278,8 @@ export interface GitCommit {
   message: string;
   author: string;
   date: string;
+  is_current: boolean;
+  direction: "current" | "ahead" | "behind" | "local_only";
 }
 
 export interface UpdateEvent {

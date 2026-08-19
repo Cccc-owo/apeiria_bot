@@ -11,7 +11,8 @@ export default {
     retry: "重试",
     back: "返回",
     dismiss: "忽略",
-    pendingChanges: "插件变更将在重启 Bot 后生效。请通过聊天命令或管理面板重启。",
+    pendingChanges:
+      "插件变更将在重启 Bot 后生效。请通过聊天命令或管理面板重启。",
   },
   nav: {
     dashboard: "看板",
@@ -54,7 +55,8 @@ export default {
     restart: "重启",
     restarting: "重启中...",
     restartConfirmTitle: "确认重启 Bot",
-    restartConfirmDesc: "重启将中断所有服务，Bot 会在几秒后重新上线。确认继续？",
+    restartConfirmDesc:
+      "重启将中断所有服务，Bot 会在几秒后重新上线。确认继续？",
     restartFailed: "重启请求失败",
     restartSuccess: "Bot 已重启",
     restartTimeout: "重启超时，请手动刷新页面",
@@ -379,5 +381,6 @@ export default {
     reconnecting: "等待 Bot 重新上线...",
     noUpdate: "无可用更新",
     noCommits: "无提交记录",
+    divergedWarning: "当前分支存在本地独有提交，切换后可能丢失",
   },
 };
