@@ -99,3 +99,12 @@ async def test_session_and_message() -> None:
         sess.add(msg)
         await sess.flush()
         assert msg.id is not None
+
+
+@pytest.mark.asyncio
+async def test_apeiria_database_rejects_non_sqlite() -> None:
+    from apeiria.db.engine import ApeiriaDatabase
+
+    db = ApeiriaDatabase("postgresql+asyncpg://user:pass@localhost/apeiria")
+    with pytest.raises(ValueError, match="仅支持 SQLite"):
+        await db.init()

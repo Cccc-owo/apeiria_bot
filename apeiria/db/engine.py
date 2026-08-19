@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
 
 _DEFAULT_DB_PATH = "data/apeiria.db"
 _DEFAULT_BUSY_TIMEOUT = 5000
+_SUPPORTED_DB_SCHEMES = frozenset({"sqlite", "sqlite+aiosqlite"})
 
 
 class DbWriteGate:
@@ -72,6 +73,12 @@ class ApeiriaDatabase:
 
     async def init(self) -> None:
         parsed = urlparse(self._url)
+        if parsed.scheme not in _SUPPORTED_DB_SCHEMES:
+            raise ValueError(  # noqa: TRY003
+                f"Apeiria 当前仅支持 SQLite 数据库，收到不支持的数据库 URL: {self._url}"
+            )
+
+        db_path: Path | None = None
         if parsed.scheme in ("sqlite+aiosqlite", "sqlite"):
             db_path = Path(parsed.path.lstrip("/"))
             db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,6 +91,8 @@ class ApeiriaDatabase:
 
         @event.listens_for(self._engine.sync_engine, "connect")
         def _on_connect(dbapi_connection, _connection_record):  # noqa: ANN001
+            if self._engine is None or self._engine.dialect.name != "sqlite":
+                return
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute(f"PRAGMA busy_timeout={self._busy_timeout_ms}")
@@ -91,7 +100,7 @@ class ApeiriaDatabase:
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.close()
 
-        logger.info("Database initialized at {}", db_path)
+        logger.info("Database initialized at {}", db_path or self._url)
 
     async def close(self) -> None:
         if self._engine is not None:
