@@ -134,14 +134,13 @@ def _build_detail_data(
 
 
 async def _do_render(template_name: str, data: dict[str, object]) -> bytes:
-    base_url = f"file://{_TEMPLATES_DIR.resolve()}"
-    return await render_template(
+    rendered = await render_template(
         str(_TEMPLATES_DIR),
         template_name=template_name,
-        templates=data,
-        pages={"viewport": {"width": 960, "height": 10}, "base_url": base_url},
-        wait=0,
+        variables=data,
+        width=960,
     )
+    return rendered.data
 
 
 async def render_menu(  # noqa: PLR0913
