@@ -54,6 +54,56 @@ def _scanned_name_to_module(name: str) -> str | None:
     return None
 
 
+def _read_packages(kind: str) -> dict:
+    if kind == "plugin":
+        return _read_plugins_yaml().get("packages") or {}
+    return _read_adapters_yaml().get("packages") or {}
+
+
+async def _list_versions(kind: str, name: str, *, not_found_detail: str) -> dict:
+    pkgs = _read_packages(kind)
+    if name not in pkgs:
+        raise HTTPException(status_code=404, detail=not_found_detail)
+    base = _requirement_base_name(pkgs[name])
+    versions = await pypi.fetch_versions(base)
+    if versions is None:
+        raise HTTPException(status_code=404, detail="PyPI 上未找到该包")
+    return {"versions": versions}
+
+
+async def _check_updates(kind: str) -> dict[str, dict]:
+    pkgs = _read_packages(kind)
+    names = list(pkgs)
+    bases = [_requirement_base_name(pkgs[n]) for n in names]
+    installed = [read_installed_version(pkgs[n]) for n in names]
+    latests = await asyncio.gather(*(pypi.fetch_latest(b) for b in bases))
+    return {
+        n: {
+            "installed": inst,
+            "latest": latest,
+            "update_available": pypi.is_newer(inst, latest),
+        }
+        for n, inst, latest in zip(names, installed, latests, strict=True)
+    }
+
+
+async def _update_package(kind: str, data: dict, *, noun: str) -> str:
+    name = data.get("name", "")
+    pkgs = _read_packages(kind)
+    if name not in pkgs:
+        raise HTTPException(status_code=400, detail=f"{noun}未安装或非 PyPI 来源")
+    base = _requirement_base_name(pkgs[name])
+    version = data.get("version")
+    if version:
+        target = f"{base}=={version}"
+    else:
+        latest = await pypi.fetch_latest(base)
+        if latest is None:
+            raise HTTPException(status_code=400, detail="无法获取最新版本")
+        target = f"{base}=={latest}"
+    return await get_task_runner().start(kind, name, target, update=True)
+
+
 @router.get("/plugins/list")
 async def api_plugins_list() -> JSONResponse:
     import nonebot
@@ -77,15 +127,16 @@ async def api_plugins_list() -> JSONResponse:
         }
 
     dep_graph_obj = get_cached_graph(loaded_plugins)
+    manifests = scan_plugins()
 
     items = merge_plugin_metadata(
-        scan_plugins(),
+        manifests,
         metadata_map,
         dep_graph=dep_graph_obj.graph,
         dep_reverse=dep_graph_obj.reverse,
     )
 
-    scanned_names = {m.name for m in scan_plugins()}
+    scanned_names = {m.name for m in manifests}
     for plugin in loaded_plugins:
         if plugin.name in scanned_names:
             continue
@@ -168,50 +219,21 @@ async def api_plugin_config(name: str) -> JSONResponse:
 
 @router.get("/plugins/{name}/versions")
 async def api_plugin_versions(name: str) -> JSONResponse:
-    pkgs = _read_plugins_yaml().get("packages") or {}
-    if name not in pkgs:
-        raise HTTPException(status_code=404, detail="非 PyPI 插件，无可选版本")
-    base = _requirement_base_name(pkgs[name])
-    versions = await pypi.fetch_versions(base)
-    if versions is None:
-        raise HTTPException(status_code=404, detail="PyPI 上未找到该包")
-    return JSONResponse(content={"versions": versions})
+    return JSONResponse(
+        content=await _list_versions(
+            "plugin", name, not_found_detail="非 PyPI 插件，无可选版本"
+        )
+    )
 
 
 @router.post("/plugins/check-updates")
 async def api_plugins_check_updates() -> JSONResponse:
-    pkgs = _read_plugins_yaml().get("packages") or {}
-    names = list(pkgs)
-    bases = [_requirement_base_name(pkgs[n]) for n in names]
-    installed = [read_installed_version(pkgs[n]) for n in names]
-    latests = await asyncio.gather(*(pypi.fetch_latest(b) for b in bases))
-    updates = {
-        n: {
-            "installed": inst,
-            "latest": latest,
-            "update_available": pypi.is_newer(inst, latest),
-        }
-        for n, inst, latest in zip(names, installed, latests, strict=True)
-    }
-    return JSONResponse(content={"updates": updates})
+    return JSONResponse(content={"updates": await _check_updates("plugin")})
 
 
 @router.post("/plugins/update")
 async def api_plugins_update(data: dict) -> JSONResponse:
-    name = data.get("name", "")
-    pkgs = _read_plugins_yaml().get("packages") or {}
-    if name not in pkgs:
-        raise HTTPException(status_code=400, detail="插件未安装或非 PyPI 来源")
-    base = _requirement_base_name(pkgs[name])
-    version = data.get("version")
-    if version:
-        target = f"{base}=={version}"
-    else:
-        latest = await pypi.fetch_latest(base)
-        if latest is None:
-            raise HTTPException(status_code=400, detail="无法获取最新版本")
-        target = f"{base}=={latest}"
-    task_id = await get_task_runner().start("plugin", name, target, update=True)
+    task_id = await _update_package("plugin", data, noun="插件")
     return JSONResponse(content={"task_id": task_id})
 
 
@@ -285,50 +307,21 @@ async def api_adapter_config(name: str) -> JSONResponse:
 
 @router.get("/adapters/{name}/versions")
 async def api_adapter_versions(name: str) -> JSONResponse:
-    pkgs = _read_adapters_yaml().get("packages") or {}
-    if name not in pkgs:
-        raise HTTPException(status_code=404, detail="非 PyPI 适配器，无可选版本")
-    base = _requirement_base_name(pkgs[name])
-    versions = await pypi.fetch_versions(base)
-    if versions is None:
-        raise HTTPException(status_code=404, detail="PyPI 上未找到该包")
-    return JSONResponse(content={"versions": versions})
+    return JSONResponse(
+        content=await _list_versions(
+            "adapter", name, not_found_detail="非 PyPI 适配器，无可选版本"
+        )
+    )
 
 
 @router.post("/adapters/check-updates")
 async def api_adapters_check_updates() -> JSONResponse:
-    pkgs = _read_adapters_yaml().get("packages") or {}
-    names = list(pkgs)
-    bases = [_requirement_base_name(pkgs[n]) for n in names]
-    installed = [read_installed_version(pkgs[n]) for n in names]
-    latests = await asyncio.gather(*(pypi.fetch_latest(b) for b in bases))
-    updates = {
-        n: {
-            "installed": inst,
-            "latest": latest,
-            "update_available": pypi.is_newer(inst, latest),
-        }
-        for n, inst, latest in zip(names, installed, latests, strict=True)
-    }
-    return JSONResponse(content={"updates": updates})
+    return JSONResponse(content={"updates": await _check_updates("adapter")})
 
 
 @router.post("/adapters/update")
 async def api_adapters_update(data: dict) -> JSONResponse:
-    name = data.get("name", "")
-    pkgs = _read_adapters_yaml().get("packages") or {}
-    if name not in pkgs:
-        raise HTTPException(status_code=400, detail="适配器未安装或非 PyPI 来源")
-    base = _requirement_base_name(pkgs[name])
-    version = data.get("version")
-    if version:
-        target = f"{base}=={version}"
-    else:
-        latest = await pypi.fetch_latest(base)
-        if latest is None:
-            raise HTTPException(status_code=400, detail="无法获取最新版本")
-        target = f"{base}=={latest}"
-    task_id = await get_task_runner().start("adapter", name, target, update=True)
+    task_id = await _update_package("adapter", data, noun="适配器")
     return JSONResponse(content={"task_id": task_id})
 
 
