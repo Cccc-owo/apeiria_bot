@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from typing import Any
 
@@ -64,11 +65,11 @@ def _topo_sort(
         for _dep in deps:
             in_degree[name] += 1
 
-    queue = [name for name, deg in in_degree.items() if deg == 0]
+    queue = deque(name for name, deg in in_degree.items() if deg == 0)
     result: list[str] = []
 
     while queue:
-        node = queue.pop(0)
+        node = queue.popleft()
         result.append(node)
         for other_name, other_deps in depends.items():
             if node in other_deps:
