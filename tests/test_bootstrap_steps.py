@@ -126,3 +126,19 @@ def test_step_require_tracker_records_runtime_dependency(monkeypatch) -> None:
     )
 
     assert calls == [("foo", "dep")]
+
+
+def test_resolve_frontend_file_serves_within_root(tmp_path) -> None:
+    from apeiria.bootstrap.steps import _resolve_frontend_file
+
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("index", encoding="utf-8")
+    (dist / "assets" / "app.js").write_text("app", encoding="utf-8")
+    outside = tmp_path / "secret.txt"
+    outside.write_text("secret", encoding="utf-8")
+
+    assert _resolve_frontend_file(dist, "assets/app.js").read_text() == "app"
+    assert _resolve_frontend_file(dist, "dashboard").read_text() == "index"
+    assert _resolve_frontend_file(dist, "../secret.txt") is None
+    assert _resolve_frontend_file(dist, "/etc/passwd") is None

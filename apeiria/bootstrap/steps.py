@@ -290,6 +290,16 @@ def _needs_frontend_build(dist_dir: Path) -> bool:
     return stored != current
 
 
+def _resolve_frontend_file(frontend_dir: Path, full_path: str) -> Path | None:
+    frontend_root = frontend_dir.resolve()
+    candidate = (frontend_dir / full_path).resolve()
+    if not candidate.is_relative_to(frontend_root):
+        return None
+    if not candidate.is_file():
+        candidate = (frontend_dir / "index.html").resolve()
+    return candidate
+
+
 def _try_auto_build_frontend() -> None:
     import shutil
     import subprocess
@@ -368,9 +378,9 @@ def step_web() -> None:
     async def _serve_frontend(full_path: str) -> FileResponse:
         if not frontend_dir.exists():
             raise HTTPException(status_code=404, detail="Frontend not built")
-        candidate = frontend_dir / full_path
-        if not candidate.exists() or not candidate.is_file():
-            candidate = frontend_dir / "index.html"
+        candidate = _resolve_frontend_file(frontend_dir, full_path)
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="Not found")
         if not candidate.exists():
             raise HTTPException(status_code=404, detail="Frontend not built")
         return FileResponse(str(candidate))
