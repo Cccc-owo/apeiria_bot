@@ -7,7 +7,7 @@ from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot.log import logger
 from nonebot_plugin_alconna import Target, UniMessage
 
-from .models import PendingRequest, ProcResult, RequestInfo
+from .models import PendingRequest, ProcResult, RequestInfo, RequestKind
 
 
 class RequestProvider(Protocol):
@@ -38,27 +38,21 @@ def _safe_str(obj: object, attr: str) -> str:
     return ""
 
 
-class OneBotV11FriendshipProvider:
-    key = "onebot_v11"
+class BaseFriendshipProvider:
+    key: str
+    adapter_name: str
+    platform_name: str
 
     def supports(self, bot: Bot, event: Event) -> bool:
-        if bot.adapter.get_name() != "OneBot V11":
+        if bot.adapter.get_name() != self.adapter_name:
             return False
         with suppress(Exception):
             return event.get_type() == "request"
         return False
 
     def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
-        request_type = _safe_str(event, "request_type")
-        sub_type = _safe_str(event, "sub_type")
-
-        if request_type == "friend":
-            kind = "friend"
-        elif request_type == "group" and sub_type == "add":
-            kind = "group_add"
-        elif request_type == "group" and sub_type == "invite":
-            kind = "group_invite"
-        else:
+        kind = self._request_kind(event)
+        if kind is None:
             return None
 
         requester_id = _safe_str(event, "user_id")
@@ -69,53 +63,125 @@ class OneBotV11FriendshipProvider:
         if not flag:
             return None
 
+        group_id = self._group_id(event)
+        sub_type = _safe_str(event, "sub_type") or None
         return RequestInfo(
             kind=kind,
             requester_id=requester_id,
             requester_name=requester_id,
-            platform="OneBot V11",
+            platform=self.platform_name,
             raw_flag=flag,
-            group_id=_safe_str(event, "group_id") or None,
+            group_id=group_id,
             comment=_safe_str(event, "comment"),
             sub_type=sub_type if kind != "friend" else None,
         )
 
+    def _request_kind(self, event: Event) -> RequestKind | None:
+        raise NotImplementedError
+
+    def _group_id(self, event: Event) -> str | None:
+        return _safe_str(event, "group_id") or None
+
     async def approve(
         self, bot: Bot, pending: PendingRequest, remark: str = ""
     ) -> ProcResult:
-        try:
-            if pending.kind == "friend":
-                await bot.set_friend_add_request(
-                    flag=pending.raw_flag, approve=True, remark=remark
-                )
-            else:
-                await bot.set_group_add_request(
-                    flag=pending.raw_flag,
-                    sub_type=pending.sub_type or "add",
-                    approve=True,
-                )
-            return ProcResult(success=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("approve request failed: {}", exc)
-            return ProcResult(success=False, message=str(exc))
+        api, kwargs = self._approve_request(pending, remark)
+        return await self._call_api(bot, api, **kwargs)
 
     async def reject(
         self, bot: Bot, pending: PendingRequest, reason: str = ""
     ) -> ProcResult:
+        api, kwargs = self._reject_request(pending, reason)
+        return await self._call_api(bot, api, **kwargs)
+
+    def _approve_request(
+        self, pending: PendingRequest, remark: str
+    ) -> tuple[str, dict[str, object]]:
+        raise NotImplementedError
+
+    def _reject_request(
+        self, pending: PendingRequest, reason: str
+    ) -> tuple[str, dict[str, object]]:
+        raise NotImplementedError
+
+    async def _call_api(self, bot: Bot, api: str, **kwargs: object) -> ProcResult:
         try:
-            if pending.kind == "friend":
-                await bot.set_friend_add_request(flag=pending.raw_flag, approve=False)
-            else:
-                await bot.set_group_add_request(
-                    flag=pending.raw_flag,
-                    sub_type=pending.sub_type or "add",
-                    approve=False,
-                    reason=reason,
-                )
+            await bot.call_api(api, **kwargs)
             return ProcResult(success=True)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("reject request failed: {}", exc)
+            logger.warning("{} request failed: {}", self.key, exc)
             return ProcResult(success=False, message=str(exc))
+
+    async def notify(
+        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
+    ) -> str | None:
+        try:
+            target = Target(
+                id=target_id,
+                private=True,
+                self_id=str(getattr(bot, "self_id", "")),
+                scope=pending.scope,
+                adapter=bot.adapter.get_name(),
+            )
+            receipt = await UniMessage(message).send(target=target, bot=bot)
+            return str(receipt.msg_ids[0]) if receipt.msg_ids else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("{} notify failed: {}", self.key, exc)
+            return None
+
+
+class OneBotStyleFriendshipProvider(BaseFriendshipProvider):
+    def _request_kind(self, event: Event) -> RequestKind | None:
+        request_type = _safe_str(event, "request_type")
+        sub_type = _safe_str(event, "sub_type")
+        if request_type == "friend":
+            return "friend"
+        if request_type == "group" and sub_type == "add":
+            return "group_add"
+        if request_type == "group" and sub_type == "invite":
+            return "group_invite"
+        return None
+
+    def _approve_request(
+        self, pending: PendingRequest, remark: str
+    ) -> tuple[str, dict[str, object]]:
+        if pending.kind == "friend":
+            return (
+                "set_friend_add_request",
+                {"flag": pending.raw_flag, "approve": True, "remark": remark},
+            )
+        return (
+            "set_group_add_request",
+            {
+                "flag": pending.raw_flag,
+                "sub_type": pending.sub_type or "add",
+                "approve": True,
+            },
+        )
+
+    def _reject_request(
+        self, pending: PendingRequest, reason: str
+    ) -> tuple[str, dict[str, object]]:
+        if pending.kind == "friend":
+            return (
+                "set_friend_add_request",
+                {"flag": pending.raw_flag, "approve": False},
+            )
+        return (
+            "set_group_add_request",
+            {
+                "flag": pending.raw_flag,
+                "sub_type": pending.sub_type or "add",
+                "approve": False,
+                "reason": reason,
+            },
+        )
+
+
+class OneBotV11FriendshipProvider(OneBotStyleFriendshipProvider):
+    key = "onebot_v11"
+    adapter_name = "OneBot V11"
+    platform_name = "OneBot V11"
 
     async def notify(
         self,
@@ -135,191 +201,53 @@ _SATORI_APPROVE_API = "handle_friend_request"
 _SATORI_GUILD_API = "handle_guild_request"
 
 
-class SatoriFriendshipProvider:
+class SatoriFriendshipProvider(BaseFriendshipProvider):
     key = "satori"
+    adapter_name = "Satori"
+    platform_name = "Satori"
 
-    def supports(self, bot: Bot, event: Event) -> bool:
-        if bot.adapter.get_name() != "Satori":
-            return False
-        with suppress(Exception):
-            return event.get_type() == "request"
-        return False
-
-    def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
+    def _request_kind(self, event: Event) -> RequestKind | None:
         request_type = _safe_str(event, "request_type")
         if request_type == "friend":
-            kind = "friend"
-        elif request_type in ("guild", "guild-member"):
-            kind = "group_add"
-        else:
-            return None
-        requester_id = _safe_str(event, "user_id")
-        if not requester_id:
-            return None
-        flag = _safe_str(event, "flag")
-        if not flag:
-            return None
-        gid = _safe_str(event, "guild_id") or _safe_str(event, "group_id") or None
-        return RequestInfo(
-            kind=kind,
-            requester_id=requester_id,
-            requester_name=requester_id,
-            platform="Satori",
-            raw_flag=flag,
-            group_id=gid,
-            comment=_safe_str(event, "comment"),
+            return "friend"
+        if request_type in ("guild", "guild-member"):
+            return "group_add"
+        return None
+
+    def _group_id(self, event: Event) -> str | None:
+        return _safe_str(event, "guild_id") or _safe_str(event, "group_id") or None
+
+    def _approve_request(
+        self, pending: PendingRequest, remark: str
+    ) -> tuple[str, dict[str, object]]:
+        api = _SATORI_APPROVE_API if pending.kind == "friend" else _SATORI_GUILD_API
+        return (
+            api,
+            {
+                "message_id": pending.raw_flag,
+                "approve": True,
+                "comment": remark,
+            },
         )
 
-    async def approve(
-        self, bot: Bot, pending: PendingRequest, remark: str = ""
-    ) -> ProcResult:
+    def _reject_request(
+        self, pending: PendingRequest, reason: str
+    ) -> tuple[str, dict[str, object]]:
         api = _SATORI_APPROVE_API if pending.kind == "friend" else _SATORI_GUILD_API
-        try:
-            await bot.call_api(
-                api,
-                message_id=pending.raw_flag,
-                approve=True,
-                comment=remark,
-            )
-            return ProcResult(success=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("satori approve failed: {}", exc)
-            return ProcResult(success=False, message=str(exc))
-
-    async def reject(
-        self, bot: Bot, pending: PendingRequest, reason: str = ""
-    ) -> ProcResult:
-        api = _SATORI_APPROVE_API if pending.kind == "friend" else _SATORI_GUILD_API
-        try:
-            await bot.call_api(
-                api,
-                message_id=pending.raw_flag,
-                approve=False,
-                comment=reason,
-            )
-            return ProcResult(success=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("satori reject failed: {}", exc)
-            return ProcResult(success=False, message=str(exc))
-
-    async def notify(
-        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
-    ) -> str | None:
-        try:
-            target = Target(
-                id=target_id,
-                private=True,
-                self_id=str(getattr(bot, "self_id", "")),
-                scope=pending.scope,
-                adapter=bot.adapter.get_name(),
-            )
-            receipt = await UniMessage(message).send(target=target, bot=bot)
-            return str(receipt.msg_ids[0]) if receipt.msg_ids else None
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("satori notify failed: {}", exc)
-            return None
+        return (
+            api,
+            {
+                "message_id": pending.raw_flag,
+                "approve": False,
+                "comment": reason,
+            },
+        )
 
 
-class MilkyFriendshipProvider:
+class MilkyFriendshipProvider(OneBotStyleFriendshipProvider):
     key = "milky"
-
-    def supports(self, bot: Bot, event: Event) -> bool:
-        if bot.adapter.get_name() != "nonebot-adapter-milky":
-            return False
-        with suppress(Exception):
-            return event.get_type() == "request"
-        return False
-
-    def extract(self, bot: Bot, event: Event) -> RequestInfo | None:  # noqa: ARG002
-        request_type = _safe_str(event, "request_type")
-        sub_type = _safe_str(event, "sub_type")
-        if request_type == "friend":
-            kind = "friend"
-        elif request_type == "group" and sub_type == "add":
-            kind = "group_add"
-        elif request_type == "group" and sub_type == "invite":
-            kind = "group_invite"
-        else:
-            return None
-        requester_id = _safe_str(event, "user_id")
-        if not requester_id:
-            return None
-        flag = _safe_str(event, "flag")
-        if not flag:
-            return None
-        return RequestInfo(
-            kind=kind,
-            requester_id=requester_id,
-            requester_name=requester_id,
-            platform="nonebot-adapter-milky",
-            raw_flag=flag,
-            group_id=_safe_str(event, "group_id") or None,
-            comment=_safe_str(event, "comment"),
-            sub_type=sub_type if kind != "friend" else None,
-        )
-
-    async def approve(
-        self, bot: Bot, pending: PendingRequest, remark: str = ""
-    ) -> ProcResult:
-        try:
-            if pending.kind == "friend":
-                await bot.call_api(
-                    "set_friend_add_request",
-                    flag=pending.raw_flag,
-                    approve=True,
-                    remark=remark,
-                )
-            else:
-                await bot.call_api(
-                    "set_group_add_request",
-                    flag=pending.raw_flag,
-                    sub_type=pending.sub_type or "add",
-                    approve=True,
-                )
-            return ProcResult(success=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("milky approve failed: {}", exc)
-            return ProcResult(success=False, message=str(exc))
-
-    async def reject(
-        self, bot: Bot, pending: PendingRequest, reason: str = ""
-    ) -> ProcResult:
-        try:
-            if pending.kind == "friend":
-                await bot.call_api(
-                    "set_friend_add_request",
-                    flag=pending.raw_flag,
-                    approve=False,
-                )
-            else:
-                await bot.call_api(
-                    "set_group_add_request",
-                    flag=pending.raw_flag,
-                    sub_type=pending.sub_type or "add",
-                    approve=False,
-                    reason=reason,
-                )
-            return ProcResult(success=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("milky reject failed: {}", exc)
-            return ProcResult(success=False, message=str(exc))
-
-    async def notify(
-        self, bot: Bot, pending: PendingRequest, target_id: str, message: str
-    ) -> str | None:
-        try:
-            target = Target(
-                id=target_id,
-                private=True,
-                self_id=str(getattr(bot, "self_id", "")),
-                scope=pending.scope,
-                adapter=bot.adapter.get_name(),
-            )
-            receipt = await UniMessage(message).send(target=target, bot=bot)
-            return str(receipt.msg_ids[0]) if receipt.msg_ids else None
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("milky notify failed: {}", exc)
-            return None
+    adapter_name = "nonebot-adapter-milky"
+    platform_name = "nonebot-adapter-milky"
 
 
 _providers: list[RequestProvider] = [
