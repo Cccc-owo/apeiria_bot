@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-import nonebot
 from sqlalchemy import select
 
 from apeiria.db.engine import get_db
 from apeiria.db.models.access import AccessRule
-
-
-def _is_superuser(user_id: str) -> bool:
-    superusers = nonebot.get_driver().config.superusers
-    return user_id in superusers or any(
-        isinstance(s, str) and s.endswith(f":{user_id}") for s in superusers
-    )
 
 
 class AccessControl:
@@ -26,11 +18,18 @@ class AccessControl:
         self._rules = sorted(rules, key=lambda r: r.priority, reverse=True)
         self._loaded = True
 
-    def evaluate(self, user_id: str, group_id: str | None, plugin_name: str) -> bool:
+    def evaluate(
+        self,
+        user_id: str,
+        group_id: str | None,
+        plugin_name: str,
+        *,
+        is_superuser: bool = False,
+    ) -> bool:
         if not self._loaded:
             return True
 
-        if _is_superuser(user_id):
+        if is_superuser:
             return True
 
         for rule in self._rules:
@@ -47,6 +46,8 @@ class AccessControl:
         user_id: str,
         group_id: str | None,
         plugin_name: str,
+        *,
+        is_superuser: bool = False,
     ) -> dict:
         result: dict = {
             "action": "allow",
@@ -57,7 +58,7 @@ class AccessControl:
         if not self._loaded:
             return result
 
-        if _is_superuser(user_id):
+        if is_superuser:
             return result
 
         for rule in self._rules:

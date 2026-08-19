@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from nonebot import require
+from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot.exception import IgnoredException
 from nonebot.matcher import Matcher  # noqa: TC002
 from nonebot.message import run_preprocessor
+from nonebot.permission import SUPERUSER
 
 require("nonebot_plugin_uninfo")
 from nonebot_plugin_uninfo import Uninfo  # noqa: TC002
@@ -22,15 +24,30 @@ def resolve_subject(session: Session) -> tuple[str, str | None]:
     return user_id, group_id
 
 
-def check_access(plugin_name: str, user_id: str, group_id: str | None) -> bool:
+def check_access(
+    plugin_name: str,
+    user_id: str,
+    group_id: str | None,
+    *,
+    is_superuser: bool = False,
+) -> bool:
     from apeiria.bootstrap.steps import get_access_control
 
-    return get_access_control().evaluate(user_id, group_id, plugin_name)
+    return get_access_control().evaluate(
+        user_id, group_id, plugin_name, is_superuser=is_superuser
+    )
 
 
-async def access_preprocessor(matcher: Matcher, session: Uninfo) -> None:
+async def access_preprocessor(
+    matcher: Matcher,
+    bot: Bot,
+    event: Event,
+    session: Uninfo,
+) -> None:
     user_id, group_id = resolve_subject(session)
     plugin_name = matcher.plugin_name or ""
+    if await SUPERUSER(bot, event):
+        return
     if not check_access(plugin_name, user_id, group_id):
         raise IgnoredException("blocked by access control")  # noqa: TRY003
 
