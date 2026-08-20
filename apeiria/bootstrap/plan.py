@@ -34,6 +34,8 @@ class BootstrapPlan:
             except Exception:  # noqa: BLE001
                 logger.opt(exception=True).error("Bootstrap step failed: {}", name)
                 failed.append(name)
+                logger.error("Bootstrap stopped after failed step: {}", name)
+                break
 
         logger.success(
             "Bootstrap complete: {} succeeded, {} failed",
