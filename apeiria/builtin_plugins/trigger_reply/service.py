@@ -6,6 +6,8 @@ from functools import lru_cache
 from pathlib import Path
 from random import choices, random
 
+from nonebot.log import logger
+
 from .loader import files_signature, load_rules
 from .models import (
     MatchResult,
@@ -156,7 +158,10 @@ class TriggerRuleSet:
     def has_changed(self) -> bool:
         return files_signature(self._paths) != self._signature
 
-    def match(self, trigger: TriggerInput) -> MatchResult | None:
+    def match(  # noqa: C901
+        self,
+        trigger: TriggerInput,
+    ) -> MatchResult | None:
         for rule in self.rules:
             if not rule.enabled:
                 continue
@@ -190,8 +195,16 @@ class TriggerRuleSet:
 
             reply = _select_reply(rule.replies)
             context = _build_context(trigger, rule, captures, triggered_text)
+            try:
+                text = render_template(reply.text, context)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "触发回复模板渲染失败，使用原始文本: {}",
+                    exc,
+                )
+                text = reply.text
             return MatchResult(
-                text=render_template(reply.text, context),
+                text=text,
                 rule=rule,
                 triggered_text=triggered_text,
                 context=context,
