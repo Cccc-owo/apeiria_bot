@@ -15,7 +15,7 @@ async def test_update_status_falls_back_to_local_refs(monkeypatch) -> None:
         "log -1 --format=%s": (0, "local msg", ""),
         "status --porcelain": (0, "", ""),
         "fetch origin --prune --tags": (1, "", "offline"),
-        "branch -r": (0, "  origin/main\n  origin/dev\n", ""),
+        "branch -r": (0, "  origin/main\n  origin/dev\n  origin/feature\n", ""),
         "tag": (0, "v1\nv2", ""),
     }
 
@@ -27,7 +27,7 @@ async def test_update_status_falls_back_to_local_refs(monkeypatch) -> None:
     resp = await update.update_status()
     assert resp.status_code == 200
     data = json.loads(resp.body)
-    assert data["available_branches"] == ["dev", "main"]
+    assert data["available_branches"] == ["dev", "feature", "main"]
     assert data["available_tags"] == ["v1", "v2"]
 
 
@@ -155,6 +155,36 @@ async def test_build_commit_list_detects_diverged_local_only(monkeypatch) -> Non
     assert local_only[0]["hash"] == "def456"
     assert local_only[0]["direction"] == "local_only"
     assert has_diverged is True
+
+
+@pytest.mark.asyncio
+async def test_build_commit_list_filters_common_ancestors(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "log origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "full_remote|remote|remote msg|author|2026-01-01T00:00:00+08:00\n"
+            "full_common|common|common msg|author|2026-01-01T00:00:00+08:00",
+            "",
+        ),
+        "rev-parse HEAD": (0, "full_local", ""),
+        "rev-list origin/main --not HEAD": (0, "full_remote", ""),
+        "log HEAD --not origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "full_local|local|local msg|author|2026-01-01T00:00:00+08:00",
+            "",
+        ),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    commits, _, _ = await update._build_commit_list("origin/main")
+
+    assert [c["hash"] for c in commits] == ["remote"]
 
 
 @pytest.mark.asyncio

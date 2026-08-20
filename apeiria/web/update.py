@@ -73,9 +73,7 @@ async def update_status() -> JSONResponse:
     await _fetch_with_warning("origin", "--prune", "--tags", label="刷新远端引用")
 
     _, branches_output, _ = await _run_git("branch", "-r")
-    all_branches = _branch_list(branches_output)
-    _allowed = {"main", "dev"}
-    available_branches = sorted(b for b in all_branches if b in _allowed)
+    available_branches = _branch_list(branches_output)
 
     _, tags_output, _ = await _run_git("tag")
     available_tags = sorted(t.strip() for t in tags_output.splitlines() if t.strip())
@@ -226,6 +224,10 @@ async def _build_commit_list(
         else:
             commit["direction"] = "behind"
         commit["is_current"] = full_hash == local_full
+
+    commits = [
+        commit for commit in commits if commit["direction"] in {"ahead", "current"}
+    ]
 
     local_only_commits: list[dict[str, object]] = []
     for line in local_only_out.splitlines():
