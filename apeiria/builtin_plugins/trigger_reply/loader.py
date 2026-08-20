@@ -93,6 +93,7 @@ def _match_options(normalized: dict[str, object]) -> dict[str, object]:
 
 def _load_file(  # noqa: C901
     file_path: Path,
+    seen_ids: set[str] | None = None,
 ) -> tuple[list[TriggerRule], list[str]]:
     if not file_path.exists():
         return [], []
@@ -110,7 +111,8 @@ def _load_file(  # noqa: C901
 
     rules: list[TriggerRule] = []
     errors: list[str] = []
-    seen_ids: set[str] = set()
+    if seen_ids is None:
+        seen_ids = set()
 
     for index, raw_rule in enumerate(raw_rules):
         prefix = f"rules[{index}]"
@@ -141,9 +143,10 @@ def _load_file(  # noqa: C901
 def load_rules(paths: Sequence[Path]) -> tuple[tuple[TriggerRule, ...], list[str]]:
     all_rules: list[TriggerRule] = []
     all_errors: list[str] = []
+    seen_ids: set[str] = set()
 
     for file_path in paths:
-        file_rules, file_errors = _load_file(file_path)
+        file_rules, file_errors = _load_file(file_path, seen_ids=seen_ids)
         all_rules.extend(file_rules)
         if file_errors:
             all_errors.append(f"{file_path}: {'; '.join(file_errors)}")

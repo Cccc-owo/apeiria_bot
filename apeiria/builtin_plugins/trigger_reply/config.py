@@ -12,7 +12,7 @@ class TriggerReplyConfig(BaseModel):
         alias="trigger_reply__enabled",
         description="是否启用触发回复",
     )
-    rules_file: str = Field(default="rules.yaml", description="规则文件路径")
+    rules_file: str = Field(default="rules", description="规则文件路径或规则目录")
     debug: bool = Field(default=False, description="启用调试日志")
 
 

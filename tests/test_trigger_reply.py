@@ -182,6 +182,62 @@ rules:
     assert any("ID 重复" in error for error in errors)
 
 
+def test_load_rules_reads_multiple_files_in_folder(tmp_path: Path) -> None:
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+    (rules_dir / "a.yaml").write_text(
+        """
+rules:
+  - id: a
+    match: hi
+    reply: hello
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (rules_dir / "b.yml").write_text(
+        """
+rules:
+  - id: b
+    match: bye
+    reply: goodbye
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    rules, errors = load_rules([rules_dir / "a.yaml", rules_dir / "b.yml"])
+
+    assert errors == []
+    assert {rule.id for rule in rules} == {"a", "b"}
+
+
+def test_load_rules_reports_duplicate_id_across_files(tmp_path: Path) -> None:
+    first = tmp_path / "first.yaml"
+    second = tmp_path / "second.yaml"
+    first.write_text(
+        """
+rules:
+  - id: same
+    match: a
+    reply: x
+""".lstrip(),
+        encoding="utf-8",
+    )
+    second.write_text(
+        """
+rules:
+  - id: same
+    match: b
+    reply: y
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    rules, errors = load_rules([first, second])
+
+    assert len(rules) == 1
+    assert any("ID 重复" in error for error in errors)
+
+
 def test_load_rules_sorts_by_priority(tmp_path: Path) -> None:
     rules_file = tmp_path / "rules.yaml"
     rules_file.write_text(
