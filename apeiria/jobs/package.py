@@ -33,6 +33,7 @@ class PackageJob(Job):
         self.module_name = module_name
         self.keep_config = keep_config
         self._snapshot_data: dict[str, str | None] = {}
+        self._plugin_backup: Path | None = None
 
     def snapshot(self) -> None:
         for path in (
@@ -40,10 +41,12 @@ class PackageJob(Job):
             _APEIRIA_DIR / "adapters.yaml",
             _APEIRIA_DIR / "pyproject.toml",
             _APEIRIA_DIR / "uv.lock",
+            Path("data/config.yaml"),
         ):
             self._snapshot_data[str(path)] = _read_text(path)
 
     async def run(self) -> None:
+        self.rollback_needed = True
         if self.operation == "install":
             await self._do_install()
         elif self.operation == "uninstall":
@@ -112,7 +115,7 @@ class PackageJob(Job):
             raise JobError(msg)
 
         if self.package_kind == "plugin":
-            _remove_local_plugin_dir(self.name)
+            self._plugin_backup = _move_local_plugin_dir_to_backup(self.name, self.id)
         elif self.package_kind == "adapter":
             from apeiria.plugin.adapter_manager import _toml_remove_adapter
 
@@ -133,6 +136,8 @@ class PackageJob(Job):
             if rc != 0:
                 msg = f"uv sync 返回码: {rc}"
                 raise JobError(msg)
+            _cleanup_plugin_backup(self._plugin_backup)
+            self._plugin_backup = None
 
     async def rollback(self) -> None:
         if not self._snapshot_data:
@@ -142,6 +147,9 @@ class PackageJob(Job):
         self.emit(
             {"type": "stage", "stage": "rollback", "line": "正在回滚包管理变更..."}
         )
+
+        _restore_plugin_backup(self._plugin_backup, self.name)
+        self._plugin_backup = None
 
         for path_str, content in self._snapshot_data.items():
             path = Path(path_str)
@@ -198,14 +206,39 @@ def _remove_config(kind: str, name: str) -> None:
     _remove_adapter_config(name)
 
 
-def _remove_local_plugin_dir(name: str) -> None:
+def _local_plugin_path(name: str) -> Path:
     from apeiria.plugin.manager import _is_safe_plugin_name
 
     local_path = Path(f".apeiria/plugins/{name}").resolve()
     plugins_root = Path(".apeiria/plugins").resolve()
-    if (
-        _is_safe_plugin_name(name)
-        and local_path.is_relative_to(plugins_root)
-        and local_path.is_dir()
-    ):
+    if not _is_safe_plugin_name(name) or not local_path.is_relative_to(plugins_root):
+        msg = f"不安全的插件目录名: {name}"
+        raise JobError(msg)
+    return local_path
+
+
+def _move_local_plugin_dir_to_backup(name: str, job_id: str) -> Path | None:
+    local_path = _local_plugin_path(name)
+    if not local_path.is_dir():
+        return None
+    trash_root = Path(".apeiria/plugins/.trash")
+    trash_root.mkdir(parents=True, exist_ok=True)
+    backup = trash_root / f"{job_id}-{name}"
+    if backup.exists():
+        shutil.rmtree(backup, ignore_errors=True)
+    local_path.rename(backup)
+    return backup
+
+
+def _restore_plugin_backup(backup: Path | None, name: str) -> None:
+    if backup is None or not backup.exists():
+        return
+    local_path = _local_plugin_path(name)
+    if local_path.exists():
         shutil.rmtree(local_path, ignore_errors=True)
+    backup.rename(local_path)
+
+
+def _cleanup_plugin_backup(backup: Path | None) -> None:
+    if backup is not None and backup.exists():
+        shutil.rmtree(backup, ignore_errors=True)
