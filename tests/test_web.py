@@ -313,3 +313,42 @@ def test_scanned_name_to_module_maps_display_name(tmp_path, monkeypatch) -> None
 
     assert _scanned_name_to_module("链接分享解析 Alconna 版") == "nonebot_plugin_parser"
     assert _scanned_name_to_module("不存在的插件") is None
+
+
+# --------------------------------------------------------------------------
+# access rule validation
+# --------------------------------------------------------------------------
+
+
+def test_validate_access_rule_fields_rejects_bad_priority() -> None:
+    from fastapi import HTTPException
+
+    from apeiria.web.routes import _validate_access_rule_fields
+
+    with pytest.raises(HTTPException) as exc:
+        _validate_access_rule_fields(
+            {
+                "subject_type": "user",
+                "subject_id": "u1",
+                "action": "allow",
+                "priority": "1",
+            },
+            partial=False,
+        )
+    assert exc.value.status_code == 400
+
+
+def test_validate_access_rule_fields_update_rejects_null_priority() -> None:
+    from fastapi import HTTPException
+
+    from apeiria.web.routes import _validate_access_rule_fields
+
+    with pytest.raises(HTTPException) as exc:
+        _validate_access_rule_fields({"priority": None}, partial=True)
+    assert exc.value.status_code == 400
+
+
+def test_validate_access_rule_fields_update_accepts_partial_valid() -> None:
+    from apeiria.web.routes import _validate_access_rule_fields
+
+    _validate_access_rule_fields({"action": "deny"}, partial=True)

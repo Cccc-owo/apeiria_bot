@@ -557,6 +557,41 @@ async def _reload_access() -> None:
     await get_access_control().load_snapshot()
 
 
+def _validate_access_rule_fields(  # noqa: C901
+    data: dict, *, partial: bool
+) -> None:
+    if not partial or "subject_type" in data:
+        subject_type = data.get("subject_type")
+        if subject_type not in ("user", "group"):
+            raise HTTPException(
+                status_code=400, detail="subject_type must be user or group"
+            )
+
+    if not partial or "subject_id" in data:
+        subject_id = data.get("subject_id")
+        if not isinstance(subject_id, str) or not subject_id.strip():
+            raise HTTPException(status_code=400, detail="subject_id required")
+
+    if not partial or "action" in data:
+        action = data.get("action")
+        if action not in ("allow", "deny"):
+            raise HTTPException(status_code=400, detail="action must be allow or deny")
+
+    if not partial or "plugin_name" in data:
+        plugin_name = data.get("plugin_name")
+        if plugin_name is not None and not isinstance(plugin_name, str):
+            raise HTTPException(
+                status_code=400, detail="plugin_name must be a string or null"
+            )
+
+    if "priority" in data and data.get("priority") is not None:
+        priority = data["priority"]
+        if not isinstance(priority, int) or isinstance(priority, bool):
+            raise HTTPException(status_code=400, detail="priority must be an integer")
+    elif partial and "priority" in data:
+        raise HTTPException(status_code=400, detail="priority must be an integer")
+
+
 @access_router.get("/rules")
 async def api_access_rules_list() -> JSONResponse:
     from sqlalchemy import select
@@ -580,18 +615,11 @@ async def api_access_rules_create(data: dict) -> JSONResponse:
     from apeiria.db import get_db
     from apeiria.db.models.access import AccessRule
 
-    subject_type = data.get("subject_type", "")
-    subject_id = data.get("subject_id", "")
-    action = data.get("action", "")
+    _validate_access_rule_fields(data, partial=False)
 
-    if subject_type not in ("user", "group"):
-        raise HTTPException(
-            status_code=400, detail="subject_type must be user or group"
-        )
-    if not subject_id:
-        raise HTTPException(status_code=400, detail="subject_id required")
-    if action not in ("allow", "deny"):
-        raise HTTPException(status_code=400, detail="action must be allow or deny")
+    subject_type = data["subject_type"]
+    subject_id = data["subject_id"]
+    action = data["action"]
 
     db = get_db()
     priority = data.get("priority")
@@ -625,6 +653,8 @@ async def api_access_rules_update(rule_id: int, data: dict) -> JSONResponse:
     from apeiria.db import get_db
     from apeiria.db.models.access import AccessRule
 
+    _validate_access_rule_fields(data, partial=True)
+
     db = get_db()
     async with db.gate.write() as session:
         result = await session.execute(
@@ -642,15 +672,6 @@ async def api_access_rules_update(rule_id: int, data: dict) -> JSONResponse:
             "priority",
         ):
             if field in data:
-                value = data[field]
-                if field == "subject_type" and value not in ("user", "group"):
-                    raise HTTPException(
-                        status_code=400, detail="subject_type must be user or group"
-                    )
-                if field == "action" and value not in ("allow", "deny"):
-                    raise HTTPException(
-                        status_code=400, detail="action must be allow or deny"
-                    )
                 setattr(rule, field, data[field])
         await session.commit()
     await _reload_access()
