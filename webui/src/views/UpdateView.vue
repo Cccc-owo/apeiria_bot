@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type {
   GitCommit,
-  UpdateEvent,
+  TaskEvent,
   UpdatePreviewResponse,
   UpdateStatusResponse,
 } from "@/types";
@@ -46,10 +46,13 @@ const sourceType = ref<"branch" | "tag">("branch");
 const selectedRef = ref("");
 
 const executing = ref(false);
+const cancelling = ref(false);
 const terminalLines = ref<string[]>([]);
 const stage = ref("");
 const updateFailed = ref(false);
 const updateDone = ref(false);
+const updateCancelled = ref(false);
+const updateTaskId = ref("");
 const polling = ref(false);
 const terminalEl = ref<HTMLElement | null>(null);
 let updateClient: SseClient | null = null;
@@ -140,6 +143,7 @@ function stageLabel(s: string): string {
     checkout: t("update.checkout"),
     pull: t("update.pull"),
     sync: t("update.sync"),
+    rollback: t("update.rollback"),
     error: t("update.failed"),
     done: t("update.success"),
   };
@@ -156,8 +160,11 @@ async function scrollTerminal() {
 async function executeUpdate(commit: string) {
   if (!selectedRef.value || executing.value) return;
   executing.value = true;
+  cancelling.value = false;
   updateFailed.value = false;
   updateDone.value = false;
+  updateCancelled.value = false;
+  updateTaskId.value = "";
   terminalLines.value = [];
   stage.value = "";
 
@@ -167,17 +174,29 @@ async function executeUpdate(commit: string) {
     sourceType.value,
     (data) => {
       try {
-        const event: UpdateEvent = JSON.parse(data);
-        stage.value = event.stage;
-        terminalLines.value.push(event.line);
-        void scrollTerminal();
-
-        if (event.stage === "error") {
+        const event: TaskEvent = JSON.parse(data);
+        if (event.type === "task") {
+          updateTaskId.value = event.task_id ?? "";
+        } else if (event.type === "stage") {
+          stage.value = event.stage ?? "";
+          if (event.line) terminalLines.value.push(event.line);
+          void scrollTerminal();
+          if (event.stage === "error") updateFailed.value = true;
+          if (event.stage === "done") {
+            updateDone.value = true;
+            pollUntilUp();
+          }
+        } else if (event.type === "output") {
+          if (event.text) terminalLines.value.push(event.text);
+          void scrollTerminal();
+        } else if (event.type === "error") {
           updateFailed.value = true;
-        }
-        if (event.stage === "done") {
-          updateDone.value = true;
-          pollUntilUp();
+          if (event.message) terminalLines.value.push(event.message);
+          void scrollTerminal();
+        } else if (event.type === "cancelled") {
+          updateCancelled.value = true;
+          if (event.message) terminalLines.value.push(event.message);
+          void scrollTerminal();
         }
       } catch {
         // skip unparseable
@@ -191,6 +210,7 @@ async function executeUpdate(commit: string) {
 
   await updateClient.done;
   executing.value = false;
+  cancelling.value = false;
   updateClient = null;
 }
 
@@ -216,10 +236,19 @@ function pollUntilUp() {
   }, 2000);
 }
 
-function cancelUpdate() {
+async function cancelUpdate() {
+  if (updateTaskId.value && executing.value && !cancelling.value) {
+    cancelling.value = true;
+    try {
+      await api.tasks.cancel(updateTaskId.value);
+    } catch {
+      // If cancel request failed, closing the stream still detaches the UI.
+    }
+  }
   updateClient?.close();
   updateClient = null;
   executing.value = false;
+  cancelling.value = false;
 }
 
 onUnmounted(() => {
@@ -468,8 +497,13 @@ fetchStatus();
 
       <!-- Execute Controls -->
       <div class="flex-none">
-        <Button v-if="executing" variant="destructive" @click="cancelUpdate()">
-          {{ $t("common.cancel") }}
+        <Button
+          v-if="executing"
+          variant="destructive"
+          :disabled="cancelling"
+          @click="cancelUpdate()"
+        >
+          {{ cancelling ? t("update.cancelling") : $t("common.cancel") }}
         </Button>
         <Button v-else-if="polling" disabled>
           <Loader2 class="mr-1.5 size-4 animate-spin" />
@@ -487,7 +521,7 @@ fetchStatus();
             <Terminal class="size-4" />
             <span v-if="stage">{{ stageLabel(stage) }}</span>
             <Loader2
-              v-if="executing"
+              v-if="executing || cancelling"
               class="size-4 animate-spin text-muted-foreground"
             />
           </CardTitle>
@@ -501,7 +535,7 @@ fetchStatus();
               <div class="text-zinc-300">{{ line }}</div>
             </template>
             <div
-              v-if="executing && terminalLines.length > 0"
+              v-if="(executing || cancelling) && terminalLines.length > 0"
               class="mt-1 inline-block h-4 w-2 animate-pulse bg-emerald-400"
             />
           </div>
@@ -510,11 +544,15 @@ fetchStatus();
 
       <!-- Post-update -->
       <div
-        v-if="updateDone"
+        v-if="updateDone || updateCancelled"
         class="flex items-center gap-2 text-sm text-muted-foreground"
       >
         <Loader2 v-if="polling" class="size-4 animate-spin text-emerald-500" />
         <span v-if="polling">{{ t("update.reconnecting") }}</span>
+        <span
+          v-else-if="updateCancelled"
+          class="text-yellow-500"
+        >{{ t("update.cancelled") }}</span>
         <span v-else class="text-emerald-500">{{ t("update.success") }}</span>
       </div>
     </template>

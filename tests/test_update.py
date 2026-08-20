@@ -1,8 +1,27 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
+
+from apeiria.jobs.base import JobRunner, JobStatus
+from apeiria.jobs.git_update import GitUpdateJob
+
+
+async def _wait_terminal(runner: JobRunner, job_id: str, max_wait: float = 2.0) -> dict:
+    deadline = asyncio.get_running_loop().time() + max_wait
+    while asyncio.get_running_loop().time() < deadline:
+        status = await runner.get_status(job_id)
+        if status and status["status"] in (
+            JobStatus.DONE.value,
+            JobStatus.ERROR.value,
+            JobStatus.CANCELLED.value,
+        ):
+            return status
+        await asyncio.sleep(0.01)
+    msg = "job did not reach terminal status"
+    raise AssertionError(msg)
 
 
 @pytest.mark.asyncio
@@ -189,7 +208,7 @@ async def test_build_commit_list_filters_common_ancestors(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_update_reset_failure_rolls_back(monkeypatch) -> None:
-    from apeiria.web import update
+    from apeiria.jobs import git_update
 
     responses: dict[str, tuple[int, str, str]] = {
         "status --porcelain": (0, "", ""),
@@ -204,16 +223,34 @@ async def test_execute_update_reset_failure_rolls_back(monkeypatch) -> None:
     async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
         return responses.get(" ".join(args), (0, "", ""))
 
-    monkeypatch.setattr(update, "_run_git", fake_run_git)
+    async def fake_sync(_job: object, _cwd: object) -> int:
+        return 0
 
-    events = [event async for event in update._execute_update("main")]
+    monkeypatch.setattr(git_update, "_run_git", fake_run_git)
+    monkeypatch.setattr(git_update, "run_uv_sync", fake_sync)
 
-    assert any('"Reset 失败: reset failed"' in event for event in events)
+    runner = JobRunner()
+    job = GitUpdateJob("main", restart=False)
+    queue = job.subscribe()
+    job_id = await runner.start(job)
+    await _wait_terminal(runner, job_id)
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    assert any(
+        event["type"] == "error" and "Reset 失败: reset failed" in event["message"]
+        for event in events
+    )
+    assert any(
+        event.get("stage") == "rollback" and "回滚完成" in event.get("line", "")
+        for event in events
+    )
 
 
 @pytest.mark.asyncio
 async def test_execute_update_sync_failure_rolls_back(monkeypatch) -> None:
-    from apeiria.web import update
+    from apeiria.jobs import git_update
 
     responses: dict[str, tuple[int, str, str]] = {
         "status --porcelain": (0, "", ""),
@@ -228,13 +265,26 @@ async def test_execute_update_sync_failure_rolls_back(monkeypatch) -> None:
     async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
         return responses.get(" ".join(args), (0, "", ""))
 
-    async def fake_sync(*_args: object, **_kwargs: object):
-        raise update._UpdateError("uv sync 返回码: 1")  # noqa: TRY003
-        yield  # pragma: no cover - makes this an async generator
+    async def fake_sync(_job: object, _cwd: object) -> int:
+        return 1
 
-    monkeypatch.setattr(update, "_run_git", fake_run_git)
-    monkeypatch.setattr(update, "_sync_and_restart", fake_sync)
+    monkeypatch.setattr(git_update, "_run_git", fake_run_git)
+    monkeypatch.setattr(git_update, "run_uv_sync", fake_sync)
 
-    events = [event async for event in update._execute_update("main")]
+    runner = JobRunner()
+    job = GitUpdateJob("main", restart=False)
+    queue = job.subscribe()
+    job_id = await runner.start(job)
+    await _wait_terminal(runner, job_id)
 
-    assert any('"uv sync 返回码: 1"' in event for event in events)
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    assert any(
+        event["type"] == "error" and "uv sync 返回码: 1" in event["message"]
+        for event in events
+    )
+    assert any(
+        event.get("stage") == "rollback" and "回滚完成" in event.get("line", "")
+        for event in events
+    )

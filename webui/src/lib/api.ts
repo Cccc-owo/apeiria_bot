@@ -7,6 +7,7 @@ import type {
   AccessRulesList,
   AccessSubjectsResult,
   Adapter,
+  CancelTaskResponse,
   CheckUpdatesResult,
   ConfigContract,
   InstallTaskResponse,
@@ -16,6 +17,7 @@ import type {
   PluginVersions,
   StatusInfo,
   StoreSearchResult,
+  TaskStatus,
   UpdatePreviewResponse,
   UpdateStatusResponse,
 } from "@/types";
@@ -79,6 +81,15 @@ export const api = {
   status: {
     get: () => request<StatusInfo>("GET", "/status"),
     restart: () => request<void>("POST", "/restart"),
+  },
+  tasks: {
+    status: (taskId: string) =>
+      request<TaskStatus>("GET", `/tasks/${encodeURIComponent(taskId)}`),
+    cancel: (taskId: string) =>
+      request<CancelTaskResponse>(
+        "POST",
+        `/tasks/${encodeURIComponent(taskId)}/cancel`,
+      ),
   },
   plugins: {
     list: () => request<{ plugins: Plugin[] }>("GET", "/plugins/list"),

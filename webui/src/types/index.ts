@@ -165,11 +165,37 @@ export interface InstallTaskResponse {
   task_id: string;
 }
 
+export type TaskEventType =
+  | "task"
+  | "stage"
+  | "output"
+  | "done"
+  | "error"
+  | "cancelled";
+
 export interface TaskEvent {
-  type: "output" | "done" | "error";
+  type: TaskEventType;
+  task_id?: string;
+  stage?: string;
+  line?: string;
   text?: string;
   ok?: boolean;
   name?: string;
+  message?: string;
+}
+
+export interface TaskStatus {
+  id: string;
+  kind: string;
+  status: "pending" | "running" | "cancelling" | "done" | "error" | "cancelled";
+  error_message: string | null;
+  created_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+}
+
+export interface CancelTaskResponse {
+  ok: boolean;
   message?: string;
 }
 
@@ -280,9 +306,4 @@ export interface GitCommit {
   date: string;
   is_current: boolean;
   direction: "current" | "ahead" | "behind" | "local_only";
-}
-
-export interface UpdateEvent {
-  stage: string;
-  line: string;
 }

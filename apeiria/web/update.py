@@ -2,24 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import json
-import shutil
-from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from nonebot.log import logger
 
+from apeiria.jobs.git_update import GitUpdateJob
+from apeiria.jobs.runtime import get_job_runner
 from apeiria.web.auth import verify_token
 
 router = APIRouter(prefix="/api/update", dependencies=[Depends(verify_token)])
 
-_DIRTY_BLOCK_MESSAGE = "工作区存在未提交的变更，请先处理后重试"
-
-
-class _UpdateError(RuntimeError):
-    pass
+_job_runner = get_job_runner()
 
 
 async def _run_git(*args: str, cwd: Path | None = None) -> tuple[int, str, str]:
@@ -120,23 +115,10 @@ async def update_preview(
     )
 
 
-async def _do_rollback(
-    original_branch: str,
-    original_commit: str,
-    cwd: Path,
-) -> None:
-    logger.warning("Rolling back to {} ({})", original_branch, original_commit[:7])
-    await _run_git("checkout", original_branch, cwd=cwd)
-    await _run_git("reset", "--hard", original_commit, cwd=cwd)
-    logger.info("Rollback complete")
-
-
 async def _fetch_with_warning(*args: str, label: str = "Fetch") -> str:
     rc, _, stderr = await _run_git("fetch", *args)
     if rc != 0:
-        message = f"{label} 失败: {stderr}"
-        logger.warning("{}", message)
-        return message
+        return f"{label} 失败: {stderr}"
     return ""
 
 
@@ -248,187 +230,6 @@ async def _build_commit_list(
     return commits, local_only_commits, has_diverged
 
 
-async def _rollback_and_error(
-    original_branch: str,
-    original_commit: str,
-    project_root: Path,
-    message: str,
-) -> AsyncIterator[str]:
-    await _do_rollback(original_branch, original_commit, project_root)
-    yield _sse({"stage": "error", "line": message})
-
-
-async def _sync_and_restart(
-    project_root: Path,
-    ref_type: str,
-    branch: str,
-) -> AsyncIterator[str]:
-    uv = shutil.which("uv")
-    if uv is None:
-        raise _UpdateError("系统中未找到 uv 命令")  # noqa: TRY003
-
-    yield _sse({"stage": "sync", "line": "$ uv sync"})
-    proc = await asyncio.create_subprocess_exec(
-        uv,
-        "sync",
-        cwd=project_root,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
-    if proc.stdout is not None:
-        async for line in proc.stdout:
-            yield _sse(
-                {
-                    "stage": "sync",
-                    "line": line.decode(errors="replace").rstrip(),
-                }
-            )
-    await proc.wait()
-    if proc.returncode != 0:
-        raise _UpdateError(f"uv sync 返回码: {proc.returncode}")  # noqa: TRY003
-
-    yield _sse({"stage": "done", "line": "更新完成，即将重启..."})
-    logger.success("Git update to {} '{}' completed. Restarting...", ref_type, branch)
-
-    from apeiria.utils.restart import graceful_restart
-
-    await asyncio.sleep(0.8)
-    await graceful_restart()
-
-
-async def _execute_update(  # noqa: C901, PLR0912, PLR0915
-    branch: str,
-    commit: str | None = None,
-    ref_type: str = "branch",
-) -> AsyncIterator[str]:
-    project_root = Path.cwd()
-
-    rc, dirty, _ = await _run_git("status", "--porcelain")
-    if rc == 0 and dirty:
-        yield _sse({"stage": "error", "line": _DIRTY_BLOCK_MESSAGE})
-        return
-
-    _, original_commit, _ = await _run_git("rev-parse", "HEAD")
-    _, original_branch, _ = await _run_git("branch", "--show-current")
-    logger.info(
-        "Starting update to {} '{}' commit '{}' from {} ({})",
-        ref_type,
-        branch,
-        commit or "HEAD",
-        original_branch,
-        original_commit[:7],
-    )
-
-    try:
-        if ref_type == "tag":
-            yield _sse({"stage": "checkout", "line": "$ git fetch origin --tags"})
-            rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--tags")
-            if rc_fetch != 0:
-                yield _sse({"stage": "error", "line": f"Fetch tags 失败: {fetch_err}"})
-                return
-
-            target = commit or branch
-            yield _sse({"stage": "checkout", "line": f"$ git checkout {target}"})
-            rc2, out, err = await _run_git("checkout", target)
-            if rc2 != 0:
-                async for event in _rollback_and_error(
-                    original_branch,
-                    original_commit,
-                    project_root,
-                    f"Checkout 失败: {err}",
-                ):
-                    yield event
-                return
-            for line in out.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "checkout", "line": line})
-            for line in err.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "checkout", "line": line})
-        else:
-            yield _sse({"stage": "checkout", "line": f"$ git checkout {branch}"})
-            rc2, out, err = await _run_git("checkout", branch)
-            if rc2 != 0:
-                err_stderr = await _run_git(
-                    "checkout", "-b", branch, f"origin/{branch}"
-                )
-                if err_stderr[0] != 0:
-                    msg = f"Checkout 失败: {err_stderr[2]}"
-                    yield _sse({"stage": "error", "line": msg})
-                    return
-                out = f"Switched to a new branch '{branch}'"
-            for line in out.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "checkout", "line": line})
-            for line in err.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "checkout", "line": line})
-
-            yield _sse({"stage": "pull", "line": f"$ git fetch origin {branch}"})
-            rc3, _, fetch_err = await _run_git("fetch", "origin", branch)
-            if rc3 != 0:
-                async for event in _rollback_and_error(
-                    original_branch,
-                    original_commit,
-                    project_root,
-                    f"Fetch 失败: {fetch_err}",
-                ):
-                    yield event
-                return
-
-            target_ref = commit or f"origin/{branch}"
-            yield _sse({"stage": "pull", "line": f"$ git reset --hard {target_ref}"})
-            rc4, reset_out, reset_err = await _run_git("reset", "--hard", target_ref)
-            for line in reset_out.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "pull", "line": line})
-            for line in reset_err.splitlines():
-                if line.strip():
-                    yield _sse({"stage": "pull", "line": line})
-            if rc4 != 0:
-                async for event in _rollback_and_error(
-                    original_branch,
-                    original_commit,
-                    project_root,
-                    f"Reset 失败: {reset_err}",
-                ):
-                    yield event
-                return
-
-        async for event in _sync_and_restart(
-            project_root,
-            ref_type,
-            branch,
-        ):
-            yield event
-    except _UpdateError as exc:
-        async for event in _rollback_and_error(
-            original_branch,
-            original_commit,
-            project_root,
-            str(exc),
-        ):
-            yield event
-    except asyncio.CancelledError:
-        async for event in _rollback_and_error(
-            original_branch,
-            original_commit,
-            project_root,
-            "更新已取消，正在回滚",
-        ):
-            yield event
-        raise
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("更新流程异常，正在回滚")
-        async for event in _rollback_and_error(
-            original_branch,
-            original_commit,
-            project_root,
-            f"更新失败: {exc}",
-        ):
-            yield event
-
-
 @router.post("/execute")
 async def update_execute(request: Request) -> StreamingResponse:
     try:
@@ -448,8 +249,27 @@ async def update_execute(request: Request) -> StreamingResponse:
     if ref_type not in ("branch", "tag"):
         raise HTTPException(status_code=400, detail="'type' 必须是 'branch' 或 'tag'")
 
+    job = GitUpdateJob(branch, commit=commit, ref_type=ref_type)
+    queue = job.subscribe()
+    task_id = await _job_runner.start(job)
+
+    async def event_stream():
+        try:
+            yield _sse({"type": "task", "task_id": task_id})
+            while True:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=30.0)
+                except TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                yield _sse(payload)
+                if payload.get("type") in ("done", "error", "cancelled"):
+                    break
+        except asyncio.CancelledError:
+            pass
+
     return StreamingResponse(
-        _execute_update(branch, commit=commit, ref_type=ref_type),
+        event_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

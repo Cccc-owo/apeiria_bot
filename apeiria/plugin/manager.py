@@ -6,6 +6,7 @@ import yaml
 from nonebot.log import logger
 
 from apeiria.env.sync import sync_apeiria_env
+from apeiria.jobs.uv import find_uv
 
 
 def _read_plugins_yaml() -> dict:
@@ -31,10 +32,9 @@ def _is_safe_plugin_name(name: str) -> bool:
 
 
 def install_plugin(name: str, pkg_requirement: str) -> tuple[bool, str]:
-    import shutil
     import subprocess
 
-    uv = shutil.which("uv")
+    uv = find_uv()
     if uv is None:
         return False, "uv not found"
 
@@ -65,7 +65,6 @@ def install_plugin(name: str, pkg_requirement: str) -> tuple[bool, str]:
 
 
 def uninstall_plugin(name: str, *, keep_config: bool = False) -> bool:
-    import shutil
     import subprocess
 
     data = _read_plugins_yaml()
@@ -75,7 +74,7 @@ def uninstall_plugin(name: str, *, keep_config: bool = False) -> bool:
         logger.warning("Plugin {} not found in plugins.yaml", name)
         return False
 
-    uv = shutil.which("uv")
+    uv = find_uv()
     if uv is not None:
         subprocess.run(
             [uv, "remove", "--directory", ".apeiria", pkg],

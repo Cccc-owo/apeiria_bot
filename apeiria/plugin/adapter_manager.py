@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -8,6 +7,7 @@ import yaml
 from nonebot.log import logger
 
 from apeiria.env.sync import sync_apeiria_env
+from apeiria.jobs.uv import find_uv
 
 _ADAPTERS_TOML = Path(".apeiria/pyproject.toml")
 _ADAPTERS_SECTION = "[tool.nonebot.adapters]"
@@ -63,7 +63,7 @@ def _toml_remove_adapter(name: str) -> None:
 def install_adapter(
     name: str, pkg_requirement: str, module_name: str
 ) -> tuple[bool, str]:
-    uv = shutil.which("uv")
+    uv = find_uv()
     if uv is None:
         return False, "uv not found"
 
@@ -103,7 +103,7 @@ def uninstall_adapter(name: str, *, keep_config: bool = False) -> bool:
         logger.warning("Adapter {} not found in adapters.yaml", name)
         return False
 
-    uv = shutil.which("uv")
+    uv = find_uv()
     if uv is not None:
         subprocess.run(
             [uv, "remove", "--directory", ".apeiria", pkg],

@@ -497,7 +497,7 @@ async def api_task_stream(request: Request, task_id: str) -> StreamingResponse:
                     yield ": keepalive\n\n"
                     continue
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                if payload.get("type") in ("done", "error"):
+                if payload.get("type") in ("done", "error", "cancelled"):
                     break
         except asyncio.CancelledError:
             pass
@@ -506,6 +506,27 @@ async def api_task_stream(request: Request, task_id: str) -> StreamingResponse:
         event_stream(),
         media_type="text/event-stream",
     )
+
+
+@router.get("/tasks/{task_id}")
+async def api_task_status(task_id: str) -> JSONResponse:
+    runner = get_task_runner()
+    status = await runner.get_status(task_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return JSONResponse(content=status)
+
+
+@router.post("/tasks/{task_id}/cancel")
+async def api_task_cancel(task_id: str) -> JSONResponse:
+    runner = get_task_runner()
+    ok = await runner.cancel(task_id)
+    if not ok:
+        return JSONResponse(
+            content={"ok": False, "message": "task not found or already finished"},
+            status_code=404,
+        )
+    return JSONResponse(content={"ok": True})
 
 
 @router.post("/restart")
