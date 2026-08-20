@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -90,7 +91,9 @@ def _match_options(normalized: dict[str, object]) -> dict[str, object]:
     return options
 
 
-def _load_file(file_path: Path) -> tuple[list[TriggerRule], list[str]]:
+def _load_file(  # noqa: C901
+    file_path: Path,
+) -> tuple[list[TriggerRule], list[str]]:
     if not file_path.exists():
         return [], []
     try:
@@ -117,6 +120,10 @@ def _load_file(file_path: Path) -> tuple[list[TriggerRule], list[str]]:
         try:
             normalized = _normalize_rule(raw_rule)
             rule = TriggerRule(**cast("Any", normalized))
+            for match in rule.matches:
+                if match.type == "regex":
+                    flags = re.IGNORECASE if match.ignore_case else 0
+                    re.compile(match.pattern, flags)
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{prefix}: {exc}")
             continue

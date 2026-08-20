@@ -211,6 +211,27 @@ def test_load_rules_missing_file_returns_empty(tmp_path: Path) -> None:
     assert errors == []
 
 
+def test_load_rules_reports_invalid_regex(tmp_path: Path) -> None:
+    rules_file = tmp_path / "rules.yaml"
+    rules_file.write_text(
+        """
+rules:
+  - id: bad
+    matches:
+      - type: regex
+        pattern: "("
+    replies:
+      - text: x
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    rules, errors = load_rules([rules_file])
+
+    assert rules == ()
+    assert any("regex" in error or "pattern" in error for error in errors)
+
+
 # ---------------------------------------------------------------------------
 # service matching
 # ---------------------------------------------------------------------------
