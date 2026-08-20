@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-from urllib.parse import urlparse
-
 from nonebot.log import logger
 from sqlalchemy import event
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -72,15 +71,14 @@ class ApeiriaDatabase:
         return self._gate
 
     async def init(self) -> None:
-        parsed = urlparse(self._url)
-        if parsed.scheme not in _SUPPORTED_DB_SCHEMES:
+        url = make_url(self._url)
+        if url.drivername not in _SUPPORTED_DB_SCHEMES:
             raise ValueError(  # noqa: TRY003
                 f"Apeiria 当前仅支持 SQLite 数据库，收到不支持的数据库 URL: {self._url}"
             )
 
-        db_path: Path | None = None
-        if parsed.scheme in ("sqlite+aiosqlite", "sqlite"):
-            db_path = Path(parsed.path.lstrip("/"))
+        db_path = Path(url.database) if url.database else None
+        if db_path is not None:
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._engine = create_async_engine(self._url, echo=False)

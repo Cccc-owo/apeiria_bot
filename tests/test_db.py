@@ -108,3 +108,46 @@ async def test_apeiria_database_rejects_non_sqlite() -> None:
     db = ApeiriaDatabase("postgresql+asyncpg://user:pass@localhost/apeiria")
     with pytest.raises(ValueError, match="仅支持 SQLite"):
         await db.init()
+
+
+@pytest.mark.asyncio
+async def test_apeiria_database_relative_path_creates_parent(
+    tmp_path, monkeypatch
+) -> None:
+    from apeiria.db.engine import ApeiriaDatabase
+
+    monkeypatch.chdir(tmp_path)
+    db = ApeiriaDatabase("sqlite+aiosqlite:///data/nested/apeiria.db")
+    try:
+        await db.init()
+        assert (tmp_path / "data" / "nested").is_dir()
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_apeiria_database_absolute_path_creates_parent(tmp_path) -> None:
+    from apeiria.db.engine import ApeiriaDatabase
+
+    nested = tmp_path / "nested"
+    db = ApeiriaDatabase(f"sqlite+aiosqlite:////{nested}/apeiria.db")
+    try:
+        await db.init()
+        assert nested.is_dir()
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_apeiria_database_in_memory_skips_dir_creation(
+    tmp_path, monkeypatch
+) -> None:
+    from apeiria.db.engine import ApeiriaDatabase
+
+    monkeypatch.chdir(tmp_path)
+    db = ApeiriaDatabase("sqlite+aiosqlite://")
+    try:
+        await db.init()
+        assert list(tmp_path.iterdir()) == []
+    finally:
+        await db.close()
