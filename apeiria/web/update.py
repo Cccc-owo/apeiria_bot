@@ -18,6 +18,10 @@ router = APIRouter(prefix="/api/update", dependencies=[Depends(verify_token)])
 _DIRTY_BLOCK_MESSAGE = "工作区存在未提交的变更，请先处理后重试"
 
 
+class _UpdateError(RuntimeError):
+    pass
+
+
 async def _run_git(*args: str, cwd: Path | None = None) -> tuple[int, str, str]:
     if cwd is None:
         cwd = Path.cwd()
@@ -34,22 +38,6 @@ async def _run_git(*args: str, cwd: Path | None = None) -> tuple[int, str, str]:
         stdout.decode(errors="replace").strip(),
         stderr.decode(errors="replace").strip(),
     )
-
-
-async def _run_stream(*args: str, cwd: Path | None = None) -> AsyncIterator[str]:
-    if cwd is None:
-        cwd = Path.cwd()
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        cwd=cwd,
-    )
-    if proc.stdout is None:
-        return
-    async for line in proc.stdout:
-        yield line.decode(errors="replace").rstrip()
-    await proc.wait()
 
 
 def _sse(data: dict) -> str:
@@ -272,23 +260,30 @@ async def _sync_and_restart(
     project_root: Path,
     ref_type: str,
     branch: str,
-    original_branch: str,
-    original_commit: str,
 ) -> AsyncIterator[str]:
     uv = shutil.which("uv")
     if uv is None:
-        async for event in _rollback_and_error(
-            original_branch,
-            original_commit,
-            project_root,
-            "系统中未找到 uv 命令",
-        ):
-            yield event
-        return
+        raise _UpdateError("系统中未找到 uv 命令")  # noqa: TRY003
 
     yield _sse({"stage": "sync", "line": "$ uv sync"})
-    async for line in _run_stream(uv, "sync", cwd=project_root):
-        yield _sse({"stage": "sync", "line": line})
+    proc = await asyncio.create_subprocess_exec(
+        uv,
+        "sync",
+        cwd=project_root,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    if proc.stdout is not None:
+        async for line in proc.stdout:
+            yield _sse(
+                {
+                    "stage": "sync",
+                    "line": line.decode(errors="replace").rstrip(),
+                }
+            )
+    await proc.wait()
+    if proc.returncode != 0:
+        raise _UpdateError(f"uv sync 返回码: {proc.returncode}")  # noqa: TRY003
 
     yield _sse({"stage": "done", "line": "更新完成，即将重启..."})
     logger.success("Git update to {} '{}' completed. Restarting...", ref_type, branch)
@@ -299,7 +294,7 @@ async def _sync_and_restart(
     await graceful_restart()
 
 
-async def _execute_update(  # noqa: C901, PLR0912
+async def _execute_update(  # noqa: C901, PLR0912, PLR0915
     branch: str,
     commit: str | None = None,
     ref_type: str = "branch",
@@ -322,87 +317,114 @@ async def _execute_update(  # noqa: C901, PLR0912
         original_commit[:7],
     )
 
-    if ref_type == "tag":
-        yield _sse({"stage": "checkout", "line": "$ git fetch origin --tags"})
-        rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--tags")
-        if rc_fetch != 0:
-            yield _sse({"stage": "error", "line": f"Fetch tags 失败: {fetch_err}"})
-            return
-
-        target = commit or branch
-        yield _sse({"stage": "checkout", "line": f"$ git checkout {target}"})
-        rc2, out, err = await _run_git("checkout", target)
-        if rc2 != 0:
-            async for event in _rollback_and_error(
-                original_branch,
-                original_commit,
-                project_root,
-                f"Checkout 失败: {err}",
-            ):
-                yield event
-            return
-        for line in out.splitlines():
-            if line.strip():
-                yield _sse({"stage": "checkout", "line": line})
-        for line in err.splitlines():
-            if line.strip():
-                yield _sse({"stage": "checkout", "line": line})
-    else:
-        yield _sse({"stage": "checkout", "line": f"$ git checkout {branch}"})
-        rc2, out, err = await _run_git("checkout", branch)
-        if rc2 != 0:
-            err_stderr = await _run_git("checkout", "-b", branch, f"origin/{branch}")
-            if err_stderr[0] != 0:
-                msg = f"Checkout 失败: {err_stderr[2]}"
-                yield _sse({"stage": "error", "line": msg})
+    try:
+        if ref_type == "tag":
+            yield _sse({"stage": "checkout", "line": "$ git fetch origin --tags"})
+            rc_fetch, _, fetch_err = await _run_git("fetch", "origin", "--tags")
+            if rc_fetch != 0:
+                yield _sse({"stage": "error", "line": f"Fetch tags 失败: {fetch_err}"})
                 return
-            out = f"Switched to a new branch '{branch}'"
-        for line in out.splitlines():
-            if line.strip():
-                yield _sse({"stage": "checkout", "line": line})
-        for line in err.splitlines():
-            if line.strip():
-                yield _sse({"stage": "checkout", "line": line})
 
-        yield _sse({"stage": "pull", "line": f"$ git fetch origin {branch}"})
-        rc3, _, fetch_err = await _run_git("fetch", "origin", branch)
-        if rc3 != 0:
-            async for event in _rollback_and_error(
-                original_branch,
-                original_commit,
-                project_root,
-                f"Fetch 失败: {fetch_err}",
-            ):
-                yield event
-            return
+            target = commit or branch
+            yield _sse({"stage": "checkout", "line": f"$ git checkout {target}"})
+            rc2, out, err = await _run_git("checkout", target)
+            if rc2 != 0:
+                async for event in _rollback_and_error(
+                    original_branch,
+                    original_commit,
+                    project_root,
+                    f"Checkout 失败: {err}",
+                ):
+                    yield event
+                return
+            for line in out.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "checkout", "line": line})
+            for line in err.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "checkout", "line": line})
+        else:
+            yield _sse({"stage": "checkout", "line": f"$ git checkout {branch}"})
+            rc2, out, err = await _run_git("checkout", branch)
+            if rc2 != 0:
+                err_stderr = await _run_git(
+                    "checkout", "-b", branch, f"origin/{branch}"
+                )
+                if err_stderr[0] != 0:
+                    msg = f"Checkout 失败: {err_stderr[2]}"
+                    yield _sse({"stage": "error", "line": msg})
+                    return
+                out = f"Switched to a new branch '{branch}'"
+            for line in out.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "checkout", "line": line})
+            for line in err.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "checkout", "line": line})
 
-        target_ref = commit or f"origin/{branch}"
-        yield _sse({"stage": "pull", "line": f"$ git reset --hard {target_ref}"})
-        rc4, reset_out, reset_err = await _run_git("reset", "--hard", target_ref)
-        for line in reset_out.splitlines():
-            if line.strip():
-                yield _sse({"stage": "pull", "line": line})
-        for line in reset_err.splitlines():
-            if line.strip():
-                yield _sse({"stage": "pull", "line": line})
-        if rc4 != 0:
-            async for event in _rollback_and_error(
-                original_branch,
-                original_commit,
-                project_root,
-                f"Reset 失败: {reset_err}",
-            ):
-                yield event
-            return
+            yield _sse({"stage": "pull", "line": f"$ git fetch origin {branch}"})
+            rc3, _, fetch_err = await _run_git("fetch", "origin", branch)
+            if rc3 != 0:
+                async for event in _rollback_and_error(
+                    original_branch,
+                    original_commit,
+                    project_root,
+                    f"Fetch 失败: {fetch_err}",
+                ):
+                    yield event
+                return
 
-    async for event in _sync_and_restart(
-        project_root,
-        ref_type,
-        branch,
-        original_branch,
-        original_commit,
-    ):
-        yield event
+            target_ref = commit or f"origin/{branch}"
+            yield _sse({"stage": "pull", "line": f"$ git reset --hard {target_ref}"})
+            rc4, reset_out, reset_err = await _run_git("reset", "--hard", target_ref)
+            for line in reset_out.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "pull", "line": line})
+            for line in reset_err.splitlines():
+                if line.strip():
+                    yield _sse({"stage": "pull", "line": line})
+            if rc4 != 0:
+                async for event in _rollback_and_error(
+                    original_branch,
+                    original_commit,
+                    project_root,
+                    f"Reset 失败: {reset_err}",
+                ):
+                    yield event
+                return
+
+        async for event in _sync_and_restart(
+            project_root,
+            ref_type,
+            branch,
+        ):
+            yield event
+    except _UpdateError as exc:
+        async for event in _rollback_and_error(
+            original_branch,
+            original_commit,
+            project_root,
+            str(exc),
+        ):
+            yield event
+    except asyncio.CancelledError:
+        async for event in _rollback_and_error(
+            original_branch,
+            original_commit,
+            project_root,
+            "更新已取消，正在回滚",
+        ):
+            yield event
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("更新流程异常，正在回滚")
+        async for event in _rollback_and_error(
+            original_branch,
+            original_commit,
+            project_root,
+            f"更新失败: {exc}",
+        ):
+            yield event
 
 
 @router.post("/execute")

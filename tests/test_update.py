@@ -179,3 +179,32 @@ async def test_execute_update_reset_failure_rolls_back(monkeypatch) -> None:
     events = [event async for event in update._execute_update("main")]
 
     assert any('"Reset 失败: reset failed"' in event for event in events)
+
+
+@pytest.mark.asyncio
+async def test_execute_update_sync_failure_rolls_back(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "status --porcelain": (0, "", ""),
+        "rev-parse HEAD": (0, "originalcommit", ""),
+        "branch --show-current": (0, "main", ""),
+        "checkout main": (0, "Already on 'main'", ""),
+        "fetch origin main": (0, "", ""),
+        "reset --hard origin/main": (0, "", ""),
+        "reset --hard originalcommit": (0, "", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    async def fake_sync(*_args: object, **_kwargs: object):
+        raise update._UpdateError("uv sync 返回码: 1")  # noqa: TRY003
+        yield  # pragma: no cover - makes this an async generator
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+    monkeypatch.setattr(update, "_sync_and_restart", fake_sync)
+
+    events = [event async for event in update._execute_update("main")]
+
+    assert any('"uv sync 返回码: 1"' in event for event in events)
