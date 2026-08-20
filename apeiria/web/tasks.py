@@ -135,11 +135,17 @@ class TaskRunner:
 
         _toml_remove_adapter(name)
 
-    async def _sync_manifest_env(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
-        from apeiria.env.sync import sync_apeiria_env
-
+    async def _sync_manifest_env(
+        self, queue: asyncio.Queue[dict[str, Any]], uv: str
+    ) -> bool:
         await self._emit(queue, "output", "> uv sync")
-        sync_apeiria_env()
+        rc = await self._run_subprocess(queue, uv, "sync")
+        if rc != 0:
+            await queue.put(
+                {"type": "error", "ok": False, "message": f"uv sync 返回码: {rc}"}
+            )
+            return False
+        return True
 
     async def _do_install(
         self,
@@ -171,7 +177,8 @@ class TaskRunner:
             states = data.setdefault("states", {})
             states[name] = {"enabled": True}
             self._write_manifest(kind, data)
-            await self._sync_manifest_env(queue)
+            if not await self._sync_manifest_env(queue, uv):
+                return
 
         await queue.put(
             {
@@ -238,7 +245,8 @@ class TaskRunner:
             if not keep_config:
                 self._remove_config(kind, name)
 
-            await self._sync_manifest_env(queue)
+            if not await self._sync_manifest_env(queue, uv):
+                return
 
         await queue.put(
             {
@@ -272,7 +280,8 @@ class TaskRunner:
             data = self._read_manifest(kind)
             data.setdefault("packages", {})[name] = pkg_requirement
             self._write_manifest(kind, data)
-            await self._sync_manifest_env(queue)
+            if not await self._sync_manifest_env(queue, uv):
+                return
 
         await queue.put(
             {
