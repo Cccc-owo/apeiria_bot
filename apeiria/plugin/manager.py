@@ -24,6 +24,12 @@ def _write_plugins_yaml(data: dict) -> None:
     )
 
 
+def _is_safe_plugin_name(name: str) -> bool:
+    return (
+        bool(name) and name not in {".", ".."} and "/" not in name and "\\" not in name
+    )
+
+
 def install_plugin(name: str, pkg_requirement: str) -> tuple[bool, str]:
     import shutil
     import subprocess
@@ -84,8 +90,13 @@ def uninstall_plugin(name: str, *, keep_config: bool = False) -> bool:
     states.pop(name, None)
     _write_plugins_yaml(data)
 
-    local_path = Path(f".apeiria/plugins/{name}")
-    if local_path.is_dir():
+    local_path = Path(f".apeiria/plugins/{name}").resolve()
+    plugins_root = Path(".apeiria/plugins").resolve()
+    if (
+        _is_safe_plugin_name(name)
+        and local_path.is_relative_to(plugins_root)
+        and local_path.is_dir()
+    ):
         import shutil as _shutil
 
         _shutil.rmtree(local_path, ignore_errors=True)

@@ -149,3 +149,40 @@ def test_resolve_pypi_module_distinfo_empty_toplevel(tmp_path) -> None:
         )
         == "GenshinUID"
     )
+
+
+def test_is_safe_plugin_name() -> None:
+    from apeiria.plugin.manager import _is_safe_plugin_name
+
+    assert _is_safe_plugin_name("demo")
+    assert _is_safe_plugin_name("服务器状态查看")
+    assert not _is_safe_plugin_name("")
+    assert not _is_safe_plugin_name(".")
+    assert not _is_safe_plugin_name("..")
+    assert not _is_safe_plugin_name("../x")
+    assert not _is_safe_plugin_name("a/b")
+    assert not _is_safe_plugin_name("a\\b")
+
+
+def test_uninstall_plugin_does_not_delete_outside_plugins_dir(
+    tmp_path, monkeypatch
+) -> None:
+    from apeiria.plugin import manager
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".apeiria").mkdir()
+    (tmp_path / ".apeiria" / "plugins.yaml").write_text(
+        "dirs: []\npackages:\n  '../../data': demo\nstates: {}\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "data"
+    target.mkdir()
+    (target / "keep.txt").write_text("keep", encoding="utf-8")
+
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+
+    result = manager.uninstall_plugin("../../data", keep_config=True)
+
+    assert result is True
+    assert target.is_dir()
+    assert (target / "keep.txt").read_text(encoding="utf-8") == "keep"

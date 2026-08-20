@@ -213,8 +213,15 @@ class TaskRunner:
             if kind == "plugin":
                 from pathlib import Path
 
-                local_path = Path(f".apeiria/plugins/{name}")
-                if local_path.is_dir():
+                from apeiria.plugin.manager import _is_safe_plugin_name
+
+                local_path = Path(f".apeiria/plugins/{name}").resolve()
+                plugins_root = Path(".apeiria/plugins").resolve()
+                if (
+                    _is_safe_plugin_name(name)
+                    and local_path.is_relative_to(plugins_root)
+                    and local_path.is_dir()
+                ):
                     import shutil as _shutil
 
                     _shutil.rmtree(local_path, ignore_errors=True)
