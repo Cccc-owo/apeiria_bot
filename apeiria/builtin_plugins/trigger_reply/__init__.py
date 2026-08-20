@@ -1,43 +1,39 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from datetime import UTC, datetime
+from pathlib import Path
 
 from nonebot import require
 from nonebot.adapters import Bot, Event  # noqa: TC002
 from nonebot.log import logger
 from nonebot.matcher import Matcher  # noqa: TC002
-from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 from nonebot.plugin.on import on_message
 from nonebot.rule import Rule
 from nonebot.typing import T_State  # noqa: TC002
 
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import (
-    Alconna,
-    CommandMeta,
-    on_alconna,
-)
-
 require("nonebot_plugin_uninfo")
 from nonebot_plugin_uninfo import Uninfo  # noqa: TC002
 
 from .config import TriggerReplyConfig, get_trigger_reply_config
-from .loader import _ensure_loaded, _refresh_rules
-from .models import TriggerEntry, TriggerInput
-from .service import _evaluate
-
-require("nonebot_plugin_localstore")
+from .loader import collect_rule_files
+from .models import MatchResult, TriggerInput
+from .service import TriggerRuleSet
 
 __plugin_meta__ = PluginMetadata(
     name="触发回复",
     description="按独立规则文件响应特定消息。",
     homepage="https://github.com/Cccc-owo/apeiria_bot",
-    usage="在本插件规则文件中配置 entry、match 与 reply 后自动回复。",
+    usage="在规则文件中配置 rule、match 与 reply 后自动回复。",
     type="application",
     config=TriggerReplyConfig,
     supported_adapters=inherit_supported_adapters("nonebot_plugin_alconna"),
 )
+
+_rule_set: TriggerRuleSet | None = None
+_rule_paths: tuple[Path, ...] = ()
 
 
 def _extract_input(
@@ -48,16 +44,24 @@ def _extract_input(
     with suppress(Exception):
         if event.get_type() != "message":
             return None
+
     if session is None:
         user_id = None
         group_id = None
         platform = None
         with suppress(Exception):
             user_id = str(event.get_user_id())
+        user_name = None
+        group_name = None
     else:
         user_id = session.user.id
         group_id = session.scene.id if session.scene.is_group else None
         platform = str(session.scope)
+        with suppress(Exception):
+            user_name = session.user.nick or session.user.name or None
+        with suppress(Exception):
+            group_name = session.scene.name if session.scene.is_group else None
+
     bot_id = None
     with suppress(Exception):
         bot_id = bot.self_id
@@ -70,6 +74,17 @@ def _extract_input(
     is_to_me = False
     with suppress(Exception):
         is_to_me = event.is_tome()
+    message_id = None
+    with suppress(Exception):
+        raw_message_id = getattr(event, "message_id", None)
+        if raw_message_id is not None:
+            message_id = str(raw_message_id)
+
+    ts = getattr(event, "time", None)
+    now = datetime.now(UTC).astimezone()
+    tz = now.tzinfo
+    dt = datetime.fromtimestamp(ts, tz=tz) if isinstance(ts, (int, float)) else now
+
     return TriggerInput(
         platform=platform,
         bot_id=str(bot_id) if bot_id else None,
@@ -78,7 +93,36 @@ def _extract_input(
         message_text=message_text,
         plaintext=plaintext,
         is_to_me=is_to_me,
+        user_name=user_name,
+        group_name=group_name,
+        message_id=message_id,
+        time=dt.strftime("%H:%M"),
+        date=dt.strftime("%Y-%m-%d"),
     )
+
+
+def _get_rule_set(config: TriggerReplyConfig) -> TriggerRuleSet | None:
+    global _rule_set, _rule_paths  # noqa: PLW0603
+
+    paths = tuple(collect_rule_files(config))
+    if _rule_set is None or paths != _rule_paths:
+        new_set, errors = TriggerRuleSet.load(paths)
+        if errors:
+            logger.warning("触发回复初始加载存在错误: {}", "; ".join(errors))
+        _rule_set = new_set
+        _rule_paths = paths
+        return _rule_set
+
+    if _rule_set.has_changed():
+        new_set, errors = TriggerRuleSet.load(paths)
+        if errors:
+            logger.warning(
+                "触发回复重载失败，保留旧规则: {}",
+                "; ".join(errors),
+            )
+        else:
+            _rule_set = new_set
+    return _rule_set
 
 
 async def _rule_checker(
@@ -95,48 +139,16 @@ async def _rule_checker(
         if config.debug:
             logger.debug("触发回复跳过: 不支持的消息输入")
         return False
-    entries = _ensure_loaded(config)
-    if not entries:
+    rule_set = _get_rule_set(config)
+    if rule_set is None:
         return False
-    if not _fast_check(trigger, entries):
-        return False
-    result = _evaluate(trigger, entries)
+    result = rule_set.match(trigger)
     if result is None:
         if config.debug:
             logger.debug("触发回复跳过: 无匹配规则")
         return False
-    reply, matched_entry = result
-    state["_trigger_reply_text"] = reply
-    state["_trigger_reply_entry"] = matched_entry
+    state["_trigger_reply_result"] = result
     return True
-
-
-def _fast_check(  # noqa: C901
-    trigger: TriggerInput, entries: tuple[TriggerEntry, ...]
-) -> bool:
-    has_regex = False
-    candidates = {trigger.plaintext.lower(), trigger.message_text.lower()}
-    for entry in entries:
-        if not entry.enabled:
-            continue
-        for match in entry.matches:
-            if match.type == "regex":
-                has_regex = True
-                continue
-            pattern = match.pattern or ""
-            if not pattern:
-                continue
-            kw = pattern.lower() if match.ignore_case else pattern
-            for text in candidates:
-                if match.type == "full" and text == kw:
-                    return True
-                if match.type == "start" and text.startswith(kw):
-                    return True
-                if match.type == "end" and text.endswith(kw):
-                    return True
-                if match.type == "fuzzy" and kw in text:
-                    return True
-    return bool(has_regex)
 
 
 _message = on_message(
@@ -144,44 +156,16 @@ _message = on_message(
     priority=12,
     block=False,
 )
-_reload = on_alconna(
-    Alconna(
-        "重载回复",
-        meta=CommandMeta(description="重新加载触发回复规则文件"),
-    ),
-    aliases={"tr"},
-    permission=SUPERUSER,
-    use_cmd_start=True,
-    priority=5,
-    block=True,
-)
 
 
 @_message.handle()
 async def handle_trigger_message(matcher: Matcher, state: T_State) -> None:
-    reply_text: str = state.get("_trigger_reply_text", "")
-    if not reply_text:
+    result: MatchResult | None = state.get("_trigger_reply_result")
+    if result is None:
         return
-    entry = state.get("_trigger_reply_entry")
-    if entry is not None and getattr(entry, "block", False):
+    if result.rule.block:
         matcher.stop_propagation()
-    await matcher.send(reply_text)
+    await matcher.send(result.text)
 
 
-@_reload.handle()
-async def handle_trigger_reply_reload() -> None:
-    config = get_trigger_reply_config()
-    count, errors = _refresh_rules(config)
-    if errors:
-        await _reload.finish(
-            f"触发回复规则已重载：{count} 条可用，{len(errors)} 个错误。"
-        )
-    await _reload.finish(f"触发回复规则已重载：{count} 条可用。")
-
-
-__all__ = [
-    "_message",
-    "_reload",
-    "handle_trigger_message",
-    "handle_trigger_reply_reload",
-]
+__all__ = ["_message", "handle_trigger_message"]

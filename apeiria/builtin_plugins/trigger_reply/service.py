@@ -1,9 +1,20 @@
-# ruff: noqa: TC001
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping, Sequence
+from functools import lru_cache
+from pathlib import Path
 from random import choices, random
 
-from .models import IdFilter, TriggerEntry, TriggerInput, TriggerMatch, TriggerReply
+from .loader import files_signature, load_rules
+from .models import (
+    MatchResult,
+    TriggerInput,
+    TriggerMatch,
+    TriggerReply,
+    TriggerRule,
+)
+from .template import render_template
 
 
 def _scoped_id(platform: str | None, value: str | None) -> str | None:
@@ -12,34 +23,52 @@ def _scoped_id(platform: str | None, value: str | None) -> str | None:
     return f"{platform}:{value}"
 
 
-def _filter_allows(filter_obj: IdFilter, target: str | None) -> bool:
-    if not filter_obj.values:
+def _filter_allows(
+    ids: Sequence[str],
+    mode: str,
+    target: str | None,
+) -> bool:
+    if not ids:
         return True
     if target is None:
         return False
-    matches = target in filter_obj.values
-    platform, _, __ = target.partition(":")
-    matches = matches or f"{platform}:*" in filter_obj.values
-    return matches if filter_obj.mode == "white" else not matches
+    platform, _, _ = target.partition(":")
+    matches = target in ids or f"{platform}:*" in ids
+    return matches if mode == "white" else not matches
 
 
-def _do_match(  # noqa: C901, PLR0911, PLR0912
-    trigger: TriggerInput,
+@lru_cache(maxsize=256)
+def _compile_regex(pattern: str, *, ignore_case: bool) -> re.Pattern[str]:
+    flags = re.IGNORECASE if ignore_case else 0
+    return re.compile(pattern, flags)
+
+
+def _match_one(  # noqa: C901, PLR0911, PLR0912
     match: TriggerMatch,
-) -> str | None:
+    trigger: TriggerInput,
+) -> tuple[str, dict[str, str]] | None:
     if match.to_me and not trigger.is_to_me:
         return None
-    pattern = match.pattern
-    if pattern is None:
-        return None
+
     message_text = trigger.message_text
     plaintext = trigger.plaintext
+    pattern = match.pattern
+
     if match.strip:
         message_text = message_text.strip()
         plaintext = plaintext.strip()
         pattern = pattern.strip()
+
     if match.type == "regex":
-        return _match_regex(match, message_text, plaintext)
+        compiled = _compile_regex(pattern, ignore_case=match.ignore_case)
+        m = compiled.search(message_text)
+        if m is None and match.allow_plaintext:
+            m = compiled.search(plaintext)
+        if m is None:
+            return None
+        captures = {key: value or "" for key, value in m.groupdict().items()}
+        return m.group(0), captures
+
     cmp_msg = message_text
     cmp_plain = plaintext
     cmp_pattern = pattern
@@ -47,88 +76,124 @@ def _do_match(  # noqa: C901, PLR0911, PLR0912
         cmp_msg = cmp_msg.lower()
         cmp_plain = cmp_plain.lower()
         cmp_pattern = cmp_pattern.lower()
+
     if match.type == "full":
         if cmp_msg == cmp_pattern:
-            return message_text
+            return message_text, {}
         if match.allow_plaintext and cmp_plain == cmp_pattern:
-            return plaintext
+            return plaintext, {}
     elif match.type == "start":
         if cmp_msg.startswith(cmp_pattern):
-            return message_text
+            return message_text, {}
         if match.allow_plaintext and cmp_plain.startswith(cmp_pattern):
-            return plaintext
+            return plaintext, {}
     elif match.type == "end":
         if cmp_msg.endswith(cmp_pattern):
-            return message_text
+            return message_text, {}
         if match.allow_plaintext and cmp_plain.endswith(cmp_pattern):
-            return plaintext
+            return plaintext, {}
     else:
         if cmp_pattern in cmp_msg:
-            return message_text
+            return message_text, {}
         if match.allow_plaintext and cmp_pattern in cmp_plain:
-            return plaintext
+            return plaintext, {}
     return None
 
 
-def _match_regex(match: TriggerMatch, message_text: str, plaintext: str) -> str | None:
-    if match.compiled_pattern is None:
-        return None
-    m = match.compiled_pattern.search(message_text)
-    if m is None and match.allow_plaintext:
-        m = match.compiled_pattern.search(plaintext)
-    if m is None:
-        return None
-    return m.group(0)
+def _select_reply(replies: tuple[TriggerReply, ...]) -> TriggerReply:
+    weights = tuple(reply.weight for reply in replies)
+    return choices(replies, weights=weights, k=1)[0]
 
 
-def _substitute(template: str, trigger: TriggerInput, triggered_text: str) -> str:
-    values: dict[str, str] = {
+def _build_context(
+    trigger: TriggerInput,
+    rule: TriggerRule,
+    captures: Mapping[str, str],
+    triggered_text: str,
+) -> dict[str, str]:
+    context: dict[str, str] = {
         "user_id": trigger.user_id or "",
+        "user_name": trigger.user_name or "",
         "group_id": trigger.group_id or "",
+        "group_name": trigger.group_name or "",
+        "platform": trigger.platform or "",
+        "scene": trigger.scene,
+        "scene_id": trigger.group_id or trigger.user_id or "",
+        "bot_id": trigger.bot_id or "",
         "message": trigger.message_text,
         "text": trigger.plaintext,
         "trigger": triggered_text,
-        "bot_id": trigger.bot_id or "",
+        "message_id": trigger.message_id or "",
+        "time": trigger.time,
+        "date": trigger.date,
     }
-    if trigger.group_id is None:
-        values["group_id"] = ""
-    try:
-        return template.format(**values)
-    except Exception:  # noqa: BLE001
-        return template
+    for key, value in rule.vars.items():
+        context[key] = str(value)
+    context.update(captures)
+    return context
 
 
-def _select_reply(replies: tuple[TriggerReply, ...]) -> str:
-    texts = tuple(r.text for r in replies)
-    weights = tuple(r.weight for r in replies)
-    return choices(texts, weights=weights, k=1)[0]
+class TriggerRuleSet:
+    def __init__(
+        self,
+        rules: tuple[TriggerRule, ...],
+        paths: tuple[Path, ...] = (),
+        signature: tuple[tuple[str, int, int], ...] = (),
+    ) -> None:
+        self.rules = rules
+        self._paths = paths
+        self._signature = signature
 
+    @classmethod
+    def load(cls, paths: Sequence[Path]) -> tuple["TriggerRuleSet", list[str]]:
+        rules, errors = load_rules(paths)
+        return cls(
+            rules,
+            tuple(paths),
+            files_signature(paths),
+        ), errors
 
-def _evaluate(
-    trigger: TriggerInput, entries: tuple[TriggerEntry, ...]
-) -> tuple[str, TriggerEntry] | None:
-    for entry in entries:
-        if not entry.enabled:
-            continue
-        if entry.scenes and trigger.scene not in entry.scenes:
-            continue
-        if entry.groups and not _filter_allows(
-            entry.groups, _scoped_id(trigger.platform, trigger.group_id)
-        ):
-            continue
-        if entry.users and not _filter_allows(
-            entry.users, _scoped_id(trigger.platform, trigger.user_id)
-        ):
-            continue
-        triggered_text: str | None = None
-        for match in entry.matches:
-            triggered_text = _do_match(trigger, match)
-            if triggered_text is not None:
-                break
-        if triggered_text is None:
-            continue
-        if entry.chance < 1.0 and random() >= entry.chance:
-            continue
-        reply_template = _select_reply(entry.replies)
-        return _substitute(reply_template, trigger, triggered_text), entry
-    return None
+    def has_changed(self) -> bool:
+        return files_signature(self._paths) != self._signature
+
+    def match(self, trigger: TriggerInput) -> MatchResult | None:
+        for rule in self.rules:
+            if not rule.enabled:
+                continue
+            if rule.scenes and trigger.scene not in rule.scenes:
+                continue
+            if rule.groups and not _filter_allows(
+                rule.groups,
+                rule.group_mode,
+                _scoped_id(trigger.platform, trigger.group_id),
+            ):
+                continue
+            if rule.users and not _filter_allows(
+                rule.users,
+                rule.user_mode,
+                _scoped_id(trigger.platform, trigger.user_id),
+            ):
+                continue
+
+            triggered_text: str | None = None
+            captures: dict[str, str] = {}
+            for match in rule.matches:
+                matched = _match_one(match, trigger)
+                if matched is not None:
+                    triggered_text, captures = matched
+                    break
+            if triggered_text is None:
+                continue
+
+            if rule.chance < 1.0 and random() >= rule.chance:
+                continue
+
+            reply = _select_reply(rule.replies)
+            context = _build_context(trigger, rule, captures, triggered_text)
+            return MatchResult(
+                text=render_template(reply.text, context),
+                rule=rule,
+                triggered_text=triggered_text,
+                context=context,
+            )
+        return None
