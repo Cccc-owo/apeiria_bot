@@ -326,8 +326,8 @@ async def login(data: LoginRequest, request: Request) -> JSONResponse:
             )
     web = _web_config()
     password_hash = await _require_password_hash()
-    ok = data.username == web.username and verify_dashboard_password(
-        password_hash, data.password
+    ok = data.username == web.username and await asyncio.to_thread(
+        verify_dashboard_password, password_hash, data.password
     )
     if not ok:
         async with _login_lock:
@@ -350,15 +350,17 @@ async def login(data: LoginRequest, request: Request) -> JSONResponse:
 @auth_router.post("/change-password", dependencies=[Depends(verify_token)])
 async def change_password(data: ChangePasswordRequest) -> JSONResponse:
     password_hash = await _require_password_hash()
-    if not verify_dashboard_password(password_hash, data.old_password):
+    old_ok = await asyncio.to_thread(
+        verify_dashboard_password, password_hash, data.old_password
+    )
+    if not old_ok:
         raise HTTPException(status_code=400, detail="Old password incorrect")
     try:
         validate_dashboard_password(data.new_password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    await _set_setting(
-        _SETTING_PASSWORD_HASH, hash_dashboard_password(data.new_password)
-    )
+    new_hash = await asyncio.to_thread(hash_dashboard_password, data.new_password)
+    await _set_setting(_SETTING_PASSWORD_HASH, new_hash)
     await _set_setting(_SETTING_PASSWORD_MUST_CHANGE, "0")
     return JSONResponse(content={"ok": True})
 
@@ -373,8 +375,7 @@ async def force_change_password(data: ForceChangePasswordRequest) -> JSONRespons
         validate_dashboard_password(data.new_password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    await _set_setting(
-        _SETTING_PASSWORD_HASH, hash_dashboard_password(data.new_password)
-    )
+    new_hash = await asyncio.to_thread(hash_dashboard_password, data.new_password)
+    await _set_setting(_SETTING_PASSWORD_HASH, new_hash)
     await _set_setting(_SETTING_PASSWORD_MUST_CHANGE, "0")
     return JSONResponse(content={"ok": True})
