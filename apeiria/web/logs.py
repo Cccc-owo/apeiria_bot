@@ -15,7 +15,7 @@ from nonebot.log import logger
 from apeiria.web.auth import verify_token
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Iterator
 
     from loguru import Message
 
@@ -99,6 +99,69 @@ def quiet_asgi_cancel_errors() -> None:
         logging.getLogger("uvicorn.error").addFilter(_AsgiCancelledFilter())
 
     get_driver().on_startup(_apply)
+
+
+def _parse_log_line(line: str) -> dict[str, Any] | None:
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    record = obj.get("record", {})
+    level_obj = record.get("level", {})
+    return {
+        "ts": record.get("time", {}).get("timestamp"),
+        "no": level_obj.get("no", 0),
+        "level": level_obj.get("name", ""),
+        "name": record.get("name") or "",
+        "message": record.get("message") or "",
+    }
+
+
+def _record_matches(  # noqa: PLR0913
+    record: dict[str, Any],
+    *,
+    level: str,
+    query: str,
+    source: str,
+    since: float | None,
+    until: float | None,
+) -> bool:
+    if level:
+        min_no = _LEVEL_NO.get(level, 0)
+        if record["no"] < min_no:
+            return False
+    if query:
+        needle = query.lower()
+        if (
+            needle not in record["message"].lower()
+            and needle not in record["name"].lower()
+        ):
+            return False
+    if source and source.lower() not in record["name"].lower():
+        return False
+    if since is not None and (record["ts"] is None or record["ts"] < since):
+        return False
+    return not (until is not None and (record["ts"] is None or record["ts"] > until))
+
+
+def _iter_reverse_lines(path: Path) -> Iterator[str]:
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        pos = f.tell()
+        pending = b""
+        while pos > 0:
+            read_size = min(64 * 1024, pos)
+            pos -= read_size
+            f.seek(pos)
+            chunk = f.read(read_size)
+            data = chunk + pending
+            lines = data.split(b"\n")
+            pending = lines[0]
+            for line in reversed(lines[1:]):
+                if line:
+                    yield line.decode(errors="replace")
+        if pending:
+            yield pending.decode(errors="replace")
 
 
 class LogHub:
@@ -191,54 +254,33 @@ class LogHub:
         if path is None or not path.exists():
             return {"items": [], "total": 0, "page": page, "size": size}
 
-        records: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
+        start = max((page - 1) * size, 0)
+        end = start + size
+        total = 0
+        items: list[dict[str, Any]] = []
+
+        for line in _iter_reverse_lines(path):
+            record = _parse_log_line(line)
+            if record is None or not _record_matches(
+                record,
+                level=level,
+                query=query,
+                source=source,
+                since=since,
+                until=until,
+            ):
                 continue
-            record = obj.get("record", {})
-            level_obj = record.get("level", {})
-            records.append(
-                {
-                    "ts": record.get("time", {}).get("timestamp"),
-                    "no": level_obj.get("no", 0),
-                    "level": level_obj.get("name", ""),
-                    "name": record.get("name") or "",
-                    "message": record.get("message") or "",
-                }
-            )
+            if start <= total < end:
+                items.append(
+                    {
+                        "ts": record["ts"],
+                        "level": record["level"],
+                        "name": record["name"],
+                        "message": record["message"],
+                    }
+                )
+            total += 1
 
-        if level:
-            min_no = _LEVEL_NO.get(level, 0)
-            records = [r for r in records if r["no"] >= min_no]
-        if query:
-            needle = query.lower()
-            records = [
-                r
-                for r in records
-                if needle in r["message"].lower() or needle in r["name"].lower()
-            ]
-        if source:
-            src = source.lower()
-            records = [r for r in records if src in r["name"].lower()]
-        if since is not None:
-            records = [r for r in records if r["ts"] is not None and r["ts"] >= since]
-        if until is not None:
-            records = [r for r in records if r["ts"] is not None and r["ts"] <= until]
-
-        records.reverse()
-        total = len(records)
-        start = (page - 1) * size
-        items = [
-            {
-                "ts": r["ts"],
-                "level": r["level"],
-                "name": r["name"],
-                "message": r["message"],
-            }
-            for r in records[start : start + size]
-        ]
         return {"items": items, "total": total, "page": page, "size": size}
 
 
