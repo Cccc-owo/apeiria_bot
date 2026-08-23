@@ -268,7 +268,7 @@ fetchStatus();
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-6 p-6 lg:p-8">
+  <div class="flex min-h-0 flex-1 flex-col p-6 lg:p-8">
     <PageHeader
       :title="t('update.title')"
       :subtitle="t('update.subtitle')"
