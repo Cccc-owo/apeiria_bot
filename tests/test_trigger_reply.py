@@ -446,3 +446,71 @@ def test_priority_uses_first_match() -> None:
     )
     assert result is not None
     assert result.text == "high"
+
+
+# ---------------------------------------------------------------------------
+# 回归: _filter_allows 排除式放行 / 模板假值变量 / 映射形式 match 继承顶层选项
+# ---------------------------------------------------------------------------
+
+
+def test_black_group_mode_allows_private() -> None:
+    """黑名单组: 只在列出组内禁用, 私聊(无 group)与未列出组仍应触发。"""
+    rule = _rule(
+        groups=("qq:g1", "qq:g2"),
+        group_mode="black",
+        matches=(TriggerMatch(type="full", pattern="hello"),),
+        replies=(TriggerReply(text="hi"),),
+    )
+    assert (
+        _ruleset((rule,)).match(_input(message_text="hello", group_id=None)) is not None
+    )
+    assert (
+        _ruleset((rule,)).match(_input(message_text="hello", group_id="g3")) is not None
+    )
+    assert _ruleset((rule,)).match(_input(message_text="hello", group_id="g1")) is None
+
+
+def test_white_group_mode_still_blocks_private() -> None:
+    """白名单组: 私聊(无 group)仍应被排除, 只对列出组生效。"""
+    rule = _rule(
+        groups=("qq:g1",),
+        group_mode="white",
+        matches=(TriggerMatch(type="full", pattern="hello"),),
+        replies=(TriggerReply(text="hi"),),
+    )
+    assert _ruleset((rule,)).match(_input(message_text="hello", group_id=None)) is None
+    assert (
+        _ruleset((rule,)).match(_input(message_text="hello", group_id="g1")) is not None
+    )
+
+
+def test_template_if_falsy_scalar_uses_else() -> None:
+    """布尔 False / 数字 0 应走 else 分支, 不能被 stringify 成真值。"""
+    rule = _rule(
+        vars={"enabled": False, "count": 0},
+        matches=(TriggerMatch(type="full", pattern="hello"),),
+        replies=(
+            TriggerReply(
+                text=(
+                    "{% if enabled %}TRUE{% else %}FALSE{% endif %}|"
+                    "{% if count %}NONZERO{% else %}ZERO{% endif %}"
+                ),
+            ),
+        ),
+    )
+    result = _ruleset((rule,)).match(_input(message_text="hello", plaintext="hello"))
+    assert result is not None
+    assert result.text == "FALSE|ZERO"
+
+
+def test_mapping_match_inherits_rule_options() -> None:
+    """映射形式 match 应与字符串形式一致: 继承顶层 type 与 matching 选项。"""
+    from apeiria.builtin_plugins.trigger_reply.loader import _normalize_rule
+
+    norm = _normalize_rule(
+        {"id": "m", "match": [{"pattern": "hi"}], "ignore_case": False}
+    )
+    assert norm["matches"] == [{"type": "full", "pattern": "hi", "ignore_case": False}]
+
+    norm2 = _normalize_rule({"id": "m2", "match": [{"type": "end", "pattern": "hi"}]})
+    assert norm2["matches"] == [{"type": "end", "pattern": "hi"}]

@@ -32,10 +32,11 @@ def _filter_allows(
 ) -> bool:
     if not ids:
         return True
-    if target is None:
-        return False
-    platform, _, _ = target.partition(":")
-    matches = target in ids or f"{platform}:*" in ids
+    matches = False
+    if target is not None:
+        platform, _, _ = target.partition(":")
+        matches = target in ids or f"{platform}:*" in ids
+    # white: 只能在列出名单内触发; black: 除列出名单外都触发(含无群/无用户背景)
     return matches if mode == "white" else not matches
 
 
@@ -112,8 +113,8 @@ def _build_context(
     rule: TriggerRule,
     captures: Mapping[str, str],
     triggered_text: str,
-) -> dict[str, str]:
-    context: dict[str, str] = {
+) -> dict[str, object]:
+    context: dict[str, object] = {
         "user_id": trigger.user_id or "",
         "user_name": trigger.user_name or "",
         "group_id": trigger.group_id or "",
@@ -129,8 +130,7 @@ def _build_context(
         "time": trigger.time,
         "date": trigger.date,
     }
-    for key, value in rule.vars.items():
-        context[key] = str(value)
+    context.update(rule.vars)
     context.update(captures)
     return context
 

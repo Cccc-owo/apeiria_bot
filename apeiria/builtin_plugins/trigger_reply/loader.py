@@ -59,7 +59,9 @@ def _normalize_rule(  # noqa: C901, PLR0912
                         }
                     )
                 elif isinstance(item, Mapping):
-                    matches.append(dict(item))
+                    merged = dict(item)
+                    merged.setdefault("type", match_type)
+                    matches.append({**_match_options(normalized), **merged})
         normalized["matches"] = matches
 
     if "reply" in normalized and "replies" not in normalized:

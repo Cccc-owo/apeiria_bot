@@ -70,4 +70,4 @@ class MatchResult:
     text: str
     rule: TriggerRule
     triggered_text: str
-    context: dict[str, str]
+    context: dict[str, object]
