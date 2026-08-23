@@ -74,6 +74,7 @@ select = [
     "E",     # pycodestyle errors
     "I",     # isort
     "C90",   # mccabe
+    "D",     # pydocstyle (Google convention)
     "N",     # pep8-naming
     "PL",    # pylint
     "UP",    # pyupgrade
@@ -140,11 +141,15 @@ allowed-confusables = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN001", "PLR2004"]
-"alembic/versions/*" = ["ANN001", "ANN201", "ANN202"]
+"tests/*" = ["ANN001", "PLR2004", "D"]
+"alembic/versions/*" = ["ANN001", "ANN201", "ANN202", "D"]
+"alembic/*" = ["D"]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

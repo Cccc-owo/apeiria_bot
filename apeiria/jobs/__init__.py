@@ -1,3 +1,5 @@
+"""Re-export the public job primitives for the ``apeiria.jobs`` package."""
+
 from apeiria.jobs.base import Job, JobRunner, JobStatus
 from apeiria.jobs.git_update import GitUpdateJob
 from apeiria.jobs.package import PackageJob

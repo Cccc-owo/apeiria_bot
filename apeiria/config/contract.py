@@ -1,3 +1,5 @@
+"""Resolve configuration contracts for loaded NoneBot plugins."""
+
 from __future__ import annotations
 
 import nonebot
@@ -9,6 +11,14 @@ from apeiria.config.schema import ConfigContract
 
 
 def _find_loaded_plugin(identifier: str):
+    """Return the loaded plugin matching the given identifier.
+
+    Args:
+        identifier: The plugin module name or plugin name to match.
+
+    Returns:
+        The matching plugin object, or None if no plugin matches.
+    """
     return next(
         (
             item
@@ -20,6 +30,14 @@ def _find_loaded_plugin(identifier: str):
 
 
 def _build_aliases(config_model: type[BaseModel]) -> dict[str, str]:
+    """Build a mapping of field names to their configured aliases.
+
+    Args:
+        config_model: The Pydantic config model to inspect.
+
+    Returns:
+        A dict mapping field name to alias for fields that define one.
+    """
     return {
         name: field_info.alias
         for name, field_info in config_model.model_fields.items()
@@ -28,6 +46,15 @@ def _build_aliases(config_model: type[BaseModel]) -> dict[str, str]:
 
 
 def resolve_config_namespace_contract(module_name: str) -> ConfigContract:
+    """Resolve the configuration contract for a plugin by module name.
+
+    Args:
+        module_name: The module name that identifies the plugin.
+
+    Returns:
+        A populated ConfigContract when the plugin exposes a Pydantic
+        config model, otherwise an empty "none" contract.
+    """
     plugin = _find_loaded_plugin(module_name)
 
     if plugin is not None and plugin.metadata is not None:

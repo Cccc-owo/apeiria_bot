@@ -1,3 +1,5 @@
+"""Core repeating logic for the repeater plugin."""
+
 from __future__ import annotations
 
 import time
@@ -10,10 +12,12 @@ if TYPE_CHECKING:
 
 
 class _RoundState:
-    """同一群内同一内容的一轮复读追踪状态。
+    """Track one active repeating round for a group and content.
 
-    一轮 = 群友连续发送相同 content_hash 的消息，直到有人换内容为止。
-    last_triggered_at 为 0.0 表示本轮还没复读过，> 0 表示已触发过复读。
+    A round starts when group members send messages with the same content
+    hash and ends when someone sends different content. ``last_triggered_at``
+    is ``0.0`` while the round has not yet triggered a repeat, and greater
+    than ``0`` once it has.
     """
 
     __slots__ = (
@@ -35,6 +39,17 @@ class _RoundState:
         last_triggered_at: float,
         last_updated_at: float | None = None,
     ) -> None:
+        """Initialize a round state for one group's repeated content.
+
+        Args:
+            content_hash (str): Hash identifying the round's content.
+            message (Any): The message object stored for the round.
+            count (int): Number of messages counted in the round so far.
+            last_user_id (str): User id of the most recent sender.
+            last_triggered_at (float): Timestamp of the last repeat, or ``0.0``.
+            last_updated_at (float | None): Timestamp of the last update;
+                defaults to the current monotonic time.
+        """
         self.content_hash = content_hash
         self.message = message
         self.count = count
@@ -46,26 +61,44 @@ class _RoundState:
 
 
 def hash_message(message: Any) -> str:
-    """对消息内容做稳定哈希，用于判断两条消息是否"相同"。"""
+    """Return a stable hash of the message content.
+
+    Args:
+        message (Any): The message object to hash.
+
+    Returns:
+        str: The SHA-256 hex digest of the message's string form.
+    """
     raw = str(message)
     return sha256(raw.encode("utf-8")).hexdigest()
 
 
 class RepeaterService:
-    """复读机核心逻辑，按群维度追踪复读轮次并决定是否触发。
+    """Core logic that tracks repeating rounds per group and decides when to repeat.
 
-    生命周期：全局单例，内存状态，重启清空。
+    Lifecycle: a global in-memory singleton whose state is cleared on restart.
     """
 
     _CLEANUP_INTERVAL = 50
 
     def __init__(self) -> None:
+        """Initialize an empty service with no tracked per-group state."""
         self._states: dict[str, _RoundState] = {}
         self._last_triggered: dict[str, float] = {}
         self._call_count = 0
 
     def _cleanup_stale(self, now: float, ttl: float) -> None:
-        """清除超过 ttl 秒没更新的僵死状态，防止长期不活跃的群占用内存。"""
+        """Drop round states that have been idle for longer than the TTL.
+
+        Remove states whose last update is older than ``ttl`` seconds, along
+        with their corresponding last-triggered records, so that long-inactive
+        groups do not leak memory.
+
+        Args:
+            now (float): Current monotonic timestamp.
+            ttl (float): Maximum age in seconds before a state is considered
+                stale.
+        """
         self._states = {
             k: v for k, v in self._states.items() if now - v.last_updated_at < ttl
         }
@@ -82,13 +115,26 @@ class RepeaterService:
         *,
         config: RepeaterConfig,
     ) -> Any | None:
-        """根据当前消息评估是否复读，返回原始消息表示触发，None 表示跳过。
+        """Evaluate a message and return it when it should be repeated.
 
-        判据链路（任一不满足即返回 None）：
-        1. 同群同一内容（content_hash）累计次数 >= repeat_threshold
-        2. 本轮尚未复读过（last_triggered_at == 0）
-        3. 距上次复读 >= cooldown_seconds
-        4. random() < probability
+        Return the original message to trigger a repeat when the round count
+        for the same group and content reaches the configured repeat threshold,
+        the round has not yet repeated, the per-group cooldown has elapsed, and
+        ``random()`` falls below the configured probability. Otherwise return
+        ``None`` to skip the message. Consecutive messages from the same user
+        are not counted.
+
+        Args:
+            group_scope (str): Group scope identifier, typically
+                ``scope:group_id``.
+            content_hash (str): Stable hash of the message content.
+            message (Any): The incoming message object to evaluate.
+            user_id (str): User id of the message sender.
+            config (RepeaterConfig): Plugin configuration.
+
+        Returns:
+            Any | None: The original message when repeating should trigger,
+                otherwise ``None``.
         """
         now = time.monotonic()
         self._call_count += 1
@@ -169,7 +215,11 @@ class RepeaterService:
         return message
 
     def reset(self, group_scope: str) -> None:
-        """重置指定群的状态（测试/调试用）。"""
+        """Reset the tracked state for the given group (for testing/debugging).
+
+        Args:
+            group_scope (str): Group scope identifier whose state to clear.
+        """
         self._states.pop(group_scope, None)
         self._last_triggered.pop(group_scope, None)
 

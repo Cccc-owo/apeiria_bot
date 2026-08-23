@@ -1,3 +1,5 @@
+"""Provide a job that self-updates a git checkout and restarts the bot."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,6 +14,15 @@ _DIRTY_BLOCK_MESSAGE = "工作区存在未提交的变更，请先处理后重�
 
 
 async def _run_git(*args: str, cwd: Path | None = None) -> tuple[int, str, str]:
+    """Run a git subprocess and return its exit code plus stdout and stderr.
+
+    Args:
+        args: The git arguments to pass after the ``git`` executable.
+        cwd: Working directory for the command; defaults to the current one.
+
+    Returns:
+        A tuple of the process return code, stripped stdout, and stripped stderr.
+    """
     if cwd is None:
         cwd = Path.cwd()
     proc = await asyncio.create_subprocess_exec(
@@ -42,6 +53,16 @@ class GitUpdateJob(Job):
         restart: bool = True,
         dirty_strategy: str = "block",
     ) -> None:
+        """Initialize a git update job.
+
+        Args:
+            branch: The branch or tag name to update to.
+            commit: Optional explicit commit to reset to, falling back to the ref.
+            ref_type: Either ``branch`` or ``tag``, selecting the update path.
+            project_root: The checkout to update; defaults to the current directory.
+            restart: Whether to restart the bot after the update completes.
+            dirty_strategy: How to handle uncommitted changes: ``block`` or ``stash``.
+        """
         super().__init__(kind="git_update", lock_name="git")
         self.branch = branch
         self.commit = commit
@@ -54,14 +75,27 @@ class GitUpdateJob(Job):
         self._stash_created = False
 
     def _emit_stage(self, stage: str, line: str) -> None:
+        """Emit a single stage line for this job.
+
+        Args:
+            stage: The stage label to attach to the event.
+            line: The text of the stage line.
+        """
         self.emit({"type": "stage", "stage": stage, "line": line})
 
     async def _emit_git_output(self, stage: str, output: str) -> None:
+        """Emit each non-empty line of git output as a stage event.
+
+        Args:
+            stage: The stage label to attach to each emitted line.
+            output: The raw git output to split into lines.
+        """
         for line in output.splitlines():
             if line.strip():
                 self._emit_stage(stage, line)
 
     async def run(self) -> None:
+        """Update the git checkout and optionally restart the bot."""
         rc, dirty, _ = await _run_git("status", "--porcelain", cwd=self.project_root)
         has_dirty = rc == 0 and bool(dirty)
         if has_dirty and self.dirty_strategy == "block":
@@ -113,6 +147,7 @@ class GitUpdateJob(Job):
             await graceful_restart()
 
     async def _stash_dirty_changes(self) -> None:
+        """Stash uncommitted changes so the update can proceed cleanly."""
         self._emit_stage("stash", "$ git stash push --include-untracked")
         rc, out, err = await _run_git(
             "stash",
@@ -128,6 +163,7 @@ class GitUpdateJob(Job):
         self._emit_stage("stash", out or "已暂存未提交变更，更新后将恢复")
 
     async def _restore_stash(self) -> None:
+        """Restore a previously created stash, leaving the stash intact on failure."""
         if not self._stash_created:
             return
         self._emit_stage("stash", "$ git stash pop")
@@ -141,6 +177,7 @@ class GitUpdateJob(Job):
         self._emit_stage("stash", out or "已恢复暂存的变更")
 
     async def _run_branch_update(self) -> None:
+        """Check out the target branch and hard reset it to the desired commit."""
         self._emit_stage("checkout", f"$ git checkout {self.branch}")
         rc, out, err = await _run_git("checkout", self.branch, cwd=self.project_root)
         if rc != 0:
@@ -179,6 +216,7 @@ class GitUpdateJob(Job):
             raise JobError(msg)
 
     async def _run_tag_update(self) -> None:
+        """Fetch tags and check out the requested tag."""
         self._emit_stage("checkout", "$ git fetch origin --tags")
         rc_fetch, _, fetch_err = await _run_git(
             "fetch", "origin", "--tags", cwd=self.project_root
@@ -198,6 +236,7 @@ class GitUpdateJob(Job):
         await self._emit_git_output("checkout", err)
 
     async def rollback(self) -> None:
+        """Restore the checkout to its pre-update branch and commit."""
         if not self.rollback_needed or not self._original_commit:
             return
         original_branch = self._original_branch

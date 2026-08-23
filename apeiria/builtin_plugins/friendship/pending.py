@@ -1,3 +1,9 @@
+"""Persistence helpers for the friendship request plugin.
+
+Read and write pending requests from a YAML store file, providing a small
+async, guarded CRUD interface used by the friendship plugin.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +26,7 @@ _TTL = timedelta(days=7)
 
 
 def _store_path() -> Path:
+    """Return the path to the YAML file storing pending requests."""
     global _STORE_FILE  # noqa: PLW0603
     if _STORE_FILE is None:
         _STORE_FILE = get_plugin_data_file("pending_requests.yaml")
@@ -27,6 +34,15 @@ def _store_path() -> Path:
 
 
 def _generate_id(pending_list: list[PendingRequest], kind: str) -> str:
+    """Generate a unique short request id for the given request kind.
+
+    Args:
+        pending_list: The list of existing pending requests.
+        kind: The request kind to generate an id for.
+
+    Returns:
+        A unique request id not already used in the pending list.
+    """
     kind_prefixes = {"friend": "f", "group_add": "g", "group_invite": "g"}
     prefix = kind_prefixes.get(kind, "f")
     existing_ids = {p.id for p in pending_list if p.id}
@@ -37,6 +53,12 @@ def _generate_id(pending_list: list[PendingRequest], kind: str) -> str:
 
 
 def _load() -> list[dict]:
+    """Load all pending requests from the store file as raw dicts.
+
+    Returns:
+        A list of the stored request dicts, or an empty list when the file is
+        missing or cannot be parsed.
+    """
     path = _store_path()
     if not path.exists():
         return []
@@ -50,6 +72,11 @@ def _load() -> list[dict]:
 
 
 def _save(requests: list[PendingRequest]) -> None:
+    """Persist the given pending requests to the store file.
+
+    Args:
+        requests: The pending requests to save.
+    """
     path = _store_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     data = [
@@ -76,6 +103,14 @@ def _save(requests: list[PendingRequest]) -> None:
 
 
 def _data_to_pending(d: dict) -> PendingRequest:
+    """Convert a raw stored dict into a PendingRequest.
+
+    Args:
+        d: The stored request dict.
+
+    Returns:
+        The corresponding PendingRequest.
+    """
     return PendingRequest(
         id=d.get("id", ""),
         provider_key=d.get("provider_key", ""),
@@ -96,11 +131,24 @@ def _data_to_pending(d: dict) -> PendingRequest:
 
 
 async def load_all() -> list[PendingRequest]:
+    """Load all pending requests from the store.
+
+    Returns:
+        The list of pending requests currently stored.
+    """
     async with _STORE_LOCK:
         return [_data_to_pending(d) for d in _load()]
 
 
 async def add_pending(pending: PendingRequest) -> None:
+    """Add a new pending request to the store.
+
+    Assigns a unique id to the request, appends it to the current request
+    list, prunes expired entries, and persists the result.
+
+    Args:
+        pending: The pending request to add.
+    """
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
         pending.id = _generate_id(items, pending.kind)
@@ -110,6 +158,14 @@ async def add_pending(pending: PendingRequest) -> None:
 
 
 async def remove_pending(request_id: str) -> bool:
+    """Remove the pending request with the given id.
+
+    Args:
+        request_id: The id of the request to remove.
+
+    Returns:
+        True if a matching request was removed, False otherwise.
+    """
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
         removed = [r for r in items if r.id == request_id]
@@ -121,6 +177,14 @@ async def remove_pending(request_id: str) -> bool:
 
 
 async def get_pending(request_id: str) -> PendingRequest | None:
+    """Return the pending request with the given id.
+
+    Args:
+        request_id: The id of the request to look up.
+
+    Returns:
+        The matching pending request, or None when no request has that id.
+    """
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
         for r in items:
@@ -130,6 +194,16 @@ async def get_pending(request_id: str) -> PendingRequest | None:
 
 
 async def update_notified(request_id: str, superuser_id: str, msg_id: str) -> None:
+    """Record a notification message for a pending request.
+
+    Stores the given message id under the superuser id in the request's
+    notified bookkeeping and persists the change.
+
+    Args:
+        request_id: The id of the request to update.
+        superuser_id: The superuser key under which to store the message id.
+        msg_id: The notification message id to record.
+    """
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
         for r in items:
@@ -140,6 +214,14 @@ async def update_notified(request_id: str, superuser_id: str, msg_id: str) -> No
 
 
 async def find_by_notified_msg(msg_id: str) -> PendingRequest | None:
+    """Return the pending request notified with the given message id.
+
+    Args:
+        msg_id: The notification message id to search for.
+
+    Returns:
+        The matching pending request, or None when no request recorded it.
+    """
     async with _STORE_LOCK:
         items = [_data_to_pending(d) for d in _load()]
         for r in items:
@@ -149,6 +231,14 @@ async def find_by_notified_msg(msg_id: str) -> PendingRequest | None:
 
 
 def _cleanup(items: list[PendingRequest]) -> None:
+    """Drop expired or non-pending requests from the given list.
+
+    Modifies the list in place, keeping only requests whose status is
+    ``pending`` and whose creation timestamps fall within the TTL window.
+
+    Args:
+        items: The list of pending requests to prune in place.
+    """
     cutoff = datetime.now(UTC) - _TTL
     items[:] = [
         r

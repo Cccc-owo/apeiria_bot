@@ -1,3 +1,5 @@
+"""Provide a job that manages plugins and adapters in the isolated .apeiria env."""
+
 from __future__ import annotations
 
 import shutil
@@ -25,6 +27,16 @@ class PackageJob(Job):
         module_name: str | None = None,
         keep_config: bool = False,
     ) -> None:
+        """Initialize a package management job.
+
+        Args:
+            kind: The package category, either ``plugin`` or ``adapter``.
+            name: The name of the package to manage.
+            pkg_requirement: The dependency requirement string to install.
+            operation: The operation: ``install``, ``uninstall`` or ``update``.
+            module_name: Optional import module name used for adapter registration.
+            keep_config: Whether to preserve config files during uninstall.
+        """
         super().__init__(kind="package", lock_name="apeiria")
         self.package_kind = kind
         self.name = name
@@ -36,6 +48,7 @@ class PackageJob(Job):
         self._plugin_backup: Path | None = None
 
     def snapshot(self) -> None:
+        """Capture the current files that this job may mutate."""
         for path in (
             _APEIRIA_DIR / "plugins.yaml",
             _APEIRIA_DIR / "adapters.yaml",
@@ -46,6 +59,7 @@ class PackageJob(Job):
             self._snapshot_data[str(path)] = _read_text(path)
 
     async def run(self) -> None:
+        """Dispatch to the operation-specific package handler."""
         self.rollback_needed = True
         if self.operation == "install":
             await self._do_install()
@@ -58,6 +72,7 @@ class PackageJob(Job):
             raise JobError(msg)
 
     async def _do_install(self) -> None:
+        """Add a package to the environment and register it in the manifest."""
         rc = await run_uv_add(self, self.pkg_requirement, _APEIRIA_DIR)
         if rc != 0:
             msg = f"uv add 返回码: {rc}"
@@ -84,6 +99,7 @@ class PackageJob(Job):
             raise JobError(msg)
 
     async def _do_update(self) -> None:
+        """Refresh a package's dependency and manifest entry in the environment."""
         rc = await run_uv_add(self, self.pkg_requirement, _APEIRIA_DIR)
         if rc != 0:
             msg = f"uv add 返回码: {rc}"
@@ -102,6 +118,7 @@ class PackageJob(Job):
             raise JobError(msg)
 
     async def _do_uninstall(self) -> None:
+        """Remove a package from the environment and clean up its registration."""
         if self.package_kind not in ("plugin", "adapter"):
             pkg_req = self.name
         else:
@@ -140,6 +157,7 @@ class PackageJob(Job):
             self._plugin_backup = None
 
     async def rollback(self) -> None:
+        """Restore snapshotted files and sync the environment back to a prior state."""
         if not self._snapshot_data:
             return
 
@@ -169,12 +187,28 @@ class PackageJob(Job):
 
 
 def _read_text(path: Path) -> str | None:
+    """Read a file's text content, returning None when the file is absent.
+
+    Args:
+        path: The file to read.
+
+    Returns:
+        The file contents as UTF-8 text, or None if the file does not exist.
+    """
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
 
 
 def _read_manifest(kind: str) -> dict[str, Any]:
+    """Read the manifest for a package category.
+
+    Args:
+        kind: The package category, either ``plugin`` or ``adapter``.
+
+    Returns:
+        The manifest data for the given category.
+    """
     if kind == "plugin":
         from apeiria.plugin.manager import _read_plugins_yaml
 
@@ -185,6 +219,12 @@ def _read_manifest(kind: str) -> dict[str, Any]:
 
 
 def _write_manifest(kind: str, data: dict[str, Any]) -> None:
+    """Write the manifest for a package category.
+
+    Args:
+        kind: The package category, either ``plugin`` or ``adapter``.
+        data: The manifest data to persist.
+    """
     if kind == "plugin":
         from apeiria.plugin.manager import _write_plugins_yaml
 
@@ -196,6 +236,12 @@ def _write_manifest(kind: str, data: dict[str, Any]) -> None:
 
 
 def _remove_config(kind: str, name: str) -> None:
+    """Remove the config associated with a plugin or adapter.
+
+    Args:
+        kind: The package category, either ``plugin`` or ``adapter``.
+        name: The package whose config should be removed.
+    """
     if kind == "plugin":
         from apeiria.plugin.manager import _remove_plugin_config
 
@@ -207,6 +253,17 @@ def _remove_config(kind: str, name: str) -> None:
 
 
 def _local_plugin_path(name: str) -> Path:
+    """Return the local plugin directory, validating the name is safe.
+
+    Args:
+        name: The plugin name to resolve.
+
+    Returns:
+        The resolved local plugin directory path.
+
+    Raises:
+        JobError: When the plugin name is unsafe or escapes the plugins root.
+    """
     from apeiria.plugin.manager import _is_safe_plugin_name
 
     local_path = Path(f".apeiria/plugins/{name}").resolve()
@@ -218,6 +275,15 @@ def _local_plugin_path(name: str) -> Path:
 
 
 def _move_local_plugin_dir_to_backup(name: str, job_id: str) -> Path | None:
+    """Move a local plugin directory into the trash for the given job.
+
+    Args:
+        name: The plugin name whose directory should be moved.
+        job_id: The id of the job owning the backup.
+
+    Returns:
+        The backup path, or None when the plugin directory does not exist.
+    """
     local_path = _local_plugin_path(name)
     if not local_path.is_dir():
         return None
@@ -231,6 +297,12 @@ def _move_local_plugin_dir_to_backup(name: str, job_id: str) -> Path | None:
 
 
 def _restore_plugin_backup(backup: Path | None, name: str) -> None:
+    """Restore a plugin directory from its backup location.
+
+    Args:
+        backup: The backup directory to restore, or None to skip.
+        name: The plugin name whose directory is being restored.
+    """
     if backup is None or not backup.exists():
         return
     local_path = _local_plugin_path(name)
@@ -240,5 +312,10 @@ def _restore_plugin_backup(backup: Path | None, name: str) -> None:
 
 
 def _cleanup_plugin_backup(backup: Path | None) -> None:
+    """Remove a leftover plugin backup directory.
+
+    Args:
+        backup: The backup directory to delete, or None to skip.
+    """
     if backup is not None and backup.exists():
         shutil.rmtree(backup, ignore_errors=True)

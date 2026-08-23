@@ -1,3 +1,5 @@
+"""Store search, pagination, and runtime status helpers for the Web API."""
+
 from __future__ import annotations
 
 import time
@@ -13,10 +15,13 @@ _CACHE_TTL = 300.0
 
 
 def _registry_url(kind: str) -> str:
+    """Return the registry URL for a given kind."""
     return f"{REGISTRY_BASE}/{kind}.json"
 
 
 class StoreItem:
+    """A single entry from a plugin or adapter store."""
+
     __slots__ = (
         "author",
         "description",
@@ -50,6 +55,23 @@ class StoreItem:
         is_official: bool = False,
         time: str = "",
     ) -> None:
+        """Initialize a store item.
+
+        Args:
+            name: Item name.
+            version: Item version.
+            description: Item description.
+            author: Author name.
+            homepage: Item homepage URL.
+            pypi_name: PyPI package name.
+            module_names: Importable module names.
+            supported_adapters: Supported adapter names, or None.
+            installed_version: Installed version, or None.
+            type: Item type.
+            tags: Item tags.
+            is_official: Whether the item is official.
+            time: Last-updated time string.
+        """
         self.name = name
         self.version = version
         self.description = description
@@ -65,6 +87,7 @@ class StoreItem:
         self.time = time
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable dictionary of the item."""
         return {
             "name": self.name,
             "version": self.version,
@@ -83,6 +106,7 @@ class StoreItem:
 
 
 def _parse_item(raw: dict[str, Any]) -> StoreItem:
+    """Build a StoreItem from a raw registry dictionary."""
     module_name = raw.get("module_name")
     module_names = (
         [module_name] if isinstance(module_name, str) else raw.get("module_names") or []
@@ -104,6 +128,7 @@ def _parse_item(raw: dict[str, Any]) -> StoreItem:
 
 
 def _matches(item: StoreItem, query: str) -> bool:
+    """Return True when a query appears in the item's searchable fields."""
     if not query:
         return True
     needle = query.lower()
@@ -126,6 +151,17 @@ def paginate(
     limit: int = 60,
     sort: str = "",
 ) -> tuple[list[Any], int]:
+    """Sort and paginate a list of store items.
+
+    Args:
+        items: Items to sort and paginate.
+        offset: Number of items to skip.
+        limit: Maximum number of items to return, or a non-positive value for all.
+        sort: Sort key, one of "name_asc", "name_desc", "time_desc", or "".
+
+    Returns:
+        A tuple of the page of items and the total number of items.
+    """
     if sort == "name_asc":
         items = sorted(items, key=lambda it: (getattr(it, "name", "") or "").lower())
     elif sort == "name_desc":
@@ -155,15 +191,33 @@ def paginate(
 
 
 class StoreSource(Protocol):
-    async def search(self, query: str) -> list[StoreItem]: ...
-    async def get(self, pkg_name: str) -> StoreItem | None: ...
+    """Protocol describing a plugin and adapter store source."""
+
+    async def search(self, query: str) -> list[StoreItem]:
+        """Return store items matching a query."""
+        ...
+
+    async def get(self, pkg_name: str) -> StoreItem | None:
+        """Return the store item for a package name, or None when not found."""
+        ...
 
 
 class NoneBotStoreSource:
+    """Store source that reads plugins and adapters from the NoneBot registry."""
+
     def __init__(self) -> None:
+        """Initialize the source with an empty registry cache."""
         self._cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
     async def _fetch(self, kind: str) -> list[dict[str, Any]]:
+        """Fetch and cache raw items for a registry kind.
+
+        Args:
+            kind: Registry kind, e.g. "plugins" or "adapters".
+
+        Returns:
+            A list of raw item dictionaries.
+        """
         cached = self._cache.get(kind)
         if cached is not None and (time.monotonic() - cached[0]) < _CACHE_TTL:
             return cached[1]
@@ -178,6 +232,15 @@ class NoneBotStoreSource:
         return items
 
     async def _search_kind(self, kind: str, query: str) -> list[StoreItem]:
+        """Search raw items of a kind and filter them by a query.
+
+        Args:
+            kind: Registry kind to search.
+            query: Search text.
+
+        Returns:
+            Matching store items.
+        """
         try:
             raw_items = await self._fetch(kind)
         except Exception as exc:  # noqa: BLE001
@@ -187,12 +250,36 @@ class NoneBotStoreSource:
         return [it for it in parsed if _matches(it, query)]
 
     async def search(self, query: str) -> list[StoreItem]:
+        """Search the plugin store for items matching a query.
+
+        Args:
+            query: Search text.
+
+        Returns:
+            Matching store items.
+        """
         return await self._search_kind("plugins", query)
 
     async def search_adapters(self, query: str) -> list[StoreItem]:
+        """Search the adapter store for items matching a query.
+
+        Args:
+            query: Search text.
+
+        Returns:
+            Matching store items.
+        """
         return await self._search_kind("adapters", query)
 
     async def get(self, pkg_name: str) -> StoreItem | None:
+        """Return a store item by name or PyPI name.
+
+        Args:
+            pkg_name: Package name to look up.
+
+        Returns:
+            The matching store item, or None when not found.
+        """
         items = await self.search(pkg_name)
         for item in items:
             if pkg_name in (item.name, item.pypi_name):
@@ -204,14 +291,17 @@ _default_store = NoneBotStoreSource()
 
 
 def get_store() -> NoneBotStoreSource:
+    """Return the default store source."""
     return _default_store
 
 
 def get_uptime() -> float:
+    """Return the process uptime in seconds."""
     return time.monotonic() - _start_time
 
 
 def _adapter_display_name(adapter: object) -> str:
+    """Return a display name for an adapter object."""
     get_name = getattr(adapter, "get_name", None)
     if callable(get_name):
         try:
@@ -224,6 +314,7 @@ def _adapter_display_name(adapter: object) -> str:
 
 
 def get_status() -> dict[str, Any]:
+    """Return runtime status: uptime, plugin count, and adapter names."""
     import nonebot
 
     return {

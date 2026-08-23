@@ -1,3 +1,5 @@
+"""Reflect Pydantic models into the configuration field node schema."""
+
 from __future__ import annotations
 
 import typing
@@ -18,10 +20,26 @@ from apeiria.config.schema import (
 
 
 def _get_pydantic_type(field_info: Any) -> type:
+    """Return the annotation of a Pydantic field.
+
+    Args:
+        field_info: The Pydantic field info.
+
+    Returns:
+        The field's annotation type.
+    """
     return field_info.annotation
 
 
 def _is_optional(annotation: type) -> bool:
+    """Return whether the annotation is Optional (Union with None).
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the annotation includes None in its union, else False.
+    """
     origin = get_origin(annotation)
     if origin is typing.Union:
         args = get_args(annotation)
@@ -30,6 +48,14 @@ def _is_optional(annotation: type) -> bool:
 
 
 def _unwrap_optional(annotation: type) -> type:
+    """Strip the Optional (None) member from a union annotation.
+
+    Args:
+        annotation: The type annotation to unwrap.
+
+    Returns:
+        The single non-None type in the union, or the original annotation.
+    """
     origin = get_origin(annotation)
     if origin is typing.Union:
         args = [a for a in get_args(annotation) if a is not type(None)]
@@ -40,6 +66,14 @@ def _unwrap_optional(annotation: type) -> type:
 
 
 def _is_secret_type(annotation: type) -> bool:
+    """Return whether the annotation is a Pydantic secret type.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the type's name or module contains "secret".
+    """
     if not isinstance(annotation, type):
         return False
     qualname = getattr(annotation, "__qualname__", "").lower()
@@ -48,6 +82,14 @@ def _is_secret_type(annotation: type) -> bool:
 
 
 def _is_enum_type(annotation: type) -> bool:
+    """Return whether the annotation is an Enum type.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the annotation is an Enum subclass and not a Literal.
+    """
     origin = get_origin(annotation)
     if origin is Literal:
         return False
@@ -55,18 +97,50 @@ def _is_enum_type(annotation: type) -> bool:
 
 
 def _is_bool_type(annotation: type) -> bool:
+    """Return whether the annotation is the bool type.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the annotation is exactly bool.
+    """
     return isinstance(annotation, type) and annotation is bool
 
 
 def _is_int_type(annotation: type) -> bool:
+    """Return whether the annotation is an int type.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the annotation is a subclass of int.
+    """
     return isinstance(annotation, type) and issubclass(annotation, int)
 
 
 def _is_float_type(annotation: type) -> bool:
+    """Return whether the annotation is a float type.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        True if the annotation is a subclass of float.
+    """
     return isinstance(annotation, type) and issubclass(annotation, float)
 
 
 def _infer_primitive_type(annotation: type) -> PrimitiveType:
+    """Infer the primitive type name for an annotation.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        The primitive type name: literal, enum, bool, int, float, or str.
+    """
     origin = get_origin(annotation)
     if origin is Literal:
         return "literal"
@@ -82,6 +156,15 @@ def _infer_primitive_type(annotation: type) -> PrimitiveType:
 
 
 def _extract_choices(annotation: type) -> list[dict[str, str]] | None:
+    """Extract selectable choices from a Literal or Enum annotation.
+
+    Args:
+        annotation: The type annotation to inspect.
+
+    Returns:
+        A list of ``{"value": ..., "label": ...}`` dicts for Literal and Enum
+        types, or None when the annotation has no fixed choices.
+    """
     origin = get_origin(annotation)
     if origin is Literal:
         args = get_args(annotation)
@@ -93,19 +176,47 @@ def _extract_choices(annotation: type) -> list[dict[str, str]] | None:
 
 
 class _FakeFieldInfo:
+    """Stand-in for a Pydantic field that carries only an annotation."""
+
     def __init__(self, annotation: type) -> None:
+        """Initialize the fake field info with a required annotation.
+
+        Args:
+            annotation: The annotation to expose as ``self.annotation``.
+        """
         self.annotation = annotation
         self.description = None
         self.title = None
 
     def is_required(self) -> bool:
+        """Return whether the field is required.
+
+        Returns:
+            True; the fake field is always treated as required.
+        """
         return True
 
     def get_default(self, *, call_default_factory: Any = False) -> Any:  # noqa: ARG002
+        """Return no default value.
+
+        Args:
+            call_default_factory: Ignored; present for API compatibility.
+
+        Returns:
+            None.
+        """
         return None
 
 
 def _make_fake_field_info(annotation: type) -> _FakeFieldInfo:
+    """Create a fake field-info object holding only the given annotation.
+
+    Args:
+        annotation: The annotation to attach to the fake field info.
+
+    Returns:
+        A ``_FakeFieldInfo`` instance carrying the annotation.
+    """
     return _FakeFieldInfo(annotation)
 
 
@@ -113,6 +224,14 @@ _JSON_SAFE_TYPES = (str, int, float, bool, list, dict, type(None))
 
 
 def _make_json_safe(value: Any) -> Any:
+    """Normalize a value to a JSON-serializable form.
+
+    Args:
+        value: The value to normalize.
+
+    Returns:
+        The value itself when already JSON-safe, otherwise its string form.
+    """
     if value is None:
         return None
     if isinstance(value, _JSON_SAFE_TYPES):
@@ -121,6 +240,14 @@ def _make_json_safe(value: Any) -> Any:
 
 
 def _field_default_to_dict(default_val: Any) -> Any:
+    """Convert a Pydantic model default into a plain dict.
+
+    Args:
+        default_val: The default value to convert.
+
+    Returns:
+        A dict for a model default, or the value itself as-is.
+    """
     if default_val is None:
         return None
     if isinstance(default_val, BaseModel):
@@ -132,6 +259,15 @@ def _field_default_to_dict(default_val: Any) -> Any:
 
 
 def _reflect_field(field_name: str, field_info: Any) -> FieldNode:
+    """Reflect a single Pydantic field into a schema node.
+
+    Args:
+        field_name: The field name.
+        field_info: The Pydantic ``FieldInfo`` for the field.
+
+    Returns:
+        The corresponding schema node for the field.
+    """
     annotation = _get_pydantic_type(field_info)
     if annotation is None:
         annotation = str
@@ -189,6 +325,14 @@ def _reflect_field(field_name: str, field_info: Any) -> FieldNode:
 
 
 def _collect_attr_docstrings(model_cls: type[BaseModel]) -> dict[str, str]:
+    """Collect docstrings of a model class and its base classes.
+
+    Args:
+        model_cls: The model class to inspect.
+
+    Returns:
+        A mapping of attribute names to their extracted docstrings.
+    """
     from pydantic._internal._docs_extraction import extract_docstrings_from_cls
 
     result: dict[str, str] = {}
@@ -213,6 +357,14 @@ def _collect_attr_docstrings(model_cls: type[BaseModel]) -> dict[str, str]:
 
 
 def reflect_model(model_cls: type[BaseModel]) -> list[FieldNode]:
+    """Reflect a Pydantic model into a list of field node schemas.
+
+    Args:
+        model_cls: The Pydantic model class to reflect.
+
+    Returns:
+        A list of ``FieldNode`` instances describing the model's fields.
+    """
     docstrings = _collect_attr_docstrings(model_cls)
     fields: list[FieldNode] = []
     for field_name, field_info in model_cls.model_fields.items():

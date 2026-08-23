@@ -1,3 +1,5 @@
+"""Implement the ``/restart`` command and restart notification on reconnect."""
+
 from __future__ import annotations
 
 import asyncio
@@ -30,6 +32,12 @@ _restart = on_alconna(
 
 @_restart.handle()
 async def handle_restart(bot: Bot, event: Event) -> None:
+    """Handle the ``/restart`` command, save context, and schedule the restart.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _restart.finish(owner_error)
@@ -41,6 +49,12 @@ async def handle_restart(bot: Bot, event: Event) -> None:
 
 
 def _save_context(bot: Bot, event: Event) -> None:
+    """Save the current bot and session info as a restart recovery context.
+
+    Args:
+        bot: The current bot instance.
+        event: The message event that triggered the command.
+    """
     ctx: dict[str, Any] = {
         "bot_self_id": bot.self_id,
         "adapter_name": bot.adapter.get_name(),
@@ -55,6 +69,15 @@ def _save_context(bot: Bot, event: Event) -> None:
 
 
 def _safe_attr(event: Event, method: str) -> str | None:
+    """Safely invoke a method on an event object and return its string result.
+
+    Args:
+        event: The event object to access.
+        method: The name of the method to call.
+
+    Returns:
+        The string result of the method call, or None when unavailable.
+    """
     try:
         return str(getattr(event, method)())
     except (AttributeError, TypeError):
@@ -62,6 +85,11 @@ def _safe_attr(event: Event, method: str) -> str | None:
 
 
 def _read_context() -> dict[str, Any] | None:
+    """Read and parse the restart recovery context.
+
+    Returns:
+        The parsed context dict, or None when missing or invalid.
+    """
     if not _CONTEXT_PATH.exists():
         return None
     try:
@@ -72,10 +100,13 @@ def _read_context() -> dict[str, Any] | None:
 
 
 def _delete_context() -> None:
+    """Remove the restart recovery context file."""
     _CONTEXT_PATH.unlink(missing_ok=True)
 
 
 class _RestartNotifyEvent:
+    """A lightweight event used to notify the original session after restart."""
+
     def __init__(
         self,
         user_id: str | None,
@@ -83,23 +114,51 @@ class _RestartNotifyEvent:
         message_type: str,
         group_id: str | None,
     ) -> None:
+        """Initialize the restart notification event.
+
+        Args:
+            user_id: The target user ID.
+            session_id: The target session ID.
+            message_type: The message type.
+            group_id: The target group ID.
+        """
         self._user_id = user_id
         self._session_id = session_id
         self.message_type = message_type
         self.group_id = group_id
 
     def get_type(self) -> str:
+        """Return the event type identifier.
+
+        Returns:
+            The event type, always ``message``.
+        """
         return "message"
 
     def get_user_id(self) -> str:
+        """Return the target user ID.
+
+        Returns:
+            The target user ID, or an empty string when unset.
+        """
         return self._user_id or ""
 
     def get_session_id(self) -> str:
+        """Return the target session ID.
+
+        Returns:
+            The target session ID.
+        """
         return self._session_id
 
 
 @get_driver().on_bot_connect
 async def _on_reconnect(bot: Bot) -> None:
+    """Notify the original session when the bot reconnects after a restart.
+
+    Args:
+        bot: The reconnected bot instance.
+    """
     ctx = _read_context()
     if not ctx:
         return
@@ -132,6 +191,16 @@ async def _on_reconnect(bot: Bot) -> None:
 async def _try_send(
     bot: Bot, event: _RestartNotifyEvent, message: str
 ) -> BaseException | None:
+    """Attempt to send a message and return the first error encountered.
+
+    Args:
+        bot: The bot instance used to send the message.
+        event: The event to associate with the send.
+        message: The message text to send.
+
+    Returns:
+        The exception raised during the send, or None on success.
+    """
     try:
         await bot.send(cast("Event", event), message)
     except (RuntimeError, OSError, ValueError, TypeError) as exc:
@@ -140,4 +209,5 @@ async def _try_send(
 
 
 async def _do_restart() -> None:
+    """Perform the actual graceful restart."""
     await graceful_restart()

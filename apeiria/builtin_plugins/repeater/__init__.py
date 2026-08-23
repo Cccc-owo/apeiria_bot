@@ -1,3 +1,9 @@
+"""Group-chat repeater plugin for Apeiria.
+
+Repeat a message in configured group chats when consecutive members send
+identical content, subject to the configured probability and cooldown.
+"""
+
 from __future__ import annotations
 
 from contextlib import suppress
@@ -34,6 +40,12 @@ _service = RepeaterService()
 async def _is_configured_group_message(
     session: Uninfo,
 ) -> bool:
+    """Return whether the message belongs to a configured, allowed group.
+
+    Group messages are eligible unless the scene type is not a group, the
+    group is listed in the blocklist, or the group is missing from the
+    allowlist while an allowlist is configured.
+    """
     scene_type = getattr(session.scene, "type", None)
     if scene_type is not None and scene_type != SceneType.GROUP:
         return False
@@ -58,6 +70,11 @@ async def handle_repeater(
     matcher: Matcher,
     session: Uninfo,
 ) -> None:
+    """Handle a group message and repeat it when the service triggers.
+
+    Run the message through the repeater service and, when it decides to
+    trigger, send the original message back to the group.
+    """
     config = get_plugin_config()
     scope = scoped_group_id(session)
     user_id = session.user.id

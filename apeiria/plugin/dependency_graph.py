@@ -1,3 +1,5 @@
+"""Build and cache plugin dependency graphs."""
+
 from __future__ import annotations
 
 from collections.abc import Collection
@@ -10,12 +12,16 @@ if TYPE_CHECKING:
 
 @dataclass
 class DepGraph:
+    """Directed plugin dependency graph with its reverse and nesting edges."""
+
     graph: dict[str, set[str]] = field(default_factory=dict)
     reverse: dict[str, set[str]] = field(default_factory=dict)
     nesting: set[tuple[str, str]] = field(default_factory=set)
 
 
 class _Cache:
+    """Hold the cached dependency graph across calls."""
+
     value: DepGraph | None = None
 
 
@@ -34,6 +40,14 @@ def reset_dependency_graph() -> None:
 
 
 def build_dependency_graph(plugins: Collection["Plugin"]) -> DepGraph:
+    """Build a dependency graph from plugins and runtime edges.
+
+    Args:
+        plugins: The collection of NoneBot plugins to include.
+
+    Returns:
+        A :class:`DepGraph` containing forward, reverse, and nesting edges.
+    """
     graph: dict[str, set[str]] = {}
     nesting: set[tuple[str, str]] = set()
 
@@ -57,6 +71,14 @@ def build_dependency_graph(plugins: Collection["Plugin"]) -> DepGraph:
 
 
 def get_cached_graph(plugins: Collection["Plugin"]) -> DepGraph:
+    """Return the cached dependency graph, building it if needed.
+
+    Args:
+        plugins: The collection of NoneBot plugins to include.
+
+    Returns:
+        The cached :class:`DepGraph`.
+    """
     if _Cache.value is None:
         _Cache.value = build_dependency_graph(plugins)
     return _Cache.value

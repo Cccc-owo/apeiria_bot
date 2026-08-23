@@ -1,3 +1,5 @@
+"""Utilities for gracefully restarting the Apeiria bot process."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,6 +17,14 @@ _POLL_INTERVAL = 0.1
 
 
 def _read_ppid(pid: int) -> int | None:
+    """Read the parent PID of *pid* from the /proc stat file.
+
+    Args:
+        pid: Process ID to inspect.
+
+    Returns:
+        The parent process ID, or ``None`` when it cannot be determined.
+    """
     try:
         content = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
     except (OSError, ValueError):
@@ -32,6 +42,12 @@ def _read_ppid(pid: int) -> int | None:
 
 
 def _build_proc_tree() -> dict[int, list[int]]:
+    """Build a parent-to-children process tree by scanning /proc.
+
+    Returns:
+        Mapping from a parent PID to the list of its child PIDs, or an empty
+        mapping when /proc is unavailable.
+    """
     proc = Path("/proc")
     children: dict[int, list[int]] = {}
     if not proc.is_dir():
@@ -48,6 +64,15 @@ def _build_proc_tree() -> dict[int, list[int]]:
 
 
 def _collect_descendants(children: dict[int, list[int]], root: int) -> list[int]:
+    """Return every descendant PID of *root* in a process-tree map.
+
+    Args:
+        children: Mapping of parent PID to its child PIDs.
+        root: Root PID whose descendants are collected.
+
+    Returns:
+        The descendant PIDs, excluding *root* itself.
+    """
     result: list[int] = []
     seen: set[int] = set()
     queue = list(children.get(root, []))
@@ -62,19 +87,40 @@ def _collect_descendants(children: dict[int, list[int]], root: int) -> list[int]
 
 
 def descendant_pids(root_pid: int) -> list[int]:
-    """返回 *root_pid* 进程的全部后代 PID（Linux，扫 /proc）。
+    """Return all descendant PIDs of *root_pid* by scanning /proc (Linux).
 
-    `/proc` 不可用或解析失败时返回空列表，绝不抛出。
+    Returns an empty list when /proc is unavailable or cannot be parsed; this
+    function never raises.
+
+    Args:
+        root_pid: Root process ID whose descendants are collected.
+
+    Returns:
+        The descendant PIDs, or an empty list on failure.
     """
     return _collect_descendants(_build_proc_tree(), root_pid)
 
 
 def _signal_pid(pid: int, sig: int) -> None:
+    """Send *sig* to *pid*, suppressing any OSError.
+
+    Args:
+        pid: Target process ID.
+        sig: Signal number to deliver.
+    """
     with contextlib.suppress(OSError):
         os.kill(pid, sig)
 
 
 def _pid_alive(pid: int) -> bool:
+    """Report whether a process with *pid* still exists.
+
+    Args:
+        pid: Process ID to check.
+
+    Returns:
+        ``True`` when the process is present, ``False`` otherwise.
+    """
     try:
         os.kill(pid, 0)
     except OSError:
@@ -83,9 +129,11 @@ def _pid_alive(pid: int) -> bool:
 
 
 async def _terminate_descendants() -> None:
-    """SIGTERM → 宽限 → SIGKILL 杀掉当前进程的全部后代（兜底浏览器进程）。
+    """Terminate the current process's descendants (SIGTERM, grace, SIGKILL).
 
-    Windows 上"杀子树但不杀自身"非平凡，此处不处理（见 tasks Gaps）。
+    This backs up browser processes before a restart. Killing a subtree
+    without killing the caller is non-trivial on Windows and is not handled
+    here.
     """
     if sys.platform == "win32":
         return
@@ -106,6 +154,7 @@ async def _terminate_descendants() -> None:
 
 
 async def _shutdown_render_safe() -> None:
+    """Shut down the HTML render service, ignoring any errors."""
     try:
         from nonebot_plugin_htmlrender import shutdown_render
 
@@ -115,6 +164,7 @@ async def _shutdown_render_safe() -> None:
 
 
 async def _close_db_safe() -> None:
+    """Close the database connection, ignoring any errors."""
     try:
         from apeiria.db.engine import close_db
 
@@ -124,6 +174,11 @@ async def _close_db_safe() -> None:
 
 
 def _exec_restart() -> None:
+    """Flush standard streams and replace the process image to restart the bot.
+
+    A new process is spawned on Windows and the current one exits; on other
+    platforms the interpreter is re-executed. This function does not return.
+    """
     with contextlib.suppress(OSError):
         sys.stdout.flush()
         sys.stderr.flush()
@@ -141,9 +196,12 @@ def _exec_restart() -> None:
 
 
 async def graceful_restart() -> None:
-    """优雅清理后重启：关浏览器树 → 关库 → 杀残留后代 → 替换进程映像。
+    """Clean up resources and restart the bot gracefully.
 
-    每步独立容错；调用方负责在调用前发送重启通知。该函数不会返回。
+    Shuts down the render tree, closes the database, kills any remaining
+    descendants, then replaces the process image. Each step tolerates failures
+    independently; the caller is responsible for notifying users before calling
+    this. This function does not return.
     """
     logger.info("Graceful restart: cleaning up before re-exec")
     await _shutdown_render_safe()

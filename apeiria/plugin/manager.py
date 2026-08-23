@@ -1,3 +1,5 @@
+"""Install, uninstall, and manage plugins in the Apeiria environment."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +12,12 @@ from apeiria.jobs.uv import find_uv
 
 
 def _read_plugins_yaml() -> dict:
+    """Read plugin package and state records from ``plugins.yaml``.
+
+    Returns:
+        A dict with ``dirs``, ``packages``, and ``states`` keys, or an empty
+        structure if the file does not exist.
+    """
     p = Path(".apeiria/plugins.yaml")
     if not p.exists():
         return {"dirs": [], "packages": {}, "states": {}}
@@ -17,6 +25,11 @@ def _read_plugins_yaml() -> dict:
 
 
 def _write_plugins_yaml(data: dict) -> None:
+    """Write plugin package and state records to ``plugins.yaml``.
+
+    Args:
+        data: The plugin data dict to persist.
+    """
     p = Path(".apeiria/plugins.yaml")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
@@ -26,12 +39,29 @@ def _write_plugins_yaml(data: dict) -> None:
 
 
 def _is_safe_plugin_name(name: str) -> bool:
+    """Return whether a plugin name is safe to use as a local directory.
+
+    Args:
+        name: The plugin name to validate.
+
+    Returns:
+        ``True`` if the name is non-empty and free of path separators.
+    """
     return (
         bool(name) and name not in {".", ".."} and "/" not in name and "\\" not in name
     )
 
 
 def install_plugin(name: str, pkg_requirement: str) -> tuple[bool, str]:
+    """Install a plugin package into the Apeiria environment.
+
+    Args:
+        name: The plugin name.
+        pkg_requirement: The package requirement to install.
+
+    Returns:
+        ``(True, message)`` on success, or ``(False, error)`` on failure.
+    """
     import subprocess
 
     uv = find_uv()
@@ -65,6 +95,15 @@ def install_plugin(name: str, pkg_requirement: str) -> tuple[bool, str]:
 
 
 def uninstall_plugin(name: str, *, keep_config: bool = False) -> bool:
+    """Uninstall a plugin package from the Apeiria environment.
+
+    Args:
+        name: The plugin name to remove.
+        keep_config: If ``True``, keep the plugin's ``config.yaml`` section.
+
+    Returns:
+        ``True`` if the plugin was removed, ``False`` if it was not found.
+    """
     import subprocess
 
     data = _read_plugins_yaml()
@@ -108,6 +147,15 @@ def uninstall_plugin(name: str, *, keep_config: bool = False) -> bool:
 
 
 def set_plugin_state(name: str, enabled: bool) -> bool:  # noqa: FBT001
+    """Set the enabled state for a plugin.
+
+    Args:
+        name: The plugin name.
+        enabled: Whether the plugin should be enabled.
+
+    Returns:
+        ``True`` when the state is recorded.
+    """
     data = _read_plugins_yaml()
     states = data.setdefault("states", {})
     states[name] = {"enabled": enabled}
@@ -116,6 +164,11 @@ def set_plugin_state(name: str, enabled: bool) -> bool:  # noqa: FBT001
 
 
 def _remove_plugin_config(name: str) -> None:
+    """Remove a plugin's configuration section from ``config.yaml``.
+
+    Args:
+        name: The plugin name whose config should be dropped.
+    """
     config_path = Path("data/config.yaml")
     if not config_path.exists():
         return

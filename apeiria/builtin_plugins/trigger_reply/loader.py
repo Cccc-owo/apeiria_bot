@@ -1,3 +1,5 @@
+"""Discovery and parsing of trigger-reply rule files."""
+
 from __future__ import annotations
 
 import re
@@ -15,6 +17,18 @@ _RULE_EXTENSIONS = ("*.yaml", "*.yml")
 
 
 def collect_rule_files(config: TriggerReplyConfig) -> list[Path]:
+    """Collect the rule file paths to load.
+
+    If the configured path resolves to a directory, return every YAML file
+    inside it; if it resolves to a single file, return that file; otherwise
+    return an empty list.
+
+    Args:
+        config: The trigger-reply configuration.
+
+    Returns:
+        The list of rule file paths to load.
+    """
     from nonebot import require
 
     require("nonebot_plugin_localstore")
@@ -34,6 +48,18 @@ def collect_rule_files(config: TriggerReplyConfig) -> list[Path]:
 def _normalize_rule(  # noqa: C901, PLR0912
     raw: Mapping[str, object],
 ) -> dict[str, object]:
+    """Normalize a raw rule mapping into model-acceptable fields.
+
+    Expands the ``match`` shorthand into a ``matches`` list and the ``reply``
+    shorthand into a ``replies`` list, then removes the temporary keys used
+    during normalization.
+
+    Args:
+        raw: The raw rule mapping from the YAML file.
+
+    Returns:
+        The normalized rule mapping.
+    """
     normalized = dict(raw)
 
     if "match" in normalized and "matches" not in normalized:
@@ -86,6 +112,15 @@ def _normalize_rule(  # noqa: C901, PLR0912
 
 
 def _match_options(normalized: dict[str, object]) -> dict[str, object]:
+    """Extract the match options from a normalized rule mapping.
+
+    Args:
+        normalized: The normalized rule mapping.
+
+    Returns:
+        A mapping containing only the ``to_me``, ``ignore_case``, ``strip``,
+        and ``allow_plaintext`` options.
+    """
     options: dict[str, object] = {}
     for key in ("to_me", "ignore_case", "strip", "allow_plaintext"):
         if key in normalized:
@@ -97,6 +132,15 @@ def _load_file(  # noqa: C901
     file_path: Path,
     seen_ids: set[str] | None = None,
 ) -> tuple[list[TriggerRule], list[str]]:
+    """Parse a single rule file.
+
+    Args:
+        file_path: Path to the rule file.
+        seen_ids: Set of rule IDs already seen, used to detect duplicates.
+
+    Returns:
+        A tuple of the parsed rules and the list of error messages.
+    """
     if not file_path.exists():
         return [], []
     try:
@@ -143,6 +187,14 @@ def _load_file(  # noqa: C901
 
 
 def load_rules(paths: Sequence[Path]) -> tuple[tuple[TriggerRule, ...], list[str]]:
+    """Load multiple rule files and aggregate the results.
+
+    Args:
+        paths: Sequence of rule file paths.
+
+    Returns:
+        A tuple of the rules sorted by priority and the list of error messages.
+    """
     all_rules: list[TriggerRule] = []
     all_errors: list[str] = []
     seen_ids: set[str] = set()
@@ -166,6 +218,15 @@ def load_rules(paths: Sequence[Path]) -> tuple[tuple[TriggerRule, ...], list[str
 
 
 def files_signature(paths: Sequence[Path]) -> tuple[tuple[str, int, int], ...]:
+    """Compute a metadata signature for the rule files.
+
+    Args:
+        paths: Sequence of rule file paths.
+
+    Returns:
+        A tuple of ``(path, mtime_ns, size)`` entries; unreadable files are
+        recorded as ``(path, 0, 0)``.
+    """
     signature: list[tuple[str, int, int]] = []
     for path in paths:
         try:

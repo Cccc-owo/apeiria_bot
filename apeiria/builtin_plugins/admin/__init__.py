@@ -1,3 +1,5 @@
+"""Built-in admin plugin exposing superuser administration commands."""
+
 from nonebot import require
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 

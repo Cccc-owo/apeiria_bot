@@ -1,3 +1,5 @@
+"""Configuration model and loader for the help plugin."""
+
 from __future__ import annotations
 
 from nonebot import get_plugin_config
@@ -5,6 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class HelpConfig(BaseModel):
+    """Configuration model for the help plugin.
+
+    The model holds the general appearance and visibility options that control
+    how the help menu and plugin details are rendered and which plugins are
+    shown to the user.
+    """
+
     model_config = ConfigDict(extra="ignore")
 
     title: str = Field(default="功能菜单", description="主标题")
@@ -18,4 +27,5 @@ class HelpConfig(BaseModel):
 
 
 def get_help_config() -> HelpConfig:
+    """Return the help plugin configuration loaded from the environment."""
     return get_plugin_config(HelpConfig)

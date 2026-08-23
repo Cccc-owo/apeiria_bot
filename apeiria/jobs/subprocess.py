@@ -1,3 +1,5 @@
+"""Run subprocesses while streaming their output and supporting cancellation."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +16,7 @@ class SubprocessExecutor:
     """Run subprocesses while streaming output and supporting cancellation."""
 
     def __init__(self) -> None:
+        """Initialize the executor with no active subprocess."""
         self._proc: asyncio.subprocess.Process | None = None
 
     async def run(
@@ -24,6 +27,20 @@ class SubprocessExecutor:
         env: dict[str, str] | None = None,
         emit: Callable[[str], None] | None = None,
     ) -> int:
+        """Run a command, streaming merged output lines to the emitter.
+
+        Args:
+            command: The command and its arguments to execute.
+            cwd: Working directory for the subprocess.
+            env: Environment variables to pass to the subprocess.
+            emit: Optional callback invoked with each non-empty output line.
+
+        Returns:
+            The subprocess exit code, defaulting to 0 when it is None.
+
+        Raises:
+            ValueError: When the command sequence is empty.
+        """
         if not command:
             msg = "subprocess command must not be empty"
             raise ValueError(msg)
@@ -53,6 +70,7 @@ class SubprocessExecutor:
                 self._kill(proc)
 
     def terminate(self) -> None:
+        """Terminate the active subprocess group if one is still running."""
         proc = self._proc
         if proc is None or proc.returncode is not None:
             return
@@ -65,6 +83,11 @@ class SubprocessExecutor:
 
     @staticmethod
     def _kill(proc: asyncio.subprocess.Process) -> None:
+        """Forcefully kill a subprocess group.
+
+        Args:
+            proc: The subprocess process to kill.
+        """
         if os.name != "nt":
             with contextlib.suppress(OSError, ProcessLookupError):
                 os.killpg(proc.pid, signal.SIGKILL)

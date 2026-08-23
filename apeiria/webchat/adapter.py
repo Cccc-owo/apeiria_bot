@@ -1,3 +1,5 @@
+"""WebChat NoneBot adapter that bridges a browser over WebSocket into the bot."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,9 +48,15 @@ _CLOSE_UNAUTHORIZED = 1008  # policy violation
 
 
 class WebChatAdapter(BaseAdapter):
-    """WebChat 适配器：浏览器经 WebSocket 作为标准 NoneBot 适配器接入。"""
+    """WebChat adapter that connects browsers as a standard NoneBot adapter."""
 
     def __init__(self, driver: Driver, **kwargs: Any) -> None:
+        """Initialize the adapter, its connection manager, and the WebSocket server.
+
+        Args:
+            driver: The NoneBot driver instance.
+            **kwargs: Additional adapter options.
+        """
         super().__init__(driver, **kwargs)
         self.connections = ConnectionManager()
         self._bot: WebChatBot | None = None
@@ -58,9 +66,11 @@ class WebChatAdapter(BaseAdapter):
 
     @classmethod
     def get_name(cls) -> str:
+        """Return the adapter's unique name."""
         return "WebChat"
 
     def _setup(self) -> None:
+        """Register the WebSocket server route if the adapter is enabled by config."""
         cfg = get_webchat_config()
         if not cfg.enabled:
             logger.info("WebChat adapter disabled by config")
@@ -71,13 +81,26 @@ class WebChatAdapter(BaseAdapter):
         logger.success("WebChat WS route registered at {}", cfg.ws_path)
 
     async def _call_api(self, bot: Bot, api: str, **data: Any) -> Any:  # noqa: ARG002
+        """Log a warning and return ``None`` because the adapter exposes no API.
+
+        Args:
+            bot: The calling bot.
+            api: The requested API name.
+            **data: The API payload.
+        """
         logger.warning("WebChat adapter has no API: {}", api)
         return None
 
     def _default_session_id(self) -> str:
+        """Return the default private session id for a single-user webchat."""
         return f"webchat:private:{resolve_default_user_id()}"
 
     async def _handle_ws(self, websocket: WebSocket) -> None:
+        """Authenticate, accept, and relay frames for a single WebSocket connection.
+
+        Args:
+            websocket: The accepted WebSocket connection.
+        """
         token = websocket.request.url.query.get("token") or ""
         username = await decode_token(token)
         if not username:
@@ -102,17 +125,25 @@ class WebChatAdapter(BaseAdapter):
                 self._teardown_bot()
 
     def _ensure_bot(self) -> WebChatBot:
+        """Create the bot instance once and connect it to the adapter."""
         if self._bot is None:
             self._bot = WebChatBot(self, SELF_ID, self.connections)
             self.bot_connect(self._bot)
         return self._bot
 
     def _teardown_bot(self) -> None:
+        """Disconnect and drop the bot instance once no connection remains."""
         if self._bot is not None:
             self.bot_disconnect(self._bot)
             self._bot = None
 
     async def _replay_history(self, conn_id: str, session_id: str) -> None:
+        """Send the recent history of a session to the given connection.
+
+        Args:
+            conn_id: The connection to replay history to.
+            session_id: The session whose history should be replayed.
+        """
         cfg = get_webchat_config()
         rows = list(reversed(await load_recent(session_id, limit=cfg.history_limit)))
         messages = [self._row_to_wire(row, session_id) for row in rows]
@@ -121,6 +152,14 @@ class WebChatAdapter(BaseAdapter):
         )
 
     def _derive_session(self, identity: dict[str, Any]) -> tuple[str, str, str, str]:
+        """Derive a session id, user id, scene type, and scene id from an identity.
+
+        Args:
+            identity: The inbound identity payload.
+
+        Returns:
+            A tuple of (session_id, user_id, scene_type, scene_id).
+        """
         user_id = str(identity.get("user_id") or resolve_default_user_id())
         scene_type = identity.get("scene_type") or "private"
         if scene_type not in ("private", "group"):
@@ -133,6 +172,15 @@ class WebChatAdapter(BaseAdapter):
         return session_id, user_id, scene_type, scene_id
 
     def _row_to_wire(self, row: MessageRow, session_id: str) -> dict[str, Any]:
+        """Convert a stored message row into a wire-format message dictionary.
+
+        Args:
+            row: The persisted message row to convert.
+            session_id: The session the message belongs to.
+
+        Returns:
+            A wire-format message dictionary.
+        """
         meta = row.meta_json or {}
         segments = meta.get("segments")
         if not segments:
@@ -147,6 +195,13 @@ class WebChatAdapter(BaseAdapter):
         )
 
     async def _on_frame(self, bot: WebChatBot, conn_id: str, raw: str) -> None:
+        """Parse an inbound frame and dispatch it to the matching handler.
+
+        Args:
+            bot: The WebChat bot instance.
+            conn_id: The connection the frame came from.
+            raw: The raw JSON string from the connection.
+        """
         try:
             frame = protocol.parse_inbound(json.loads(raw))
         except (json.JSONDecodeError, protocol.ProtocolError) as exc:
@@ -166,6 +221,13 @@ class WebChatAdapter(BaseAdapter):
     async def _on_message(
         self, bot: WebChatBot, conn_id: str, frame: InboundMessage
     ) -> None:
+        """Persist an inbound message, echo it, and dispatch it as a message event.
+
+        Args:
+            bot: The WebChat bot instance.
+            conn_id: The connection the message came from.
+            frame: The parsed inbound message frame.
+        """
         session_id, user_id, scene_type, scene_id = self._derive_session(frame.identity)
         self._conn_sessions[conn_id] = session_id
 
@@ -210,15 +272,31 @@ class WebChatAdapter(BaseAdapter):
         task.add_done_callback(self._tasks.discard)
 
     async def _on_switch(self, conn_id: str, frame: InboundSwitch) -> None:
+        """Switch the connection to a new session and replay its history.
+
+        Args:
+            conn_id: The connection to switch.
+            frame: The parsed switch frame carrying the target identity.
+        """
         session_id, _, _, _ = self._derive_session(frame.identity)
         self._conn_sessions[conn_id] = session_id
         await self._replay_history(conn_id, session_id)
 
     async def _on_clear(self, conn_id: str) -> None:
+        """Clear the session associated with a connection and broadcast the event.
+
+        Args:
+            conn_id: The connection whose session should be cleared.
+        """
         session_id = self._conn_sessions.get(conn_id) or self._default_session_id()
         await delete_session_messages(session_id)
         await self.connections.broadcast(protocol.cleared_frame(session_id))
 
     async def _on_delete(self, message_id: str) -> None:
+        """Delete a single message and broadcast the deletion to all connections.
+
+        Args:
+            message_id: The id of the message to delete.
+        """
         await delete_message(message_id)
         await self.connections.broadcast(protocol.deleted_frame(message_id))

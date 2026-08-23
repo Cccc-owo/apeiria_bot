@@ -1,3 +1,5 @@
+"""Concrete bootstrap steps executed during project startup."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,12 +25,21 @@ _require_tracker_installed = False
 
 
 def get_access_control() -> AccessControl:
+    """Return the initialized access-control instance.
+
+    Returns:
+        The shared :class:`AccessControl` instance.
+
+    Raises:
+        RuntimeError: If access control has not been initialized yet.
+    """
     if _access_control is None:
         raise RuntimeError("Access control not initialized")  # noqa: TRY003
     return _access_control
 
 
 def step_db_migrate() -> None:
+    """Apply all Alembic database migrations up to the head revision."""
     from alembic.config import Config
 
     from alembic import command
@@ -39,30 +50,41 @@ def step_db_migrate() -> None:
 
 
 def step_db_shutdown() -> None:
+    """Install a driver shutdown hook that closes the database engine."""
     from apeiria.db.engine import close_db
 
     @nonebot.get_driver().on_shutdown
     async def _close_db() -> None:
+        """Close the database engine cleanly on shutdown."""
         await close_db()
 
     logger.success("DB graceful-shutdown hook installed")
 
 
 def step_apeiria_ensure() -> None:
+    """Ensure the plugin environment is created and ready for use."""
     ensure_apeiria_env()
     logger.success("Plugin environment ensured")
 
 
 def step_apeiria_sync() -> None:
+    """Sync the plugin environment against the managed dependency lockfile."""
     if sync_apeiria_env():
         logger.success("Plugin environment synced")
 
 
 def step_apeiria_inject() -> None:
+    """Inject the plugin environment paths into the interpreter."""
     inject_apeiria_paths()
 
 
 def _read_adapter_states() -> dict[str, dict]:
+    """Return the enabled states of adapters from the adapters YAML file.
+
+    Returns:
+        A mapping of adapter name to its state, or an empty dict when the file
+        does not exist or contains no states.
+    """
     import yaml
 
     yaml_path = Path(".apeiria/adapters.yaml")
@@ -73,6 +95,7 @@ def _read_adapter_states() -> dict[str, dict]:
 
 
 def step_require_tracker() -> None:
+    """Install a wrapper around ``require`` that records plugin dependencies."""
     global _require_tracker_installed  # noqa: PLW0603
     if _require_tracker_installed:
         return
@@ -86,6 +109,14 @@ def step_require_tracker() -> None:
     from apeiria.plugin.dependency_graph import record_dependency
 
     def _tracking_require(name: str) -> ModuleType:
+        """Require a plugin and record the dependency from the calling plugin.
+
+        Args:
+            name: Name of the plugin to require.
+
+        Returns:
+            The module returned by the original ``require`` call.
+        """
         module = original_require(name)
         frame = inspect.currentframe()
         try:
@@ -113,6 +144,7 @@ def step_require_tracker() -> None:
 
 
 def step_load_builtin_adapters() -> None:
+    """Load the builtin adapters declared in the project pyproject.toml."""
     from apeiria.config.loader import load_adapters_from_toml
 
     states = _read_adapter_states()
@@ -120,6 +152,7 @@ def step_load_builtin_adapters() -> None:
 
 
 def step_load_adapters() -> None:
+    """Load the adapters defined in the plugin-environment pyproject.toml."""
     from apeiria.config.loader import load_adapters_from_toml
 
     states = _read_adapter_states()
@@ -127,6 +160,7 @@ def step_load_adapters() -> None:
 
 
 def step_load_builtins() -> None:
+    """Load all enabled builtin plugins."""
     loaded = 0
     for manifest in scan_plugins():
         if manifest.source != "builtin":
@@ -143,6 +177,7 @@ def step_load_builtins() -> None:
 
 
 def step_load_local() -> None:
+    """Load all enabled local plugins from the plugin environment."""
     import sys
 
     loaded = 0
@@ -185,6 +220,7 @@ def step_load_local() -> None:
 
 
 def step_load_pypi() -> None:
+    """Load all enabled plugins installed from PyPI."""
     loaded = 0
     for manifest in scan_plugins():
         if manifest.source != "pypi":
@@ -210,6 +246,7 @@ def step_load_pypi() -> None:
 
 
 def step_conversation() -> None:
+    """Install the message-persistence hook on the event postprocessor."""
     global _conversation_hook_installed  # noqa: PLW0603
     if _conversation_hook_installed:
         return
@@ -222,6 +259,7 @@ def step_conversation() -> None:
 
 
 def step_access() -> None:
+    """Initialize access control and install its access hooks."""
     global _access_control  # noqa: PLW0603
     _access_control = AccessControl()
 
@@ -231,11 +269,17 @@ def step_access() -> None:
 
     @nonebot.get_driver().on_startup
     async def _load_rules() -> None:
+        """Load the access rules snapshot on driver startup."""
         assert _access_control is not None
         await _access_control.load_snapshot()
 
     @nonebot.get_driver().on_bot_connect
     async def _reload_rules(bot: nonebot.adapters.Bot) -> None:  # noqa: ARG001  # pyright: ignore[reportAttributeAccessIssue]
+        """Reload the access rules snapshot when a bot connects.
+
+        Args:
+            bot: The bot that connected to the driver.
+        """
         assert _access_control is not None
         await _access_control.load_snapshot()
 
@@ -243,6 +287,7 @@ def step_access() -> None:
 
 
 def step_webchat() -> None:
+    """Register the WebChat adapter and its helpers when WebChat is enabled."""
     from apeiria.webchat.config import get_webchat_config
 
     if not get_webchat_config().enabled:
@@ -260,6 +305,14 @@ def step_webchat() -> None:
 
 
 def _source_fingerprint(src_dir: Path) -> str:
+    """Return a SHA-256 fingerprint of the frontend source files.
+
+    Args:
+        src_dir: Directory containing the frontend source files.
+
+    Returns:
+        A hexadecimal SHA-256 digest over the source files in the directory.
+    """
     import hashlib
 
     hasher = hashlib.sha256()
@@ -274,6 +327,14 @@ def _source_fingerprint(src_dir: Path) -> str:
 
 
 def _needs_frontend_build(dist_dir: Path) -> bool:
+    """Return whether the frontend distribution needs a fresh build.
+
+    Args:
+        dist_dir: Directory containing the built frontend assets.
+
+    Returns:
+        True if a rebuild is required, False otherwise.
+    """
     index = dist_dir / "index.html"
     if not index.is_file():
         return True
@@ -292,6 +353,16 @@ def _needs_frontend_build(dist_dir: Path) -> bool:
 
 
 def _resolve_frontend_file(frontend_dir: Path, full_path: str) -> Path | None:
+    """Resolve a request path to a file inside the frontend root.
+
+    Args:
+        frontend_dir: Root directory of the built frontend assets.
+        full_path: Requested path relative to the frontend root.
+
+    Returns:
+        The resolved file path, falling back to index.html when the requested
+        path does not exist, or None when the path escapes the frontend root.
+    """
     frontend_root = frontend_dir.resolve()
     candidate = (frontend_dir / full_path).resolve()
     if not candidate.is_relative_to(frontend_root):
@@ -302,6 +373,7 @@ def _resolve_frontend_file(frontend_dir: Path, full_path: str) -> Path | None:
 
 
 def _try_auto_build_frontend() -> None:
+    """Build the frontend with pnpm when a rebuild is needed and tooling is present."""
     import shutil
     import subprocess
 
@@ -340,6 +412,7 @@ def _try_auto_build_frontend() -> None:
 
 
 def step_web() -> None:
+    """Configure the FastAPI web app and register its routes and middleware."""
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import FileResponse
 
@@ -377,6 +450,18 @@ def step_web() -> None:
 
     @app.get("/{full_path:path}")
     async def _serve_frontend(full_path: str) -> FileResponse:
+        """Serve a built frontend asset for a request path.
+
+        Args:
+            full_path: Request path relative to the frontend root.
+
+        Returns:
+            A :class:`FileResponse` for the resolved asset.
+
+        Raises:
+            HTTPException: If the frontend is not built, the requested path is
+                not found, or the resolved asset does not exist.
+        """
         if not frontend_dir.exists():
             raise HTTPException(status_code=404, detail="Frontend not built")
         candidate = _resolve_frontend_file(frontend_dir, full_path)

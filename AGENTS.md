@@ -57,6 +57,17 @@ L5  web/        — Web UI API (认证/任务/插件更新/日志)
 - **禁止硬编码新依赖。** 添加 PyPI 包前确认项目是否已有替代方案。
 - **禁止在 commit message 中使用内部计划术语**（L 数字、T 数字等）。
 
+### 代码风格 / Docstring
+
+- **所有 module、class、function、method 必须写 Google 风格 docstring。**
+  参考 [Google Python Style Guide §3.8 Comments and Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)。
+- **格式：** 使用三元双引号；首行为一句式祈使语气总结并以英文句号结尾；必要时用 `Args:` / `Returns:`（生成器用 `Yields:`）/ `Raises:` 小节；每个参数名须与签名完全一致（方法省略 `self`/`cls`）。
+- **Module docstring 放文件最先，**`from __future__ import annotations` 之前。子包 `__init__.py` 写包简介。
+- **语言：** docstring 用英文；行内注释可保留中文。
+- **由 ruff 强制：** `pyproject.toml` 已启用 `D` 规则族并配置 `[tool.ruff.lint.pydocstyle] convention = "google"`。
+  在 `apeiria/` 包内强制执行；`tests/*`、`alembic/*` 通过 per-file-ignores 豁免。
+- 新增/修改函数、方法、类时，补上对应 docstring，保持 `uv run ruff check` 与 `uv run ruff format --check` 通过。
+
 ## 项目结构
 
 ```

@@ -1,3 +1,5 @@
+"""Password hashing and validation utilities for the Web dashboard."""
+
 from __future__ import annotations
 
 import hashlib
@@ -19,6 +21,7 @@ _GENERATED_PASSWORD_LENGTH = 24
 
 
 def _scrypt(raw_password: str, salt: bytes, n: int, r: int, p: int) -> bytes:
+    """Derive a scrypt digest for a raw password with the given parameters."""
     return hashlib.scrypt(
         raw_password.encode("utf-8"),
         salt=salt,

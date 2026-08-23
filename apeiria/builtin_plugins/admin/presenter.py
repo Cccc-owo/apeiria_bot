@@ -1,3 +1,5 @@
+"""Present helper functions that render structured data as text blocks."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -16,6 +18,17 @@ def render_block(
     summary: str | None = None,
     footer: str | None = None,
 ) -> str:
+    """Render a text block with a title, optional summary, and field list.
+
+    Args:
+        title: The block title.
+        fields: An iterable of (label, value) field pairs.
+        summary: Optional summary text shown below the title.
+        footer: Optional footer text shown at the end of the block.
+
+    Returns:
+        The rendered text block.
+    """
     lines = [f"【{title}】"]
     if summary:
         lines.extend(["", summary])
@@ -41,6 +54,18 @@ def render_list_block(
     empty_message: str | None = None,
     footer: str | None = None,
 ) -> str:
+    """Render a text block with a title, optional summary, and item list.
+
+    Args:
+        title: The block title.
+        items: An iterable of item strings to render.
+        summary: Optional summary text shown below the title.
+        empty_message: Optional placeholder text when the list is empty.
+        footer: Optional footer text shown at the end of the block.
+
+    Returns:
+        The rendered text block.
+    """
     lines = [f"【{title}】"]
     if summary:
         lines.extend(["", summary])
@@ -58,6 +83,14 @@ def render_list_block(
 
 
 def _stringify(value: object) -> str:  # noqa: PLR0911
+    """Convert a single value into its display string representation.
+
+    Args:
+        value: The value to convert.
+
+    Returns:
+        The converted display string.
+    """
     if value is None:
         return "无"
     if isinstance(value, bool):

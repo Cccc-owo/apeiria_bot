@@ -1,3 +1,5 @@
+"""Scan installed plugins and build plugin manifests."""
+
 from __future__ import annotations
 
 import re
@@ -23,6 +25,8 @@ BUILTIN_LIST = [
 
 @dataclass
 class PluginManifest:
+    """Metadata describing a plugin discovered by ``scan_plugins``."""
+
     name: str
     path_or_module: str
     enabled: bool
@@ -31,6 +35,14 @@ class PluginManifest:
 
 
 def requirement_to_module(requirement: str) -> str:
+    """Convert a package requirement to a canonical module name.
+
+    Args:
+        requirement: The package requirement string.
+
+    Returns:
+        The module name derived from the requirement's distribution name.
+    """
     match = _REQUIREMENT_NAME.match(requirement.strip())
     base = match.group(0) if match else requirement
     base = base.split("[", 1)[0]
@@ -38,16 +50,37 @@ def requirement_to_module(requirement: str) -> str:
 
 
 def _requirement_base_name(requirement: str) -> str:
+    """Return the base distribution name of a requirement.
+
+    Args:
+        requirement: The package requirement string.
+
+    Returns:
+        The base distribution name with any extras stripped.
+    """
     match = _REQUIREMENT_NAME.match(requirement.strip())
     base = match.group(0) if match else requirement
     return base.split("[", 1)[0]
 
 
 def _normalize_dist_name(name: str) -> str:
+    """Normalize a distribution name for comparison.
+
+    Args:
+        name: The distribution name to normalize.
+
+    Returns:
+        A lower-cased name with separators replaced by underscores.
+    """
     return name.lower().replace("-", "_").replace(".", "_")
 
 
 def _default_venv_site_packages() -> Path | None:
+    """Return the site-packages path of the Apeiria virtualenv.
+
+    Returns:
+        The site-packages ``Path``, or ``None`` if it cannot be located.
+    """
     venv_path = Path(".apeiria/.venv")
     for lib_dir in sorted(venv_path.glob("lib/python*/site-packages")):
         return lib_dir
@@ -55,6 +88,15 @@ def _default_venv_site_packages() -> Path | None:
 
 
 def _top_module_from_record(record_text: str | None, dist_name: str) -> str | None:
+    """Derive the top-level package from a distribution RECORD.
+
+    Args:
+        record_text: The contents of the distribution RECORD file.
+        dist_name: The distribution name to match against.
+
+    Returns:
+        The top-level module name, or ``None`` if it cannot be derived.
+    """
     if not record_text:
         return None
     normalized = _normalize_dist_name(dist_name)
@@ -79,6 +121,15 @@ def _top_module_from_record(record_text: str | None, dist_name: str) -> str | No
 
 
 def _top_module_from_distinfo(dist_name: str, site_packages: Path) -> str | None:
+    """Derive the top-level module name from an installed distribution.
+
+    Args:
+        dist_name: The distribution name to locate.
+        site_packages: The site-packages path to search.
+
+    Returns:
+        The top-level module name, or ``None`` if it cannot be found.
+    """
     import importlib.metadata as md
 
     normalized = _normalize_dist_name(dist_name)
@@ -104,6 +155,17 @@ def resolve_pypi_module(
     config_module: str | None = None,
     venv_site_packages: Path | None = None,
 ) -> str:
+    """Resolve the import module name for a PyPI-based plugin.
+
+    Args:
+        requirement: The package requirement string.
+        config_module: An explicit config module, if known.
+        venv_site_packages: Site-packages path to search, defaulting to the
+            Apeiria virtualenv.
+
+    Returns:
+        The resolved module name.
+    """
     if config_module:
         return config_module
     site_packages = venv_site_packages or _default_venv_site_packages()
@@ -116,6 +178,14 @@ def resolve_pypi_module(
 
 
 def read_installed_version(requirement: str) -> str | None:
+    """Read the installed version of a distribution.
+
+    Args:
+        requirement: The package requirement string.
+
+    Returns:
+        The installed version string, or ``None`` if not found.
+    """
     import importlib.metadata as md
 
     dist_name = _requirement_base_name(requirement)
@@ -223,6 +293,14 @@ def local_plugin_module_name(plugin_dir: Path) -> str | None:
 
 
 def manifest_module_candidate(manifest: PluginManifest) -> str:
+    """Return the module name a plugin manifest should be imported as.
+
+    Args:
+        manifest: The plugin manifest to resolve.
+
+    Returns:
+        A module name candidate string.
+    """
     if manifest.source == "pypi":
         return resolve_pypi_module(manifest.path_or_module, manifest.config_module)
     if manifest.source == "local":
@@ -232,6 +310,12 @@ def manifest_module_candidate(manifest: PluginManifest) -> str:
 
 
 def _load_plugins_yaml() -> dict:
+    """Load plugin package and state records from ``plugins.yaml``.
+
+    Returns:
+        A dict with ``dirs``, ``packages``, and ``states`` keys, or an empty
+        structure if the file does not exist.
+    """
     yaml_path = Path(".apeiria/plugins.yaml")
     if not yaml_path.exists():
         return {"dirs": [], "packages": {}, "states": {}}
@@ -239,6 +323,15 @@ def _load_plugins_yaml() -> dict:
 
 
 def _is_enabled(name: str, data: dict) -> bool:
+    """Return whether a plugin is enabled by its recorded state.
+
+    Args:
+        name: The plugin name.
+        data: The loaded plugins YAML data.
+
+    Returns:
+        ``True`` if enabled, ``False`` otherwise.
+    """
     states = data.get("states") or {}
     if name in states:
         return bool(states[name].get("enabled", True))
@@ -246,6 +339,11 @@ def _is_enabled(name: str, data: dict) -> bool:
 
 
 def scan_plugins() -> list[PluginManifest]:
+    """Scan builtin, local, and PyPI plugins.
+
+    Returns:
+        A list of parsed :class:`PluginManifest` instances.
+    """
     data = _load_plugins_yaml()
     dirs = data.get("dirs") or []
     packages = data.get("packages") or {}

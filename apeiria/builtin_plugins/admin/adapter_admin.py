@@ -1,3 +1,5 @@
+"""Implement the ``/adapters`` and ``/adapter`` commands for adapter management."""
+
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
@@ -32,6 +34,12 @@ _adapter = on_alconna(
 
 @_adapters.handle()
 async def handle_adapters(bot: Bot, event: Event) -> None:
+    """Handle the ``/adapters`` command and list all loaded adapters.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _adapters.finish(owner_error)
@@ -63,6 +71,14 @@ async def handle_adapter(
     action: Match[str],
     adapter_name: Match[str],
 ) -> None:
+    """Handle the ``/adapter`` command to inspect or toggle a single adapter.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+        action: The command action, one of info/enable/disable.
+        adapter_name: The target adapter name.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _adapter.finish(owner_error)
@@ -90,6 +106,14 @@ async def handle_adapter(
 
 
 def _find_adapter(query: str) -> AdapterManifest | None:
+    """Find a loaded adapter by its name or module name.
+
+    Args:
+        query: The adapter name query to match.
+
+    Returns:
+        The matching adapter manifest, or None when no adapter matches.
+    """
     normalized = query.strip().lower()
     for a in scan_adapters():
         if normalized in (a.name.lower(), a.module_name.lower()):
@@ -98,6 +122,14 @@ def _find_adapter(query: str) -> AdapterManifest | None:
 
 
 def _render_info(a: AdapterManifest) -> str:
+    """Render a detail block for a single adapter.
+
+    Args:
+        a: The adapter manifest to render.
+
+    Returns:
+        The rendered detail text.
+    """
     return render_block(
         "适配器详情",
         [

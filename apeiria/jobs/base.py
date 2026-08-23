@@ -1,3 +1,5 @@
+"""Define long-running background job primitives and their lifecycle runner."""
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +21,8 @@ _HISTORY_LIMIT = 1000
 
 
 class JobStatus(StrEnum):
+    """Enumeration of the possible lifecycle states of a job."""
+
     PENDING = "pending"
     RUNNING = "running"
     CANCELLING = "cancelling"
@@ -35,6 +39,12 @@ class Job(ABC):
     """Base class for long-running background jobs."""
 
     def __init__(self, *, kind: str, lock_name: str | None = None) -> None:
+        """Initialize a job.
+
+        Args:
+            kind: Label for the kind of work this job performs.
+            lock_name: Optional name of the lock that serializes this job.
+        """
         self.id = uuid.uuid4().hex
         self.kind = kind
         self.lock_name = lock_name
@@ -64,23 +74,41 @@ class Job(ABC):
         """Roll back side effects when the job fails or is cancelled."""
 
     def attach_executor(self, executor: SubprocessExecutor) -> None:
+        """Attach a subprocess executor so cancellation can terminate the process.
+
+        Args:
+            executor: The executor managing the job's active subprocess.
+        """
         self._executor = executor
 
     def detach_executor(self) -> None:
+        """Clear the previously attached subprocess executor."""
         self._executor = None
 
     async def cancel(self) -> None:
+        """Request cancellation of the job and terminate its subprocess."""
         self.cancel_event.set()
         if self._executor is not None:
             self._executor.terminate()
 
     def emit(self, event: dict[str, Any]) -> None:
+        """Record an event in job history and broadcast it to subscribers.
+
+        Args:
+            event: The event payload to publish; the task id is added if absent.
+        """
         event.setdefault("task_id", self.id)
         self._history.append(event)
         for queue in list(self._subscribers):
             queue.put_nowait(event)
 
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
+        """Return a queue that replays history and receives future events.
+
+        Returns:
+            A new asyncio queue populated with prior events that will also
+            receive every later event emitted by this job.
+        """
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         for event in self._history:
             queue.put_nowait(event)
@@ -88,9 +116,19 @@ class Job(ABC):
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        """Remove a previously returned subscriber queue.
+
+        Args:
+            queue: The subscriber queue to detach.
+        """
         self._subscribers.discard(queue)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a serializable snapshot of the job's status fields.
+
+        Returns:
+            A dictionary of job id, kind, status and timing information.
+        """
         return {
             "id": self.id,
             "kind": self.kind,
@@ -106,6 +144,7 @@ class JobRunner:
     """Registry and lifecycle owner for :class:`Job` instances."""
 
     def __init__(self) -> None:
+        """Initialize the runner with empty registries and per-kind locks."""
         self._jobs: dict[str, Job] = {}
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._git_lock = asyncio.Lock()
@@ -113,9 +152,18 @@ class JobRunner:
 
     @property
     def jobs(self) -> dict[str, Job]:
+        """Return the registry of tracked jobs keyed by job id."""
         return self._jobs
 
     async def start(self, job: Job) -> str:
+        """Register and start a job, returning its id.
+
+        Args:
+            job: The job to run; a job already registered returns its id.
+
+        Returns:
+            The id of the started job.
+        """
         if job.id in self._jobs:
             return job.id
         self._jobs[job.id] = job
@@ -123,6 +171,11 @@ class JobRunner:
         self._tasks[job.id] = task
 
         def _on_done(done_task: asyncio.Task[Any]) -> None:
+            """Finalize the job when its task completes, scheduling cleanup.
+
+            Args:
+                done_task: The completed asyncio task for the job.
+            """
             self._tasks.pop(job.id, None)
             job.finished_at = time.monotonic()
             if job.status in (JobStatus.DONE, JobStatus.ERROR, JobStatus.CANCELLED):
@@ -149,6 +202,11 @@ class JobRunner:
         return job.id
 
     async def _run(self, job: Job) -> None:
+        """Run a job under its serialization lock, handling terminal failures.
+
+        Args:
+            job: The job to execute.
+        """
         job.status = JobStatus.RUNNING
         job.started_at = time.monotonic()
         lock = self._lock_for(job)
@@ -183,6 +241,11 @@ class JobRunner:
             job.status = JobStatus.ERROR
 
     async def _run_with_rollback(self, job: Job) -> None:
+        """Run a job and roll back its side effects on failure or cancellation.
+
+        Args:
+            job: The job to execute.
+        """
         try:
             job.snapshot()
             await job.run()
@@ -222,6 +285,14 @@ class JobRunner:
             job.status = JobStatus.ERROR
 
     def _lock_for(self, job: Job) -> asyncio.Lock | None:
+        """Return the asyncio lock that serializes a job, if any.
+
+        Args:
+            job: The job whose lock is needed.
+
+        Returns:
+            The matching lock, or None when the job requires no lock.
+        """
         if job.lock_name == "git":
             return self._git_lock
         if job.lock_name == "apeiria":
@@ -229,10 +300,26 @@ class JobRunner:
         return None
 
     async def subscribe(self, job_id: str) -> asyncio.Queue[dict[str, Any]] | None:
+        """Return a subscriber queue for a job id, or None if the job is unknown.
+
+        Args:
+            job_id: The id of the job to subscribe to.
+
+        Returns:
+            A subscriber queue for the job, or None when the job is not found.
+        """
         job = self._jobs.get(job_id)
         return job.subscribe() if job is not None else None
 
     async def cancel(self, job_id: str) -> bool:
+        """Request cancellation of a running job.
+
+        Args:
+            job_id: The id of the job to cancel.
+
+        Returns:
+            True when cancellation was initiated, False otherwise.
+        """
         job = self._jobs.get(job_id)
         if job is None or job.status in (
             JobStatus.DONE,
@@ -248,10 +335,26 @@ class JobRunner:
         return True
 
     async def get_status(self, job_id: str) -> dict[str, Any] | None:
+        """Return a status snapshot for a job id, or None if the job is unknown.
+
+        Args:
+            job_id: The id of the job to inspect.
+
+        Returns:
+            The job status dictionary, or None when the job is not found.
+        """
         job = self._jobs.get(job_id)
         return job.to_dict() if job is not None else None
 
 
 def drain_queue(queue: asyncio.Queue[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+    """Yield leftover events currently buffered on a subscriber queue.
+
+    Args:
+        queue: The subscriber queue to drain.
+
+    Yields:
+        Each pending event in the queue, drained in order.
+    """
     while not queue.empty():
         yield queue.get_nowait()

@@ -1,3 +1,5 @@
+"""Web API routes for plugins, adapters, config, store, tasks, status, and RBAC."""
+
 from __future__ import annotations
 
 import asyncio
@@ -37,6 +39,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(verify_token)])
 
 
 def _write_yaml(raw: dict) -> None:
+    """Write a raw dictionary back to data/config.yaml."""
     import yaml
 
     p = Path("data/config.yaml")
@@ -47,6 +50,14 @@ def _write_yaml(raw: dict) -> None:
 
 
 def _scanned_name_to_module(name: str) -> str | None:
+    """Resolve a scanned plugin name to its module candidate.
+
+    Args:
+        name: Plugin name to resolve.
+
+    Returns:
+        The module candidate, or None when the name is not scanned.
+    """
     from apeiria.plugin.scanner import manifest_module_candidate, scan_plugins
 
     for manifest in scan_plugins():
@@ -56,12 +67,33 @@ def _scanned_name_to_module(name: str) -> str | None:
 
 
 def _read_packages(kind: str) -> dict:
+    """Read the installed package map for a kind.
+
+    Args:
+        kind: Either "plugin" or "adapter".
+
+    Returns:
+        A mapping of package names to requirements.
+    """
     if kind == "plugin":
         return _read_plugins_yaml().get("packages") or {}
     return _read_adapters_yaml().get("packages") or {}
 
 
 async def _list_versions(kind: str, name: str, *, not_found_detail: str) -> dict:
+    """List available PyPI versions for an installed package.
+
+    Args:
+        kind: Either "plugin" or "adapter".
+        name: Package name to list.
+        not_found_detail: Detail message when the package is not installed.
+
+    Returns:
+        A dictionary with the list of available versions.
+
+    Raises:
+        HTTPException: With 404 when the package is missing or not on PyPI.
+    """
     pkgs = _read_packages(kind)
     if name not in pkgs:
         raise HTTPException(status_code=404, detail=not_found_detail)
@@ -73,6 +105,14 @@ async def _list_versions(kind: str, name: str, *, not_found_detail: str) -> dict
 
 
 async def _check_updates(kind: str) -> dict[str, dict]:
+    """Check installed versions against the latest PyPI versions for a kind.
+
+    Args:
+        kind: Either "plugin" or "adapter".
+
+    Returns:
+        A mapping of package name to its installed, latest, and update flags.
+    """
     pkgs = _read_packages(kind)
     names = list(pkgs)
     bases = [_requirement_base_name(pkgs[n]) for n in names]
@@ -89,6 +129,20 @@ async def _check_updates(kind: str) -> dict[str, dict]:
 
 
 async def _update_package(kind: str, data: dict, *, noun: str) -> str:
+    """Start an update task for a PyPI package.
+
+    Args:
+        kind: Either "plugin" or "adapter".
+        data: Request body with the package name and optional version.
+        noun: Human-readable noun used in error messages.
+
+    Returns:
+        The id of the started update task.
+
+    Raises:
+        HTTPException: With 400 when the package is not installed or its latest
+            version cannot be determined.
+    """
     name = data.get("name", "")
     pkgs = _read_packages(kind)
     if name not in pkgs:
@@ -107,6 +161,11 @@ async def _update_package(kind: str, data: dict, *, noun: str) -> str:
 
 @router.get("/plugins/list")
 async def api_plugins_list() -> JSONResponse:
+    """List plugins merged from manifests, metadata, and dependency info.
+
+    Returns:
+        A JSON response with the plugin list.
+    """
     import nonebot
 
     from apeiria.plugin.dependency_graph import get_cached_graph
@@ -177,6 +236,17 @@ async def api_plugins_list() -> JSONResponse:
 
 @router.post("/plugins/install")
 async def api_plugins_install(data: dict) -> JSONResponse:
+    """Start an install task for a plugin.
+
+    Args:
+        data: Request body with the plugin name and package specifier.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when name or pkg is missing.
+    """
     name = data.get("name", "")
     pkg = data.get("pkg", "")
     if not name or not pkg:
@@ -187,6 +257,17 @@ async def api_plugins_install(data: dict) -> JSONResponse:
 
 @router.post("/plugins/uninstall")
 async def api_plugins_uninstall(data: dict) -> JSONResponse:
+    """Start an uninstall task for a plugin.
+
+    Args:
+        data: Request body with the plugin name and keep-config flag.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when the name is missing.
+    """
     name = data.get("name", "")
     keep_config = data.get("keep_config", False)
     if not name:
@@ -199,6 +280,17 @@ async def api_plugins_uninstall(data: dict) -> JSONResponse:
 
 @router.post("/plugins/state")
 async def api_plugins_state(data: dict) -> JSONResponse:
+    """Set the enabled state of a plugin.
+
+    Args:
+        data: Request body with the plugin name and enabled flag.
+
+    Returns:
+        A JSON response indicating whether the state was applied.
+
+    Raises:
+        HTTPException: With 400 when the name is missing.
+    """
     name = data.get("name", "")
     enabled = data.get("enabled", True)
     if not name:
@@ -209,6 +301,17 @@ async def api_plugins_state(data: dict) -> JSONResponse:
 
 @router.get("/plugins/{name}/config")
 async def api_plugin_config(name: str) -> JSONResponse:
+    """Return the config contract and values for a plugin.
+
+    Args:
+        name: Plugin name.
+
+    Returns:
+        A JSON response with the config contract and current values.
+
+    Raises:
+        HTTPException: With 404 when the plugin has no config.
+    """
     contract = resolve_config_namespace_contract(name)
 
     if contract.source == "none" and not contract.fields:
@@ -226,6 +329,17 @@ async def api_plugin_config(name: str) -> JSONResponse:
 
 @router.get("/plugins/{name}/versions")
 async def api_plugin_versions(name: str) -> JSONResponse:
+    """Return available PyPI versions for a plugin.
+
+    Args:
+        name: Plugin name.
+
+    Returns:
+        A JSON response with the list of available versions.
+
+    Raises:
+        HTTPException: With 404 when the package is missing or not on PyPI.
+    """
     return JSONResponse(
         content=await _list_versions(
             "plugin", name, not_found_detail="非 PyPI 插件，无可选版本"
@@ -235,17 +349,39 @@ async def api_plugin_versions(name: str) -> JSONResponse:
 
 @router.post("/plugins/check-updates")
 async def api_plugins_check_updates() -> JSONResponse:
+    """Check plugins for available updates.
+
+    Returns:
+        A JSON response with the update check results.
+    """
     return JSONResponse(content={"updates": await _check_updates("plugin")})
 
 
 @router.post("/plugins/update")
 async def api_plugins_update(data: dict) -> JSONResponse:
+    """Start an update task for a plugin.
+
+    Args:
+        data: Request body with the plugin name and optional version.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when the package is not installed or its latest
+            version cannot be determined.
+    """
     task_id = await _update_package("plugin", data, noun="插件")
     return JSONResponse(content={"task_id": task_id})
 
 
 @router.get("/adapters/list")
 async def api_adapters_list() -> JSONResponse:
+    """List installed adapters with their versions.
+
+    Returns:
+        A JSON response with the adapter list.
+    """
     pkgs = _read_adapters_yaml().get("packages") or {}
     items = [
         {
@@ -264,6 +400,17 @@ async def api_adapters_list() -> JSONResponse:
 
 @router.post("/adapters/install")
 async def api_adapters_install(data: dict) -> JSONResponse:
+    """Start an install task for an adapter.
+
+    Args:
+        data: Request body with the adapter name, package, and module name.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when name, pkg, or module_name is missing.
+    """
     name = data.get("name", "")
     pkg = data.get("pkg", "")
     module_name = data.get("module_name", "")
@@ -279,6 +426,17 @@ async def api_adapters_install(data: dict) -> JSONResponse:
 
 @router.post("/adapters/uninstall")
 async def api_adapters_uninstall(data: dict) -> JSONResponse:
+    """Start an uninstall task for an adapter.
+
+    Args:
+        data: Request body with the adapter name and keep-config flag.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when the name is missing.
+    """
     name = data.get("name", "")
     keep_config = data.get("keep_config", False)
     if not name:
@@ -291,6 +449,17 @@ async def api_adapters_uninstall(data: dict) -> JSONResponse:
 
 @router.post("/adapters/state")
 async def api_adapters_state(data: dict) -> JSONResponse:
+    """Set the enabled state of an adapter.
+
+    Args:
+        data: Request body with the adapter name and enabled flag.
+
+    Returns:
+        A JSON response indicating whether the state was applied.
+
+    Raises:
+        HTTPException: With 400 when the name is missing.
+    """
     name = data.get("name", "")
     enabled = data.get("enabled", True)
     if not name:
@@ -301,6 +470,17 @@ async def api_adapters_state(data: dict) -> JSONResponse:
 
 @router.get("/adapters/{name}/config")
 async def api_adapter_config(name: str) -> JSONResponse:
+    """Return the config contract and values for an adapter.
+
+    Args:
+        name: Adapter name.
+
+    Returns:
+        A JSON response with the config contract and current values.
+
+    Raises:
+        HTTPException: With 404 when the adapter has no config.
+    """
     from apeiria.plugin.adapter_resolver import resolve_adapter_config
 
     contract = resolve_adapter_config(name)
@@ -314,6 +494,17 @@ async def api_adapter_config(name: str) -> JSONResponse:
 
 @router.get("/adapters/{name}/versions")
 async def api_adapter_versions(name: str) -> JSONResponse:
+    """Return available PyPI versions for an adapter.
+
+    Args:
+        name: Adapter name.
+
+    Returns:
+        A JSON response with the list of available versions.
+
+    Raises:
+        HTTPException: With 404 when the package is missing or not on PyPI.
+    """
     return JSONResponse(
         content=await _list_versions(
             "adapter", name, not_found_detail="非 PyPI 适配器，无可选版本"
@@ -323,23 +514,56 @@ async def api_adapter_versions(name: str) -> JSONResponse:
 
 @router.post("/adapters/check-updates")
 async def api_adapters_check_updates() -> JSONResponse:
+    """Check adapters for available updates.
+
+    Returns:
+        A JSON response with the update check results.
+    """
     return JSONResponse(content={"updates": await _check_updates("adapter")})
 
 
 @router.post("/adapters/update")
 async def api_adapters_update(data: dict) -> JSONResponse:
+    """Start an update task for an adapter.
+
+    Args:
+        data: Request body with the adapter name and optional version.
+
+    Returns:
+        A JSON response with the task id.
+
+    Raises:
+        HTTPException: With 400 when the package is not installed or its latest
+            version cannot be determined.
+    """
     task_id = await _update_package("adapter", data, noun="适配器")
     return JSONResponse(content={"task_id": task_id})
 
 
 @router.get("/config")
 async def api_config_get() -> JSONResponse:
+    """Return the full merged configuration.
+
+    Returns:
+        A JSON response with the configuration.
+    """
     app = load_config("data/config.yaml")
     return JSONResponse(content=app.model_dump())
 
 
 @router.get("/config/schema/{section}")
 async def api_config_schema(section: str) -> JSONResponse:
+    """Return the config schema for a section.
+
+    Args:
+        section: Config section to inspect.
+
+    Returns:
+        A JSON response with the config schema contract.
+
+    Raises:
+        HTTPException: With 400 when the section is unknown.
+    """
     if section == "nonebot":
         from nonebot import get_driver
 
@@ -393,6 +617,17 @@ async def api_config_schema(section: str) -> JSONResponse:
 
 @router.put("/config/nonebot")
 async def api_config_nonebot(data: dict) -> JSONResponse:
+    """Patch the nonebot config section.
+
+    Args:
+        data: Values to merge into the nonebot section.
+
+    Returns:
+        A JSON response acknowledging the update.
+
+    Raises:
+        HTTPException: With 422 when a protected field such as driver changes.
+    """
     if "driver" in data:
         current = load_config("data/config.yaml").nonebot.driver
         if data["driver"] != current:
@@ -407,6 +642,14 @@ async def api_config_nonebot(data: dict) -> JSONResponse:
 
 @router.put("/config/plugins")
 async def api_config_plugins(data: dict) -> JSONResponse:
+    """Patch the plugins config section and apply the runtime config.
+
+    Args:
+        data: Values to merge into the plugins section.
+
+    Returns:
+        A JSON response acknowledging the update.
+    """
     _patch_config("plugins", data)
     app = load_config("data/config.yaml")
     update_runtime_config(app)
@@ -415,6 +658,14 @@ async def api_config_plugins(data: dict) -> JSONResponse:
 
 @router.put("/config/adapters")
 async def api_config_adapters(data: dict) -> JSONResponse:
+    """Patch the adapters config section and apply the runtime config.
+
+    Args:
+        data: Values to merge into the adapters section.
+
+    Returns:
+        A JSON response acknowledging the update.
+    """
     _patch_config("adapters", data)
     app = load_config("data/config.yaml")
     update_runtime_config(app)
@@ -423,6 +674,14 @@ async def api_config_adapters(data: dict) -> JSONResponse:
 
 @router.put("/config/apeiria")
 async def api_config_apeiria(data: dict) -> JSONResponse:
+    """Patch the apeiria config section, clearing the Web cache when needed.
+
+    Args:
+        data: Values to merge into the apeiria section.
+
+    Returns:
+        A JSON response acknowledging the update.
+    """
     before = load_config("data/config.yaml").apeiria.web.model_dump()
     _patch_config("apeiria", data)
     after = load_config("data/config.yaml").apeiria.web.model_dump()
@@ -432,6 +691,12 @@ async def api_config_apeiria(data: dict) -> JSONResponse:
 
 
 def _patch_config(section: str, data: dict) -> None:
+    """Merge data into a config section and write it back to YAML.
+
+    Args:
+        section: Config section name.
+        data: Values to merge into the section.
+    """
     import yaml
 
     p = Path("data/config.yaml")
@@ -447,6 +712,17 @@ def _patch_config(section: str, data: dict) -> None:
 async def api_store_search(
     q: str = "", limit: int = 60, offset: int = 0, sort: str = ""
 ) -> JSONResponse:
+    """Search the plugin store.
+
+    Args:
+        q: Search text.
+        limit: Maximum number of results to return.
+        offset: Number of results to skip.
+        sort: Sort key for the results.
+
+    Returns:
+        A JSON response with the matching items and total count.
+    """
     store = get_store()
     items = await store.search(q)
     page, total = paginate(items, offset, limit, sort)
@@ -457,6 +733,17 @@ async def api_store_search(
 
 @router.get("/store/plugins/{pkg_name}")
 async def api_store_get(pkg_name: str) -> JSONResponse:
+    """Return a single plugin store item.
+
+    Args:
+        pkg_name: Package name to look up.
+
+    Returns:
+        A JSON response with the store item.
+
+    Raises:
+        HTTPException: With 404 when the item is not found.
+    """
     store = get_store()
     item = await store.get(pkg_name)
     if item is None:
@@ -468,6 +755,17 @@ async def api_store_get(pkg_name: str) -> JSONResponse:
 async def api_store_adapters_search(
     q: str = "", limit: int = 60, offset: int = 0, sort: str = ""
 ) -> JSONResponse:
+    """Search the adapter store.
+
+    Args:
+        q: Search text.
+        limit: Maximum number of results to return.
+        offset: Number of results to skip.
+        sort: Sort key for the results.
+
+    Returns:
+        A JSON response with the matching items and total count.
+    """
     store = get_store()
     items = await store.search_adapters(q)
     page, total = paginate(items, offset, limit, sort)
@@ -478,22 +776,45 @@ async def api_store_adapters_search(
 
 @router.get("/store/sources")
 async def api_store_sources() -> JSONResponse:
+    """Return the available store sources.
+
+    Returns:
+        A JSON response with the store source names.
+    """
     return JSONResponse(content={"sources": ["nonebot"]})
 
 
 @router.get("/status")
 async def api_status() -> JSONResponse:
+    """Return the runtime status.
+
+    Returns:
+        A JSON response with runtime status information.
+    """
     return JSONResponse(content=get_status())
 
 
 @router.get("/tasks/{task_id}/stream")
 async def api_task_stream(request: Request, task_id: str) -> StreamingResponse:
+    """Stream a task's progress events.
+
+    Args:
+        request: The streaming request.
+        task_id: Id of the task to stream.
+
+    Returns:
+        A server-sent events stream response.
+
+    Raises:
+        HTTPException: With 404 when the task is unknown.
+    """
     runner = get_task_runner()
     queue = await runner.subscribe(task_id)
     if queue is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
     async def event_stream():
+        """Yield task progress events as server-sent events frames."""
         try:
             while True:
                 if await request.is_disconnected():
@@ -517,6 +838,17 @@ async def api_task_stream(request: Request, task_id: str) -> StreamingResponse:
 
 @router.get("/tasks/{task_id}")
 async def api_task_status(task_id: str) -> JSONResponse:
+    """Return the current status of a task.
+
+    Args:
+        task_id: Id of the task to inspect.
+
+    Returns:
+        A JSON response with the task status.
+
+    Raises:
+        HTTPException: With 404 when the task is unknown.
+    """
     runner = get_task_runner()
     status = await runner.get_status(task_id)
     if status is None:
@@ -526,6 +858,14 @@ async def api_task_status(task_id: str) -> JSONResponse:
 
 @router.post("/tasks/{task_id}/cancel")
 async def api_task_cancel(task_id: str) -> JSONResponse:
+    """Cancel a running task.
+
+    Args:
+        task_id: Id of the task to cancel.
+
+    Returns:
+        A JSON response indicating whether the cancellation was accepted.
+    """
     runner = get_task_runner()
     ok = await runner.cancel(task_id)
     if not ok:
@@ -538,9 +878,15 @@ async def api_task_cancel(task_id: str) -> JSONResponse:
 
 @router.post("/restart")
 async def api_restart() -> JSONResponse:
+    """Trigger a graceful restart of the bot.
+
+    Returns:
+        A JSON response acknowledging the restart request.
+    """
     from apeiria.utils.restart import graceful_restart
 
     async def _delayed_restart() -> None:
+        """Restart after a short delay."""
         await asyncio.sleep(0.5)
         await graceful_restart()
 
@@ -550,6 +896,11 @@ async def api_restart() -> JSONResponse:
 
 @router.get("/plugins/names")
 async def api_plugins_names() -> JSONResponse:
+    """Return the sorted names of all known plugins.
+
+    Returns:
+        A JSON response with the plugin name list.
+    """
     import nonebot
 
     names: list[str] = []
@@ -569,6 +920,7 @@ access_router = APIRouter(prefix="/api/access", dependencies=[Depends(verify_tok
 
 
 def _rule_to_dict(rule: "AccessRule") -> dict:
+    """Serialize an access rule to a dictionary."""
     return {
         "id": rule.id,
         "subject_type": rule.subject_type,
@@ -580,6 +932,7 @@ def _rule_to_dict(rule: "AccessRule") -> dict:
 
 
 async def _reload_access() -> None:
+    """Reload the access control snapshot from the database."""
     from apeiria.bootstrap.steps import get_access_control
 
     await get_access_control().load_snapshot()
@@ -588,6 +941,15 @@ async def _reload_access() -> None:
 def _validate_access_rule_fields(  # noqa: C901
     data: dict, *, partial: bool
 ) -> None:
+    """Validate access rule fields, optionally allowing a partial update.
+
+    Args:
+        data: Access rule field dictionary.
+        partial: Whether only the present fields are validated.
+
+    Raises:
+        HTTPException: With 400 when a field is missing or invalid.
+    """
     if not partial or "subject_type" in data:
         subject_type = data.get("subject_type")
         if subject_type not in ("user", "group"):
@@ -622,6 +984,11 @@ def _validate_access_rule_fields(  # noqa: C901
 
 @access_router.get("/rules")
 async def api_access_rules_list() -> JSONResponse:
+    """List all access rules ordered by priority.
+
+    Returns:
+        A JSON response with the access rule list.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db
@@ -638,6 +1005,17 @@ async def api_access_rules_list() -> JSONResponse:
 
 @access_router.post("/rules")
 async def api_access_rules_create(data: dict) -> JSONResponse:
+    """Create a new access rule.
+
+    Args:
+        data: Access rule fields.
+
+    Returns:
+        A JSON response with the created rule.
+
+    Raises:
+        HTTPException: With 400 when a required field is missing or invalid.
+    """
     from sqlalchemy import func
 
     from apeiria.db import get_db
@@ -676,6 +1054,18 @@ async def api_access_rules_create(data: dict) -> JSONResponse:
 
 @access_router.put("/rules/{rule_id}")
 async def api_access_rules_update(rule_id: int, data: dict) -> JSONResponse:
+    """Update an existing access rule.
+
+    Args:
+        rule_id: Id of the rule to update.
+        data: Access rule fields to update.
+
+    Returns:
+        A JSON response with the updated rule.
+
+    Raises:
+        HTTPException: With 404 when the rule is absent and 400 on invalid fields.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db
@@ -708,6 +1098,17 @@ async def api_access_rules_update(rule_id: int, data: dict) -> JSONResponse:
 
 @access_router.delete("/rules/{rule_id}")
 async def api_access_rules_delete(rule_id: int) -> JSONResponse:
+    """Delete an access rule.
+
+    Args:
+        rule_id: Id of the rule to delete.
+
+    Returns:
+        A JSON response acknowledging the deletion.
+
+    Raises:
+        HTTPException: With 404 when the rule is absent.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db
@@ -729,6 +1130,17 @@ async def api_access_rules_delete(rule_id: int) -> JSONResponse:
 
 @access_router.post("/rules/reorder")
 async def api_access_rules_reorder(data: dict) -> JSONResponse:
+    """Reorder access rules by assigning priorities from a list of ids.
+
+    Args:
+        data: Request body with the ordered list of rule ids.
+
+    Returns:
+        A JSON response acknowledging the reorder.
+
+    Raises:
+        HTTPException: With 400 when the ids list is empty.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db
@@ -759,6 +1171,19 @@ async def api_access_rules_preview(
     subject_id: Annotated[str, Query()],
     plugin_name: Annotated[str, Query()] = "",
 ) -> JSONResponse:
+    """Preview the access decision for a subject.
+
+    Args:
+        subject_type: Subject type, either "user" or "group".
+        subject_id: Subject id.
+        plugin_name: Plugin name to scope the preview to, if any.
+
+    Returns:
+        A JSON response with the access evaluation details.
+
+    Raises:
+        HTTPException: With 400 when the subject type is invalid.
+    """
     if subject_type == "user":
         user_id, group_id = subject_id, None
     elif subject_type == "group":
@@ -778,6 +1203,18 @@ async def api_access_subjects_search(
     q: Annotated[str, Query()] = "",
     subject_type_q: Annotated[str, Query(alias="type")] = "user",
 ) -> JSONResponse:
+    """Search known subjects by id for a subject type.
+
+    Args:
+        q: Search text.
+        subject_type_q: Subject type, either "user" or "group".
+
+    Returns:
+        A JSON response with the matching subjects.
+
+    Raises:
+        HTTPException: With 400 when the subject type is invalid.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db

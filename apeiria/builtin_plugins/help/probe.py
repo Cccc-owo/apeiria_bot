@@ -1,3 +1,5 @@
+"""Plugin introspection helpers that build help information."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,6 +21,14 @@ _THIRD_PARTY_PREFIXES = ("nonebot_plugin_", "nonebot.")
 
 
 def _plugin_source(plugin: Any) -> str:
+    """Categorize a plugin's source as builtin, framework, third-party, or user.
+
+    Args:
+        plugin: The plugin object to categorize.
+
+    Returns:
+        One of ``"builtin"``, ``"framework"``, ``"third_party"``, or ``"user"``.
+    """
     module_file = getattr(getattr(plugin, "module", None), "__file__", None) or ""
     module_name = plugin.module_name or ""
     if "builtin_plugins" in module_file or module_name.startswith(
@@ -33,6 +43,14 @@ def _plugin_source(plugin: Any) -> str:
 
 
 def _find_icon(plugin: Any) -> str:
+    """Return the data URI for a plugin's logo, or the default NoneBot logo.
+
+    Args:
+        plugin: The plugin whose logo to locate.
+
+    Returns:
+        A ``data:`` URI for the logo image, or the default logo URL.
+    """
     module_file = getattr(getattr(plugin, "module", None), "__file__", None)
     if module_file:
         base = Path(module_file).resolve().parent
@@ -48,6 +66,14 @@ def _find_icon(plugin: Any) -> str:
 
 
 def _probe_admin_only(matcher: Any) -> bool:
+    """Return whether a matcher's permission restricts it to superusers.
+
+    Args:
+        matcher: The matcher to inspect.
+
+    Returns:
+        ``True`` if the matcher requires superuser permission, else ``False``.
+    """
     try:
         handlers = getattr(matcher.permission, "checkers", set())
         if SUPERUSER_PERM.checkers & handlers:
@@ -60,6 +86,15 @@ def _probe_admin_only(matcher: Any) -> bool:
 
 
 def _build_usage(ac: Any, command_name: str) -> str:
+    """Build a usage string from a command's args and options.
+
+    Args:
+        ac: The command instance holding the args and options.
+        command_name: The command name used as the usage prefix.
+
+    Returns:
+        A space-separated usage string.
+    """
     parts = [command_name]
     for arg in getattr(ac, "args", []):
         aname = getattr(arg, "name", "").strip()
@@ -82,6 +117,14 @@ def _build_usage(ac: Any, command_name: str) -> str:
 
 
 def probe_commands(plugin: Any) -> list[HelpCommandItem]:
+    """Collect the help command items exposed by the given plugin.
+
+    Args:
+        plugin: The plugin to probe.
+
+    Returns:
+        A list of ``HelpCommandItem`` entries for the plugin's commands.
+    """
     commands: list[HelpCommandItem] = []
     added: set[str] = set()
     admin_only = False
@@ -124,6 +167,14 @@ def probe_commands(plugin: Any) -> list[HelpCommandItem]:
 
 
 def _try_extract_matcher_cmds(matcher: Any) -> list[HelpCommandItem]:
+    """Extract command items from a matcher via Alconna or command rules.
+
+    Args:
+        matcher: The matcher to inspect.
+
+    Returns:
+        A list of extracted ``HelpCommandItem`` entries.
+    """
     results: list[HelpCommandItem] = []
     alconna_results = _probe_alconna(matcher)
     results.extend(alconna_results)
@@ -135,6 +186,14 @@ def _try_extract_matcher_cmds(matcher: Any) -> list[HelpCommandItem]:
 
 
 def _probe_alconna(matcher: Any) -> list[HelpCommandItem]:
+    """Extract a command item from a matcher's Alconna command definition.
+
+    Args:
+        matcher: The matcher to inspect.
+
+    Returns:
+        A list containing the extracted command item, or an empty list.
+    """
     factory = getattr(matcher, "command", None)
     if not callable(factory):
         return []
@@ -173,6 +232,14 @@ def _probe_alconna(matcher: Any) -> list[HelpCommandItem]:
 
 
 def _probe_command_rule(matcher: Any) -> list[HelpCommandItem]:
+    """Extract a command item from a matcher's command rules.
+
+    Args:
+        matcher: The matcher to inspect.
+
+    Returns:
+        A list containing the extracted command item, or an empty list.
+    """
     rule = getattr(matcher, "rule", None)
     if rule is None:
         return []
@@ -186,6 +253,14 @@ def _probe_command_rule(matcher: Any) -> list[HelpCommandItem]:
 
 
 def _extract_rule_commands(rule: Any) -> list[str]:
+    """Extract command names from a rule's CommandRule checkers.
+
+    Args:
+        rule: The rule to inspect.
+
+    Returns:
+        A list of command name strings.
+    """
     result: list[str] = []
     seen: set[str] = set()
     for checker in getattr(rule, "checkers", ()):
@@ -205,6 +280,15 @@ def _apply_admin_filter(
     *,
     is_superuser: bool,
 ) -> list[HelpCommandItem] | None:
+    """Filter out admin-only commands unless the requester is a superuser.
+
+    Args:
+        commands: The commands to filter.
+        is_superuser: Whether the requester has superuser access.
+
+    Returns:
+        The visible commands, or ``None`` when no commands remain visible.
+    """
     if is_superuser:
         return commands
     visible = [c for c in commands if not c.admin_only]
@@ -219,6 +303,16 @@ def discover_plugins(
     is_superuser: bool,
     show_all: bool = False,
 ) -> list[HelpPluginItem]:
+    """Discover and build help items for all visible loaded plugins.
+
+    Args:
+        config: The help plugin configuration.
+        is_superuser: Whether the requester has superuser access.
+        show_all: Whether to show hidden and built-in plugins.
+
+    Returns:
+        A list of ``HelpPluginItem`` entries, app plugins before built-ins.
+    """
     blacklist: set[str] = set() if show_all else set(config.hidden_plugins)
     result: list[HelpPluginItem] = []
 
@@ -275,6 +369,17 @@ def find_plugin_by_name(
     is_superuser: bool,
     show_all: bool = False,
 ) -> HelpPluginItem | None:
+    """Find a plugin by its display name or module name.
+
+    Args:
+        name: The plugin name or module name to search for.
+        config: The help plugin configuration.
+        is_superuser: Whether the requester has superuser access.
+        show_all: Whether to include hidden and built-in plugins.
+
+    Returns:
+        The matching ``HelpPluginItem``, or ``None`` if not found.
+    """
     plugins = discover_plugins(config, is_superuser=is_superuser, show_all=show_all)
     nl = name.lower()
     methods = (

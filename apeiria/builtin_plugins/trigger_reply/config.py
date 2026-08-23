@@ -1,3 +1,5 @@
+"""Trigger-reply configuration model and accessor."""
+
 from __future__ import annotations
 
 from nonebot import get_plugin_config
@@ -5,6 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TriggerReplyConfig(BaseModel):
+    """Configuration model for the trigger-reply plugin.
+
+    The model is populated from environment variables prefixed with
+    ``trigger_reply__`` and controls the rules file location, whether the
+    plugin is enabled, and debug logging.
+    """
+
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     enabled: bool = Field(
@@ -17,4 +26,9 @@ class TriggerReplyConfig(BaseModel):
 
 
 def get_trigger_reply_config() -> TriggerReplyConfig:
+    """Return the trigger-reply plugin configuration.
+
+    Returns:
+        The trigger-reply configuration model.
+    """
     return get_plugin_config(TriggerReplyConfig)

@@ -1,3 +1,5 @@
+"""Render the help menu and plugin details as images or plain text."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,6 +18,7 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
 def _default_logo_data_uri() -> str:
+    """Return a data URI for the default placeholder logo."""
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" '
         'viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" '
@@ -33,11 +36,28 @@ def _default_logo_data_uri() -> str:
 
 
 def _norm_color(color: str) -> str:
+    """Normalize a color string to a valid hex color, or a default fallback.
+
+    Args:
+        color: The color value to normalize.
+
+    Returns:
+        The normalized hex color string.
+    """
     s = color.strip()
     return s if s.startswith("#") and len(s) in {4, 7} else "#4e96f7"
 
 
 def _resolve_title(config: HelpConfig, *, is_superuser: bool) -> str:
+    """Resolve the menu title, appending a superuser marker when appropriate.
+
+    Args:
+        config: The help plugin configuration.
+        is_superuser: Whether the requester has superuser access.
+
+    Returns:
+        The resolved title string.
+    """
     base = config.title or "功能菜单"
     return f"{base} (主人)" if is_superuser else base
 
@@ -52,6 +72,17 @@ def _build_menu_data(
     config: HelpConfig,
     is_superuser: bool,
 ) -> dict[str, object]:
+    """Build the template data for the main help menu.
+
+    Args:
+        plugins: The plugins to show in the menu.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+        is_superuser: Whether the requester has superuser access.
+
+    Returns:
+        A dictionary of data for the menu template.
+    """
     groups: list[dict[str, object]] = []
 
     app_plugins = [_plugin_card(p, prefix, config) for p in plugins if not p.is_builtin]
@@ -79,6 +110,16 @@ def _plugin_card(
     prefix: str,
     config: HelpConfig,
 ) -> dict[str, object]:
+    """Build the card data for a single plugin in the menu.
+
+    Args:
+        p: The plugin item to build a card for.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+
+    Returns:
+        A dictionary describing the plugin card.
+    """
     card: dict[str, object] = {
         "name": p.name,
         "description": p.description,
@@ -107,6 +148,16 @@ def _build_detail_data(
     prefix: str,
     config: HelpConfig,
 ) -> dict[str, object]:
+    """Build the template data for a plugin detail view.
+
+    Args:
+        plugin: The plugin item to render.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+
+    Returns:
+        A dictionary of data for the detail template.
+    """
     return {
         "plugin": {
             "name": plugin.name,
@@ -134,6 +185,15 @@ def _build_detail_data(
 
 
 async def _do_render(template_name: str, data: dict[str, object]) -> bytes:
+    """Render an HTML template to an image and return its bytes.
+
+    Args:
+        template_name: The template file name to render.
+        data: The template data to render with.
+
+    Returns:
+        The rendered image data as bytes.
+    """
     base_url = f"file://{_TEMPLATES_DIR.resolve()}"
     return await render_template(
         str(_TEMPLATES_DIR),
@@ -153,6 +213,16 @@ async def render_menu(  # noqa: PLR0913
     is_superuser: bool,
     matcher: Any,
 ) -> None:
+    """Render the help menu and send it to the bot.
+
+    Args:
+        plugins: The plugins to show in the menu.
+        bot: The bot instance to send the result to.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+        is_superuser: Whether the requester has superuser access.
+        matcher: The matcher used to send the rendered result.
+    """
     data = _build_menu_data(
         plugins, prefix=prefix, config=config, is_superuser=is_superuser
     )
@@ -177,6 +247,15 @@ async def render_detail(
     config: HelpConfig,
     matcher: Any,
 ) -> None:
+    """Render a plugin detail view and send it to the bot.
+
+    Args:
+        plugin: The plugin item to render.
+        bot: The bot instance to send the result to.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+        matcher: The matcher used to send the rendered result.
+    """
     data = _build_detail_data(plugin, prefix=prefix, config=config)
 
     if _is_console(bot):
@@ -192,6 +271,14 @@ async def render_detail(
 
 
 def _is_console(bot: Any) -> bool:
+    """Return whether the bot's adapter is the Console adapter.
+
+    Args:
+        bot: The bot instance to inspect.
+
+    Returns:
+        ``True`` if the bot is using the Console adapter, else ``False``.
+    """
     try:
         return bot.adapter.get_name() == "Console"
     except Exception:  # noqa: BLE001
@@ -204,6 +291,16 @@ def _format_menu_text(
     prefix: str,
     config: HelpConfig,
 ) -> str:
+    """Format the help menu as plain text.
+
+    Args:
+        plugins: The plugins to format.
+        prefix: The command prefix used to build command hints.
+        config: The help plugin configuration.
+
+    Returns:
+        The formatted menu text.
+    """
     title = config.title or "功能菜单"
     lines = [title, config.subtitle or "", ""]
     expanded = config.expand_commands
@@ -226,6 +323,15 @@ def _format_detail_text(
     *,
     prefix: str,
 ) -> str:
+    """Format a plugin detail view as plain text.
+
+    Args:
+        plugin: The plugin item to format.
+        prefix: The command prefix used to build command hints.
+
+    Returns:
+        The formatted detail text.
+    """
     lines = [
         f"【{plugin.name}】",
         f"描述: {plugin.description or '暂无描述'}",

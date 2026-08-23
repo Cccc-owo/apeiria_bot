@@ -1,3 +1,5 @@
+"""Merge plugin manifests with NoneBot metadata into Web-facing plugin rows."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -14,6 +16,15 @@ if TYPE_CHECKING:
 def _lookup(
     manifest: PluginManifest, metadata_map: dict[str, dict[str, Any]]
 ) -> dict[str, Any] | None:
+    """Look up metadata for a manifest by name, falling back to its module candidate.
+
+    Args:
+        manifest: Plugin manifest to look up.
+        metadata_map: Mapping of names to metadata dictionaries.
+
+    Returns:
+        The matching metadata dictionary, or None when not found.
+    """
     if manifest.name in metadata_map:
         return metadata_map[manifest.name]
     return metadata_map.get(manifest_module_candidate(manifest))
@@ -25,6 +36,17 @@ def merge_plugin_metadata(
     dep_graph: dict | None = None,
     dep_reverse: dict | None = None,
 ) -> list[dict[str, Any]]:
+    """Merge plugin manifests with metadata and dependency info into Web rows.
+
+    Args:
+        manifests: Plugin manifests to include.
+        metadata_map: Mapping of names to metadata dictionaries.
+        dep_graph: Optional mapping of a plugin to the plugins it depends on.
+        dep_reverse: Optional mapping of a plugin to the plugins depending on it.
+
+    Returns:
+        A list of Web-facing plugin row dictionaries.
+    """
     rows: list[dict[str, Any]] = []
     for manifest in manifests:
         meta = _lookup(manifest, metadata_map) or {}

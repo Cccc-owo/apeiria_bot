@@ -1,3 +1,5 @@
+"""Parsing and rendering of simple mustache-like templates."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -7,17 +9,23 @@ from functools import lru_cache
 
 @dataclass(frozen=True)
 class _Text:
+    """A plain-text template node."""
+
     text: str
 
 
 @dataclass(frozen=True)
 class _Variable:
+    """A variable template node with an optional default value."""
+
     name: str
     default: str | None = None
 
 
 @dataclass(frozen=True)
 class _If:
+    """An ``if``/``else`` branch template node."""
+
     var: str
     body: tuple[_Node, ...]
     orelse: tuple[_Node, ...] = ()
@@ -27,15 +35,35 @@ type _Node = _Text | _Variable | _If
 
 
 class _TemplateSyntaxError(ValueError):
-    pass
+    """Raised when template source cannot be parsed."""
 
 
 class _Parser:
+    """Recursive-descent parser for the template syntax.
+
+    Handles plain text, ``{{ variable }}`` nodes, and ``{% if %}`` /
+    ``{% else %}`` / ``{% endif %}`` blocks.
+    """
+
     def __init__(self, source: str) -> None:
+        """Initialize the parser.
+
+        Args:
+            source: The template source string.
+        """
         self._source = source
         self._pos = 0
 
     def parse(self) -> tuple[_Node, ...]:
+        """Parse the full template.
+
+        Returns:
+            The top-level node tuple.
+
+        Raises:
+            _TemplateSyntaxError: When the template is invalid or has
+                unbalanced block tags.
+        """
         nodes, stop = self._parse_until(frozenset())
         if stop is not None:
             msg = f"unexpected tag: {stop}"
@@ -45,6 +73,20 @@ class _Parser:
     def _parse_until(  # noqa: C901, PLR0912, PLR0915
         self, stop: frozenset[str]
     ) -> tuple[list[_Node], str | None]:
+        """Parse nodes until a stop tag is reached.
+
+        Args:
+            stop: The set of tags that terminate parsing.
+
+        Returns:
+            A tuple of the parsed node list and the stop tag that halted
+            parsing, or ``None`` for the stop tag when the end of the source
+            is reached.
+
+        Raises:
+            _TemplateSyntaxError: When a required stop tag is missing or the
+                template syntax is invalid.
+        """
         nodes: list[_Node] = []
         source = self._source
 
@@ -119,10 +161,27 @@ class _Parser:
 
 @lru_cache(maxsize=1024)
 def _compile(template: str) -> tuple[_Node, ...]:
+    """Compile a template into a cached node tuple.
+
+    Args:
+        template: The template string.
+
+    Returns:
+        The parsed node tuple.
+    """
     return _Parser(template).parse()
 
 
 def _render_nodes(nodes: tuple[_Node, ...], context: Mapping[str, object]) -> str:
+    """Render a node sequence to a string.
+
+    Args:
+        nodes: The node tuple.
+        context: The rendering context mapping.
+
+    Returns:
+        The rendered text.
+    """
     parts: list[str] = []
     for node in nodes:
         if isinstance(node, _Text):
@@ -144,4 +203,13 @@ def _render_nodes(nodes: tuple[_Node, ...], context: Mapping[str, object]) -> st
 
 
 def render_template(template: str, context: Mapping[str, object]) -> str:
+    """Render a template string against a context.
+
+    Args:
+        template: The template string.
+        context: The rendering context mapping.
+
+    Returns:
+        The rendered text.
+    """
     return _render_nodes(_compile(template), context)

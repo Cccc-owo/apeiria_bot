@@ -1,3 +1,5 @@
+"""WebChat bot instance that serializes outbound messages back to the browser."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class WebChatBot(BaseBot):
-    """WebChat Bot：把出站消息序列化回推浏览器，并做 webchat 范围出站持久化。"""
+    """WebChat bot that serializes outbound messages back to the browser."""
 
     def __init__(
         self,
@@ -28,6 +30,13 @@ class WebChatBot(BaseBot):
         self_id: str,
         connections: ConnectionManager,
     ) -> None:
+        """Initialize the bot with its adapter, self id, and connection manager.
+
+        Args:
+            adapter: The adapter that owns this bot.
+            self_id: The bot's self identifier.
+            connections: The connection manager used to route outbound frames.
+        """
         super().__init__(adapter, self_id)
         self.connections = connections
 
@@ -37,6 +46,16 @@ class WebChatBot(BaseBot):
         message: str | BaseMessage | BaseMessageSegment,
         **kwargs: Any,  # noqa: ARG002
     ) -> Any:
+        """Serialize a message to wire format, send it to the browser, and persist it.
+
+        Args:
+            event: The event that triggered the outbound send.
+            message: The message to send, as text, a message, or a single segment.
+            **kwargs: Extra send options (unused).
+
+        Returns:
+            A dict containing the generated ``message_id``.
+        """
         if isinstance(message, Message):
             msg = message
         elif isinstance(message, MessageSegment):
@@ -75,6 +94,15 @@ class WebChatBot(BaseBot):
         msg: Message,
         segments: list[dict[str, Any]],
     ) -> None:
+        """Persist an outbound bot message to the conversation store.
+
+        Args:
+            event: The event that triggered the outbound send.
+            session_id: The session the message belongs to.
+            message_id: The generated message id.
+            msg: The message object to persist.
+            segments: The wire-format segments to store as metadata.
+        """
         from apeiria.conversation.store import append_message, ensure_session
 
         try:

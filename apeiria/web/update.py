@@ -1,3 +1,5 @@
+"""Git-based update preview and execution endpoints for the Web UI."""
+
 from __future__ import annotations
 
 import asyncio
@@ -44,6 +46,19 @@ async def _run_git(
     cwd: Path | None = None,
     timeout_s: float | None = _GIT_TIMEOUT,
 ) -> tuple[int, str, str]:
+    """Run a git subprocess and return its exit code, stdout, and stderr.
+
+    Args:
+        *args: Git command arguments.
+        cwd: Working directory, defaulting to the current directory.
+        timeout_s: Timeout in seconds before the subprocess is killed.
+
+    Returns:
+        A tuple of the exit code, stripped stdout, and stripped stderr.
+
+    Raises:
+        _GitError: When the subprocess fails to finish within the timeout.
+    """
     if cwd is None:
         cwd = Path.cwd()
     proc = await asyncio.create_subprocess_exec(
@@ -67,10 +82,19 @@ async def _run_git(
 
 
 def _sse(data: dict) -> str:
+    """Serialize a dictionary as a server-sent events data frame."""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 def _branch_list(output: str) -> list[str]:
+    """Parse a git branch listing into a sorted list of branch names.
+
+    Args:
+        output: Raw git branch output.
+
+    Returns:
+        A sorted list of branch names.
+    """
     branches: list[str] = []
     for raw in output.splitlines():
         stripped = raw.strip()
@@ -84,6 +108,15 @@ def _branch_list(output: str) -> list[str]:
 
 
 async def _fetch_with_warning(*args: str, label: str = "Fetch") -> str:
+    """Fetch from the remote and return a warning string on failure.
+
+    Args:
+        *args: Arguments to pass to the git fetch command.
+        label: Label used when building the failure message.
+
+    Returns:
+        An empty string on success, or a warning message on failure.
+    """
     try:
         rc, _, stderr = await _run_git("fetch", *args)
     except _GitError as err:
@@ -112,6 +145,14 @@ async def _refresh_remote_refs() -> str:
 
 @router.get("/status")
 async def update_status() -> JSONResponse:
+    """Return the git branch, commit, dirty state, and available refs.
+
+    Returns:
+        A JSON response with git status details.
+
+    Raises:
+        HTTPException: With 500 when the current branch cannot be determined.
+    """
     rc, branch, _ = await _run_git("branch", "--show-current")
     if rc != 0 or not branch:
         raise HTTPException(status_code=500, detail="无法获取当前分支")
@@ -154,6 +195,20 @@ async def update_preview(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> JSONResponse:
+    """Build a commit preview for a branch or tag ref.
+
+    Args:
+        ref: Ref name to preview.
+        ref_type: Ref type, either "branch" or "tag".
+        offset: Number of commits to skip, for pagination.
+        limit: Maximum number of commits to return.
+
+    Returns:
+        A JSON response with the preview commit list.
+
+    Raises:
+        HTTPException: With 404 when the ref is absent and 500 on a git error.
+    """
     try:
         (
             log_ref,
@@ -235,6 +290,19 @@ async def _resolve_preview_ref(
     ref: str,
     ref_type: str,
 ) -> tuple[str, str, str, int, str]:
+    """Resolve a ref into a usable log ref and preview metadata.
+
+    Args:
+        ref: Ref name to resolve.
+        ref_type: Ref type, either "branch" or "tag".
+
+    Returns:
+        A tuple of the log ref, remote hash, remote message, commits behind,
+        and any fetch warning.
+
+    Raises:
+        HTTPException: With 404 when the ref does not exist.
+    """
     if ref_type == "tag":
         fetch_warning = await _maybe_fetch_ref(ref, "tag", "Fetch tags")
         tag_ref = ref
@@ -265,6 +333,17 @@ async def _build_commit_list(
     offset: int = 0,
     limit: int = 20,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], bool]:
+    """Build a commit list and divergence info for a ref.
+
+    Args:
+        log_ref: Ref to inspect.
+        offset: Number of commits to skip.
+        limit: Maximum number of commits to return.
+
+    Returns:
+        A tuple of the paginated commits, the local-only commits, and a flag
+        indicating whether the history has diverged.
+    """
     log_args = ["log", log_ref, "--format=%H|%h|%s|%an|%aI"]
     if offset > 0:
         log_args.extend(["--skip", str(offset)])
@@ -334,6 +413,17 @@ async def _build_commit_list(
 
 
 def _parse_execute_body(body: dict) -> tuple[str, str | None, str, str]:
+    """Parse and validate an update execute request body.
+
+    Args:
+        body: Request body dictionary.
+
+    Returns:
+        A tuple of branch, commit, ref_type, and dirty_strategy.
+
+    Raises:
+        HTTPException: With 400 when a required field is missing or invalid.
+    """
     branch = body.get("branch")
     if not branch or not isinstance(branch, str):
         raise HTTPException(status_code=400, detail="缺少或无效的 'branch' 字段")
@@ -358,6 +448,17 @@ def _parse_execute_body(body: dict) -> tuple[str, str | None, str, str]:
 
 @router.post("/execute")
 async def update_execute(request: Request) -> StreamingResponse:
+    """Execute a git update and stream its progress to the client.
+
+    Args:
+        request: The streaming request.
+
+    Returns:
+        A server-sent events stream response with task progress.
+
+    Raises:
+        HTTPException: With 400 when the request body is invalid JSON or invalid.
+    """
     try:
         body = await request.json()
     except json.JSONDecodeError as err:
@@ -375,6 +476,7 @@ async def update_execute(request: Request) -> StreamingResponse:
     task_id = await _job_runner.start(job)
 
     async def event_stream():
+        """Yield task and progress events as server-sent events frames."""
         try:
             yield _sse({"type": "task", "task_id": task_id})
             while True:

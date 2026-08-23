@@ -1,3 +1,10 @@
+"""Friend and group request management for NoneBot.
+
+Handle friend requests, group join requests, and group invites, notify
+superusers of incoming requests, and provide commands and reply actions to
+approve or reject them.
+"""
+
 from __future__ import annotations
 
 from contextlib import suppress
@@ -76,6 +83,16 @@ _apply = on_alconna(
 
 
 async def _reply_rule(bot: Bot, event: Event) -> bool:
+    """Return whether the event is a superuser reply to a notified request.
+
+    Args:
+        bot: The bot instance that received the event.
+        event: The incoming message event to check.
+
+    Returns:
+        True if the event is a reply from a superuser referencing a notified
+        request, False otherwise.
+    """
     if not await SUPERUSER(bot, event):
         return False
     reply = getattr(event, "reply", None)
@@ -100,6 +117,16 @@ async def handle_request(
     event: Event,
     session: Uninfo,
 ) -> None:
+    """Handle an incoming request event and notify superusers.
+
+    Save the pending request to the store, then send a notification to each
+    superuser when notification is enabled.
+
+    Args:
+        bot: The bot instance that received the request.
+        event: The request event.
+        session: The unified session info for the requesting user.
+    """
     config = get_friendship_config()
     if not config.enabled:
         return
@@ -156,6 +183,7 @@ async def handle_request(
 
 
 async def handle_list_pending() -> None:
+    """List all pending requests along with processing hints."""
     pending_list = await load_all()
     pending_list = [r for r in pending_list if r.status == "pending"]
     if not pending_list:
@@ -181,6 +209,13 @@ async def handle_apply(  # noqa: C901, PLR0912
     event: Event,
     arp: Arparma = AlconnaMatches(),
 ) -> None:
+    """Process an approve/reject command for a pending request.
+
+    Args:
+        bot: The bot instance that issued the command.
+        event: The command event.
+        arp: The parsed Alconna arguments for the command.
+    """
     config = get_friendship_config()
     if not config.enabled:
         await _apply.finish("好友请求管理已禁用")
@@ -235,6 +270,15 @@ async def handle_reply_action(
     bot: Bot,
     event: Event,
 ) -> None:
+    """Process a reply to a notification message.
+
+    Interpret a reply containing an approve or reject keyword and apply the
+    matching action to the referenced pending request.
+
+    Args:
+        bot: The bot instance that received the reply.
+        event: The reply message event.
+    """
     if not await SUPERUSER(bot, event):
         return
 
@@ -283,6 +327,15 @@ def format_notification(
     pending: PendingRequest,
     title: str,
 ) -> str:
+    """Format a notification message for a pending request.
+
+    Args:
+        pending: The pending request being notified about.
+        title: The human-readable notification title.
+
+    Returns:
+        The formatted notification message.
+    """
     msg = f"【{title}】\n"
     msg += f"ID: {pending.id}\n"
     msg += f"用户: {pending.requester_name}({pending.requester_id})\n"

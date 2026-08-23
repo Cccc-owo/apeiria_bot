@@ -1,3 +1,5 @@
+"""Implement the ``/access`` command for managing access control rules."""
+
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
@@ -41,6 +43,18 @@ async def handle_access(  # noqa: PLR0913, PLR0917
     arg4: Match[str],
     arg5: Match[str],
 ) -> None:
+    """Handle the ``/access`` command and dispatch based on the requested action.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+        action: The command action, one of list/add/remove.
+        arg1: The first positional argument.
+        arg2: The second positional argument.
+        arg3: The third positional argument.
+        arg4: The fourth positional argument.
+        arg5: The fifth positional argument.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _access.finish(owner_error)
@@ -74,6 +88,12 @@ async def handle_access(  # noqa: PLR0913, PLR0917
 
 
 async def _list_rules() -> str:
+    """Query and format all current access control rules.
+
+    Returns:
+        A formatted text describing the rules, or an empty-state message when
+        no rules are configured.
+    """
     db = get_db()
     async with db.gate.read() as sess:
         rules = list((await sess.execute(select(AccessRule))).scalars().all())
@@ -88,6 +108,7 @@ async def _list_rules() -> str:
 
 
 async def _reload_access() -> None:
+    """Reload the access control snapshot so DB changes take effect immediately."""
     from apeiria.bootstrap.steps import get_access_control
 
     await get_access_control().load_snapshot()
@@ -100,6 +121,18 @@ async def _add_rule(
     plugin_query: str,
     priority: str = "0",
 ) -> str:
+    """Add an access control rule and reload the access snapshot.
+
+    Args:
+        effect: The access effect, either allow or deny.
+        subject_type: The rule subject type, either user or group.
+        subject_id: The rule subject ID.
+        plugin_query: The plugin query; global targets all plugins.
+        priority: The rule priority, defaulting to 0.
+
+    Returns:
+        A message describing the result of the addition.
+    """
     normalized_effect = effect.strip().lower()
     normalized_type = subject_type.strip().lower()
     if normalized_effect not in {"allow", "deny"}:
@@ -135,6 +168,17 @@ async def _del_rule(
     subject_id: str,
     plugin_query: str,
 ) -> str:
+    """Delete matching access control rules and reload the access snapshot.
+
+    Args:
+        subject_type: The rule subject type, either user or group.
+        subject_id: The rule subject ID.
+        plugin_query: The plugin query; global targets all plugins.
+
+    Returns:
+        A message describing the deletion result, or a not-found message when
+        no rule matches.
+    """
     normalized_type = subject_type.strip().lower()
     if normalized_type not in {"user", "group"}:
         return _USAGE_RM

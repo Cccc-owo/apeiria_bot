@@ -1,3 +1,5 @@
+"""Authentication and credential management for the Web UI API."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,16 +48,26 @@ _setting_cache: dict[str, str | None] = {}
 
 
 def _web_config() -> WebConfig:  # type: ignore[valid-type]
+    """Return the cached Web configuration."""
     if _web_cache[0] is None:
         _web_cache[0] = load_config(str(CONFIG_PATH)).apeiria.web
     return _web_cache[0]
 
 
 def _clear_web_cache() -> None:
+    """Clear the cached Web configuration."""
     _web_cache[0] = None
 
 
 async def _get_setting(key: str) -> str | None:
+    """Read a setting value from the database, caching the result.
+
+    Args:
+        key: Setting key to read.
+
+    Returns:
+        The setting value, or None when unavailable or absent.
+    """
     if key in _setting_cache:
         return _setting_cache[key]
 
@@ -79,10 +91,17 @@ async def _get_setting(key: str) -> str | None:
 
 
 def _clear_setting_cache() -> None:
+    """Clear the cached settings."""
     _setting_cache.clear()
 
 
 async def _set_setting(key: str, value: str) -> None:
+    """Upsert a setting value in the database.
+
+    Args:
+        key: Setting key to write.
+        value: Setting value to store.
+    """
     from sqlalchemy import select
 
     from apeiria.db import get_db
@@ -102,6 +121,14 @@ async def _set_setting(key: str, value: str) -> None:
 
 
 def _run_async(coro: Coroutine[Any, Any, Any]) -> Any:
+    """Run a coroutine to completion, either in a running loop or a fresh one.
+
+    Args:
+        coro: The coroutine to run.
+
+    Returns:
+        The coroutine's result.
+    """
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -110,6 +137,11 @@ def _run_async(coro: Coroutine[Any, Any, Any]) -> Any:
 
 
 def _migrate_from_yaml() -> tuple[str | None, str | None]:
+    """Migrate legacy credentials from config.yaml to the database.
+
+    Returns:
+        A tuple of the migrated password hash and JWT secret, or None for each.
+    """
     if not CONFIG_PATH.exists():
         return None, None
     raw = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
@@ -142,6 +174,7 @@ def _migrate_from_yaml() -> tuple[str | None, str | None]:
 
 
 def ensure_credentials() -> None:
+    """Ensure password and JWT credentials exist, generating them if needed."""
     web = _web_config()
     legacy_hash, legacy_jwt = _migrate_from_yaml()
 
@@ -174,6 +207,14 @@ def ensure_credentials() -> None:
 
 
 def reset_password(new_password: str | None = None) -> str:
+    """Set a new dashboard password and return its plaintext.
+
+    Args:
+        new_password: Optional plaintext password; a random one when omitted.
+
+    Returns:
+        The plaintext password.
+    """
     plaintext = new_password or generate_dashboard_password()
     _run_async(_set_setting(_SETTING_PASSWORD_HASH, hash_dashboard_password(plaintext)))
     _run_async(_set_setting(_SETTING_PASSWORD_MUST_CHANGE, "1"))
@@ -181,6 +222,11 @@ def reset_password(new_password: str | None = None) -> str:
 
 
 async def _require_password_hash() -> str:
+    """Return the stored password hash, raising when uninitialized.
+
+    Raises:
+        HTTPException: When the password credential has not been initialized.
+    """
     ph = await _get_setting(_SETTING_PASSWORD_HASH)
     if not ph:
         raise HTTPException(status_code=500, detail="Credentials not initialized")
@@ -188,6 +234,11 @@ async def _require_password_hash() -> str:
 
 
 async def _require_jwt_secret() -> str:
+    """Return the stored JWT secret, raising when uninitialized.
+
+    Raises:
+        HTTPException: When the JWT credential has not been initialized.
+    """
     js = await _get_setting(_SETTING_JWT_SECRET)
     if not js:
         raise HTTPException(status_code=500, detail="Credentials not initialized")
@@ -195,6 +246,15 @@ async def _require_jwt_secret() -> str:
 
 
 def _issue_token(username: str, jwt_secret: str) -> str:
+    """Issue a signed JWT for a username.
+
+    Args:
+        username: Subject to encode in the token.
+        jwt_secret: Secret used to sign the token.
+
+    Returns:
+        The signed JWT string.
+    """
     now = datetime.now(UTC)
     payload = {
         "sub": username,
@@ -205,6 +265,14 @@ def _issue_token(username: str, jwt_secret: str) -> str:
 
 
 def _extract_token(request: Request) -> str | None:
+    """Extract the bearer token from headers, cookie, or query string.
+
+    Args:
+        request: The HTTP request.
+
+    Returns:
+        The token string, or None when not present.
+    """
     header = request.headers.get("Authorization", "")
     if header.startswith("Bearer "):
         return header.removeprefix("Bearer ").strip() or None
@@ -215,6 +283,17 @@ def _extract_token(request: Request) -> str | None:
 
 
 async def verify_token(request: Request) -> str:
+    """Verify the request token and return the authenticated username.
+
+    Args:
+        request: The HTTP request to authenticate.
+
+    Returns:
+        The authenticated username.
+
+    Raises:
+        HTTPException: With 401 when the token is missing, expired, or invalid.
+    """
     token = _extract_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -232,9 +311,10 @@ async def verify_token(request: Request) -> str:
 
 
 async def decode_token(token: str) -> str | None:
-    """解码 JWT 并返回 subject（用户名），无效/过期/未初始化时返回 None。
+    """Decode a JWT and return its subject (username), or None when invalid.
 
-    用于 HTTP 请求上下文之外的鉴权（如 WebSocket 握手）。
+    Used for authentication outside the HTTP request context (e.g. WebSocket
+    handshakes).
     """
     if not token:
         return None
@@ -251,6 +331,15 @@ async def decode_token(token: str) -> str | None:
 
 
 def _is_trusted(peer: str, proxies: list[str]) -> bool:
+    """Return True when a peer address falls within a trusted proxy network.
+
+    Args:
+        peer: Peer IP address string.
+        proxies: Trusted proxy network entries.
+
+    Returns:
+        True when the peer is trusted; False otherwise.
+    """
     try:
         addr = ipaddress.ip_address(peer)
     except ValueError:
@@ -265,6 +354,14 @@ def _is_trusted(peer: str, proxies: list[str]) -> bool:
 
 
 def _resolve_client_ip(request: Request) -> str:
+    """Resolve the client IP when the peer is a trusted proxy.
+
+    Args:
+        request: The HTTP request.
+
+    Returns:
+        The resolved client IP address.
+    """
     peer = request.client.host if request.client else "unknown"
     web = _web_config()
     if not web.real_ip_header or not web.trusted_proxies:
@@ -278,6 +375,14 @@ def _resolve_client_ip(request: Request) -> str:
 
 
 def _retry_after(key: str) -> float:
+    """Return the remaining backoff delay in seconds for a login key.
+
+    Args:
+        key: Login failure key.
+
+    Returns:
+        Seconds to wait before the next attempt is allowed.
+    """
     count, last = _login_failures.get(key, (0, 0.0))
     if count < _FAIL_THRESHOLD:
         return 0.0
@@ -288,25 +393,33 @@ def _retry_after(key: str) -> float:
 
 
 def _record_failure(key: str) -> None:
+    """Record a failed login attempt for a key."""
     count, _ = _login_failures.get(key, (0, 0.0))
     _login_failures[key] = (count + 1, time.monotonic())
 
 
 def _reset_failures(key: str) -> None:
+    """Clear the recorded login failures for a key."""
     _login_failures.pop(key, None)
 
 
 class LoginRequest(BaseModel):
+    """Request body for dashboard login."""
+
     username: str
     password: str
 
 
 class ChangePasswordRequest(BaseModel):
+    """Request body for changing the dashboard password."""
+
     old_password: str
     new_password: str
 
 
 class ForceChangePasswordRequest(BaseModel):
+    """Request body for forcing the dashboard password change."""
+
     new_password: str
 
 
@@ -315,6 +428,18 @@ auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @auth_router.post("/login")
 async def login(data: LoginRequest, request: Request) -> JSONResponse:
+    """Authenticate a dashboard user and issue a JWT.
+
+    Args:
+        data: Login credentials.
+        request: The HTTP request, used to resolve the client IP.
+
+    Returns:
+        A JSON response with the token, username, and must-change flag.
+
+    Raises:
+        HTTPException: With 429 on too many attempts and 401 on bad credentials.
+    """
     key = _resolve_client_ip(request)
     async with _login_lock:
         wait = _retry_after(key)
@@ -349,6 +474,17 @@ async def login(data: LoginRequest, request: Request) -> JSONResponse:
 
 @auth_router.post("/change-password", dependencies=[Depends(verify_token)])
 async def change_password(data: ChangePasswordRequest) -> JSONResponse:
+    """Change the dashboard password after verifying the old one.
+
+    Args:
+        data: Old and new passwords.
+
+    Returns:
+        A JSON response acknowledging the change.
+
+    Raises:
+        HTTPException: With 400 when the old password is wrong or invalid.
+    """
     password_hash = await _require_password_hash()
     old_ok = await asyncio.to_thread(
         verify_dashboard_password, password_hash, data.old_password
@@ -367,7 +503,17 @@ async def change_password(data: ChangePasswordRequest) -> JSONResponse:
 
 @auth_router.post("/change-password-force", dependencies=[Depends(verify_token)])
 async def force_change_password(data: ForceChangePasswordRequest) -> JSONResponse:
-    """首次登录强制改密：无需旧密码，仅在必须改密时允许。"""
+    """Force a password change without the old password when required.
+
+    Args:
+        data: New password.
+
+    Returns:
+        A JSON response acknowledging the change.
+
+    Raises:
+        HTTPException: With 400 when a change is not required or is invalid.
+    """
     must_change = await _get_setting(_SETTING_PASSWORD_MUST_CHANGE) == "1"
     if not must_change:
         raise HTTPException(status_code=400, detail="Password change not required")

@@ -1,3 +1,5 @@
+"""Provide the Click command that resets the administrator password."""
+
 from __future__ import annotations
 
 import click
@@ -10,6 +12,18 @@ import click
     help="Set a specific password (a strong one is generated if omitted)",
 )
 def reset_password_cmd(password: str | None) -> None:
+    """Reset the administrator password for the Web UI.
+
+    Validate the provided password when given, initialize the database, then
+    print the new or generated password to the console.
+
+    Args:
+        password (str | None): A specific password to set. If omitted, a strong
+            password is generated.
+
+    Raises:
+        click.ClickException: If the provided password fails validation.
+    """
     import asyncio
 
     from apeiria.config.loader import load_config

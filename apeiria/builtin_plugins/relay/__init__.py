@@ -1,3 +1,9 @@
+"""Provide the relay builtin plugin that forwards one-way messages.
+
+The relay plugin lets a user send a one-way message via the /传话 command
+to a configured target, defaulting to the superusers when none is configured.
+"""
+
 from __future__ import annotations
 
 from collections import deque
@@ -52,6 +58,12 @@ _relay = on_alconna(
 
 
 def _prune_rates(now: float, window: float) -> None:
+    """Remove rate-limit history entries that have fallen outside the window.
+
+    Args:
+        now: Current monotonic timestamp.
+        window: Window length in seconds.
+    """
     for uid, history in list(_rates.items()):
         while history and now - history[0] > window:
             history.popleft()
@@ -60,6 +72,16 @@ def _prune_rates(now: float, window: float) -> None:
 
 
 def _rate_check(user_id: str, count: int, window: float) -> bool:
+    """Return whether the user is still within the allowed rate limit.
+
+    Args:
+        user_id: Identifier of the user to check.
+        count: Maximum messages allowed within the window; zero disables the limit.
+        window: Window length in seconds.
+
+    Returns:
+        True if the request is allowed, otherwise False.
+    """
     if count <= 0:
         return True
     now = monotonic()
@@ -68,10 +90,24 @@ def _rate_check(user_id: str, count: int, window: float) -> bool:
 
 
 def _rate_push(user_id: str) -> None:
+    """Record a message for the given user to update its rate-limit history.
+
+    Args:
+        user_id: Identifier of the user whose history is updated.
+    """
     _rates.setdefault(user_id, deque()).append(monotonic())
 
 
 def _parse_target(value: str) -> tuple[str, str] | None:
+    """Parse a target string of the form scope:id into its parts.
+
+    Args:
+        value: Target string to parse.
+
+    Returns:
+        A tuple of (scope, id) when the value contains a valid separator,
+        otherwise None.
+    """
     text = value.strip()
     if ":" not in text:
         return None
@@ -84,6 +120,14 @@ def _parse_target(value: str) -> tuple[str, str] | None:
 
 
 def _build_source_line(session: Uninfo) -> str:
+    """Build a single-line description of the message source.
+
+    Args:
+        session: Uninfo session describing the incoming message.
+
+    Returns:
+        The formatted source line, including the group when applicable.
+    """
     nick = ""
     with suppress(Exception):
         nick = session.user.nick or session.user.name or ""
@@ -99,6 +143,15 @@ def _build_source_line(session: Uninfo) -> str:
 
 
 async def _deliver_to_targets(content: UniMessage, targets: list[Target]) -> bool:
+    """Deliver the given message to each of the specified targets.
+
+    Args:
+        content: Message content to send.
+        targets: List of targets to deliver the message to.
+
+    Returns:
+        True if at least one delivery succeeded, otherwise False.
+    """
     any_success = False
     for target in targets:
         try:
@@ -116,6 +169,13 @@ async def handle_relay(
     session: Uninfo,
     message: Match[UniMessage],
 ) -> None:
+    """Handle the /传话 command and forward the user's message.
+
+    Args:
+        bot: The bot instance used to resolve superuser targets.
+        session: Uninfo session describing the incoming message.
+        message: Parsed command argument matching the message body.
+    """
     config = get_relay_config()
 
     body = message.result.exclude(Reply).strip() if message.available else UniMessage()

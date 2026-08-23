@@ -1,3 +1,5 @@
+"""Implement the ``/sid`` command for showing current session information."""
+
 from __future__ import annotations
 
 from arclet.alconna import CommandMeta
@@ -17,6 +19,12 @@ _session = on_alconna(
 
 @_session.handle()
 async def handle_session(bot: Bot, event: Event) -> None:
+    """Handle the ``/sid`` command and show the current session information.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _session.finish(owner_error)
@@ -40,6 +48,14 @@ async def handle_session(bot: Bot, event: Event) -> None:
 
 
 def _safe_get_user_id(event: Event) -> str | None:
+    """Return the user id for an event, or ``None`` if it cannot be resolved.
+
+    Args:
+        event: The chat event to inspect.
+
+    Returns:
+        The user id, or ``None`` when the adapter cannot provide one.
+    """
     try:
         return event.get_user_id()
     except Exception:  # noqa: BLE001
@@ -47,6 +63,14 @@ def _safe_get_user_id(event: Event) -> str | None:
 
 
 def _safe_get_session_id(event: Event) -> str | None:
+    """Return the session id for an event, or ``None`` if it cannot be resolved.
+
+    Args:
+        event: The chat event to inspect.
+
+    Returns:
+        The session id, or ``None`` when the adapter cannot provide one.
+    """
     try:
         return event.get_session_id()
     except Exception:  # noqa: BLE001
@@ -54,6 +78,14 @@ def _safe_get_session_id(event: Event) -> str | None:
 
 
 def _resolve_message_type(event: Event) -> str:
+    """Resolve a human-readable message type for an event.
+
+    Args:
+        event: The chat event to inspect.
+
+    Returns:
+        The message type, or the event class name as a fallback.
+    """
     message_type = getattr(event, "message_type", None)
     if isinstance(message_type, str) and message_type.strip():
         return message_type.strip()

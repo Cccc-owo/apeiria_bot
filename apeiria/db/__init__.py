@@ -1,3 +1,5 @@
+"""Database package for Apeiria: models, engine, and access helpers."""
+
 from apeiria.db.base import Base
 from apeiria.db.engine import ApeiriaDatabase, close_db, get_db, init_db
 

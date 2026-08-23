@@ -1,3 +1,5 @@
+"""Scan installed adapters and build adapter manifests."""
+
 from __future__ import annotations
 
 import tomllib
@@ -9,6 +11,8 @@ import yaml
 
 @dataclass
 class AdapterManifest:
+    """Metadata describing an adapter discovered by ``scan_adapters``."""
+
     name: str
     module_name: str
     enabled: bool
@@ -16,6 +20,12 @@ class AdapterManifest:
 
 
 def _load_adapters_yaml() -> dict:
+    """Load the adapter package and state records.
+
+    Returns:
+        A dict with ``packages`` and ``states`` sub-dicts, or an empty
+        structure if ``adapters.yaml`` does not exist.
+    """
     yaml_path = Path(".apeiria/adapters.yaml")
     if not yaml_path.exists():
         return {"packages": {}, "states": {}}
@@ -23,6 +33,15 @@ def _load_adapters_yaml() -> dict:
 
 
 def _is_adapter_enabled(name: str, data: dict) -> bool:
+    """Return whether an adapter is enabled by its recorded state.
+
+    Args:
+        name: The adapter display name.
+        data: The loaded adapters YAML data.
+
+    Returns:
+        ``True`` if enabled, ``False`` otherwise.
+    """
     states = data.get("states") or {}
     if name in states:
         return bool(states[name].get("enabled", True))
@@ -30,6 +49,14 @@ def _is_adapter_enabled(name: str, data: dict) -> bool:
 
 
 def _read_toml_adapters(toml_path: Path) -> list[dict]:
+    """Read adapter entries from a ``pyproject.toml``.
+
+    Args:
+        toml_path: Path to the TOML file to read.
+
+    Returns:
+        A list of adapter dicts with ``name`` and ``module_name`` keys.
+    """
     if not toml_path.exists():
         return []
     raw = tomllib.loads(toml_path.read_text(encoding="utf-8"))
@@ -51,6 +78,11 @@ def _read_toml_adapters(toml_path: Path) -> list[dict]:
 
 
 def scan_adapters() -> list[AdapterManifest]:
+    """Scan builtin and PyPI adapters and return their manifests.
+
+    Returns:
+        A list of parsed :class:`AdapterManifest` instances.
+    """
     data = _load_adapters_yaml()
 
     result: list[AdapterManifest] = []

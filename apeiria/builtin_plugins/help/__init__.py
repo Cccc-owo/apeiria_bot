@@ -45,6 +45,15 @@ async def _handle_help(
     show_admin_flag: Match[object],
     show_all_flag: Match[object],
 ) -> None:
+    """Handle the help command and render either the menu or a plugin detail.
+
+    Args:
+        bot: The bot instance that received the command.
+        event: The event that triggered the command.
+        plugin_name: The optional target plugin name parts.
+        show_admin_flag: Whether the ``--admin`` flag was provided.
+        show_all_flag: Whether the ``--all`` flag was provided.
+    """
     config = get_help_config()
     prefix = _cmd_prefix()
     is_owner = await SUPERUSER(bot, event)
@@ -80,11 +89,20 @@ async def _handle_help(
 
 
 def _cmd_prefix() -> str:
+    """Return the first configured command-start prefix, or ``/`` as a fallback."""
     prefixes = get_driver().config.command_start
     return next(iter(prefixes)) if prefixes else "/"
 
 
 def _merge_plugin_name(m: Match[tuple[str, ...]]) -> str | None:
+    """Merge the captured plugin-name parts into a single string.
+
+    Args:
+        m: The argument match containing the plugin name parts.
+
+    Returns:
+        The joined plugin name, or ``None`` if no parts are available.
+    """
     if not m.available:
         return None
     parts = [

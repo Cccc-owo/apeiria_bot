@@ -1,3 +1,5 @@
+"""Load Apeiria configuration and expand it into the process environment."""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,14 @@ from apeiria.config.models import AppConfig
 
 
 def load_config(path: str) -> AppConfig:
+    """Load the app configuration from a YAML file.
+
+    Args:
+        path: The path to the YAML config file.
+
+    Returns:
+        The parsed AppConfig, or a default AppConfig if the file is missing.
+    """
     config_path = Path(path)
     if not config_path.exists():
         logger.warning("Config file not found at {}, using defaults", path)
@@ -23,6 +33,14 @@ def load_config(path: str) -> AppConfig:
 
 
 def to_env_value(value: object) -> str:
+    """Convert a Python value into an environment variable string.
+
+    Args:
+        value: The value to convert.
+
+    Returns:
+        The string form of the value for use as an environment variable.
+    """
     if isinstance(value, str):
         return value
     if isinstance(value, bool):
@@ -37,6 +55,15 @@ def _flatten_nested(
     skipped: list[str] | None = None,
     skip_existing: bool = False,  # noqa: FBT001, FBT002
 ) -> None:
+    """Recursively flatten a nested dict into environment variables.
+
+    Args:
+        prefix: The uppermost env prefix for the section.
+        obj: The nested dict to flatten.
+        parent: The accumulated parent key used to build the env name.
+        skipped: Optional list to collect env keys that were skipped.
+        skip_existing: Whether to skip keys already present in the environment.
+    """
     for key, val in obj.items():
         full_key = f"{parent}__{key}" if parent else key
         env_key = f"{prefix}__{full_key}".upper()
@@ -50,6 +77,14 @@ def _flatten_nested(
 
 
 def _try_resolve_plugin_contract(name: str):
+    """Try to resolve the configuration contract for a plugin name.
+
+    Args:
+        name: The plugin module name to resolve.
+
+    Returns:
+        The resolved ConfigContract, or None if resolution fails.
+    """
     try:
         from apeiria.config.contract import resolve_config_namespace_contract
 
@@ -59,6 +94,14 @@ def _try_resolve_plugin_contract(name: str):
 
 
 def _try_resolve_adapter_contract(name: str):
+    """Try to resolve the configuration contract for an adapter name.
+
+    Args:
+        name: The adapter module name to resolve.
+
+    Returns:
+        The resolved ConfigContract, or None if resolution fails.
+    """
     try:
         from apeiria.plugin.adapter_resolver import resolve_adapter_config
 
@@ -74,6 +117,16 @@ _PLUGIN_FIELD_ALIASES: dict[str, dict[str, str]] = {
 
 
 def _field_alias(contract: Any, plugin_name: str, key: str) -> str | None:
+    """Resolve the environment alias for a plugin config field.
+
+    Args:
+        contract: The resolved plugin contract, or None.
+        plugin_name: The plugin name.
+        key: The config field key.
+
+    Returns:
+        The field's alias, or None if no alias applies.
+    """
     if contract is not None:
         alias = contract.aliases.get(key)
         if alias is not None:
@@ -87,6 +140,14 @@ def _inject_plugin_config(
     skipped: list[str] | None = None,
     skip_existing: bool = False,  # noqa: FBT001, FBT002
 ) -> None:
+    """Inject plugin config entries into the environment.
+
+    Args:
+        entries: Mapping of plugin name to its config dict.
+        set_driver_attr: Optional driver object to set config attrs on.
+        skipped: Optional list to collect env keys that were skipped.
+        skip_existing: Whether to skip keys already present in the environment.
+    """
     for name, cfg in entries.items():
         if not cfg:
             continue
@@ -110,6 +171,15 @@ def _inject_section_config(
     skipped: list[str] | None = None,
     skip_existing: bool = False,  # noqa: FBT001, FBT002
 ) -> None:
+    """Inject a config section into the environment.
+
+    Args:
+        entries: Mapping of section member name to its config dict.
+        resolve_fn: Callable that resolves a member's configuration contract.
+        set_driver_attr: Optional driver object to set config attrs on.
+        skipped: Optional list to collect env keys that were skipped.
+        skip_existing: Whether to skip keys already present in the environment.
+    """
     for name, cfg in entries.items():
         if not cfg:
             continue
@@ -138,6 +208,11 @@ def _inject_section_config(
 
 
 def expand_config(app: AppConfig) -> None:
+    """Expand the app configuration into the process environment.
+
+    Args:
+        app: The app configuration to expand.
+    """
     skipped_keys: list[str] = []
 
     nonebot_fields = {
@@ -175,6 +250,14 @@ def expand_config(app: AppConfig) -> None:
 
 
 def _collect_adapter_entries(*paths: str) -> list[dict]:
+    """Collect adapter entries from the given TOML files.
+
+    Args:
+        paths: Paths to TOML files that declare adapter config.
+
+    Returns:
+        A list of adapter entry dicts, deduplicated by module name.
+    """
     import tomllib
 
     seen_modules: set[str] = set()
@@ -207,6 +290,15 @@ def load_adapters_from_toml(
     *paths: str,
     states: dict[str, dict] | None = None,
 ) -> int:
+    """Load and register adapters declared in the given TOML files.
+
+    Args:
+        paths: Paths to TOML files that declare adapter config.
+        states: Optional mapping of adapter name to its enabled state.
+
+    Returns:
+        The number of adapters registered.
+    """
     import importlib
 
     from nonebot import get_adapters, get_driver
@@ -245,6 +337,11 @@ def load_adapters_from_toml(
 
 
 def update_runtime_config(app: AppConfig) -> None:
+    """Hot-reload plugin and adapter config into the running driver.
+
+    Args:
+        app: The app configuration to apply.
+    """
     from nonebot import get_driver
 
     driver = get_driver()

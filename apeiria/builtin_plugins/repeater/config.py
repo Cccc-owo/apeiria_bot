@@ -1,9 +1,17 @@
+"""Configuration model and loader for the repeater plugin."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class RepeaterConfig(BaseModel):
+    """Configuration for the group-chat repeater plugin.
+
+    Store the repeat probability, cooldown, trigger threshold, and the
+    allowlist/blocklist of scopes in which the repeater is active.
+    """
+
     model_config = ConfigDict(extra="ignore")
 
     probability: float = Field(
@@ -26,6 +34,7 @@ class RepeaterConfig(BaseModel):
 
 
 def get_plugin_config() -> RepeaterConfig:
+    """Return the repeater plugin configuration loaded through NoneBot."""
     from nonebot import get_plugin_config as _get_plugin_config
 
     return _get_plugin_config(RepeaterConfig)

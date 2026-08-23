@@ -1,3 +1,5 @@
+"""Ensure the ``.apeiria`` plugin environment directory and config files exist."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,6 +30,15 @@ states: {}
 
 
 def ensure_apeiria_env() -> Path:
+    """Create the ``.apeiria`` plugin environment and its default files.
+
+    Creates the base ``.apeiria`` directory and the ``plugins`` subdirectory,
+    then writes the ``pyproject.toml``, ``plugins.yaml``, and ``adapters.yaml``
+    config files, each only when it does not already exist.
+
+    Returns:
+        The ``Path`` to the base ``.apeiria`` directory.
+    """
     base = Path(".apeiria")
     base.mkdir(parents=True, exist_ok=True)
 

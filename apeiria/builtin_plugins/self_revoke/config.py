@@ -1,3 +1,9 @@
+"""Configuration models for the self-revoke plugin.
+
+This module defines the runtime configuration used by the self-revoke plugin
+and the helper that loads it.
+"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -10,6 +16,13 @@ SelfRevokeFeedback = Literal["silent", "reaction"]
 
 
 class SelfRevokeConfig(BaseModel):
+    """Runtime configuration for the self-revoke plugin.
+
+    This model groups the settings that control who may trigger a revoke,
+    whether the trigger message itself is also revoked, and how the plugin
+    gives feedback to the user.
+    """
+
     model_config = ConfigDict(extra="ignore")
 
     permission: SelfRevokePermission = Field(
@@ -24,4 +37,9 @@ class SelfRevokeConfig(BaseModel):
 
 
 def get_self_revoke_config() -> SelfRevokeConfig:
+    """Return the self-revoke plugin configuration.
+
+    Returns:
+        The validated :class:`SelfRevokeConfig` instance for the plugin.
+    """
     return get_plugin_config(SelfRevokeConfig)

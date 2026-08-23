@@ -1,3 +1,5 @@
+"""Provide the Click command that runs the Apeiria Bot application."""
+
 from __future__ import annotations
 
 import os
@@ -33,7 +35,15 @@ GRACEFUL_SHUTDOWN_TIMEOUT = 3
 
 @click.command("run")
 @click.option("--reload", is_flag=True, default=False, help="Enable hot reload")
-def run_cmd(reload: bool) -> None:  # noqa: FBT001
+def run_cmd(reload: bool) -> None:  # noqa: FBT001, PLR0915
+    """Run the Apeiria Bot application.
+
+    Load the project configuration, initialize the database, build and execute
+    the bootstrap plan, then start the NoneBot driver.
+
+    Args:
+        reload (bool): Whether to enable hot reload and restart on changes.
+    """
     import nonebot
     from dotenv import load_dotenv
     from nonebot.log import logger
@@ -109,6 +119,7 @@ def run_cmd(reload: bool) -> None:  # noqa: FBT001
         import watchfiles
 
         def _watch_and_restart() -> None:
+            """Restart the process when a watched file changes."""
             for _changes in watchfiles.watch(
                 Path("apeiria"),
                 Path(".apeiria/plugins"),

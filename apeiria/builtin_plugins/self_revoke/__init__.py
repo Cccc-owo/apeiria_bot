@@ -1,3 +1,10 @@
+"""Self-revoke plugin: let users revoke bot-sent messages.
+
+Users reply to a message the bot sent and send either "撤回" or "revoke" to
+trigger a revoke of that message. This module wires up the matchers, the
+permission check, and the revoke flow.
+"""
+
 from __future__ import annotations
 
 from contextlib import suppress
@@ -35,12 +42,33 @@ __plugin_meta__ = PluginMetadata(
 
 
 async def _is_superuser_event(bot: Bot, event: Event) -> bool:
+    """Return whether the event was sent by a superuser.
+
+    Any exception raised while evaluating the permission is suppressed and
+    treated as a non-superuser sender.
+
+    Args:
+        bot: The bot instance handling the event.
+        event: The incoming event to check.
+
+    Returns:
+        True if the event sender is a superuser, False otherwise.
+    """
     with suppress(Exception):
         return await SUPERUSER(bot, event)
     return False
 
 
 def _strip_command_prefix(text: str) -> str | None:
+    """Strip the configured command prefix from a message text.
+
+    Args:
+        text: The raw message text.
+
+    Returns:
+        The text with the matching command prefix removed, or None if no
+        configured prefix matches.
+    """
     try:
         command_start = getattr(get_driver().config, "command_start", {"/"})
     except Exception:  # noqa: BLE001
@@ -61,6 +89,18 @@ def _strip_command_prefix(text: str) -> str | None:
 
 
 async def _is_prefixed_revoke(event: Event) -> bool:
+    """Return whether the event text is a command-prefixed revoke request.
+
+    Any exception raised while reading the event text is suppressed and treated
+    as an absence of a prefixed revoke request.
+
+    Args:
+        event: The incoming message event.
+
+    Returns:
+        True if the text uses a command prefix followed by a revoke keyword,
+        False otherwise.
+    """
     with suppress(Exception):
         text = event.get_plaintext().strip()
         prefix = _strip_command_prefix(text)
@@ -90,6 +130,17 @@ async def handle_revoke(  # noqa: C901
     event: Event,
     matcher: Matcher,  # noqa: ARG001
 ) -> None:
+    """Handle a revoke request for a message the bot sent.
+
+    Resolve the message the user replied to, verify the bot authored it and
+    the caller is allowed to revoke, then revoke the target message and
+    optionally the trigger message.
+
+    Args:
+        bot: The bot instance handling the event.
+        event: The incoming message event.
+        matcher: The matcher that triggered this handler.
+    """
     config = get_self_revoke_config()
     provider = _resolve_provider(bot, event)
     if provider is None:

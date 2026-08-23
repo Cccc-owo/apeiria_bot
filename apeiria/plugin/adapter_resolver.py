@@ -1,3 +1,5 @@
+"""Resolve adapter configuration contracts from installed adapters."""
+
 from __future__ import annotations
 
 import importlib
@@ -11,6 +13,14 @@ from apeiria.config.schema import ConfigContract
 
 
 def _find_config_in_module(module_name: str) -> type[BaseModel] | None:
+    """Find the adapter config model class in an adapter module.
+
+    Args:
+        module_name: The dotted module name to inspect.
+
+    Returns:
+        The config ``BaseModel`` subclass, or ``None`` if none is found.
+    """
     try:
         module = importlib.import_module(module_name)
     except ImportError:
@@ -30,6 +40,15 @@ def _find_config_in_module(module_name: str) -> type[BaseModel] | None:
 
 
 def resolve_adapter_config(adapter_name: str) -> ConfigContract | None:
+    """Build a config contract for a registered adapter.
+
+    Args:
+        adapter_name: The name of the registered adapter.
+
+    Returns:
+        The adapter's ``ConfigContract``, or ``None`` if the adapter or its
+        config model cannot be resolved.
+    """
     try:
         adapter = nonebot.get_adapter(adapter_name)
     except (ValueError, KeyError):

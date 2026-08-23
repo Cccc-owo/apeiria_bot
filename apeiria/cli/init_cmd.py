@@ -1,3 +1,5 @@
+"""Provide the Click command that initializes a new Apeiria Bot project."""
+
 from __future__ import annotations
 
 import click
@@ -7,6 +9,12 @@ from apeiria.env.ensure import ensure_apeiria_env
 
 @click.command("init")
 def init_cmd() -> None:
+    """Initialize a new Apeiria Bot project.
+
+    Prompt for the bot nickname and admin IDs, ensure the Apeiria environment
+    is set up, then write the default ``data/config.yaml`` and a placeholder
+    ``.env`` file.
+    """
     click.echo("Apeiria Bot — project initialization\n")
 
     nickname = click.prompt("Bot nickname", default="Bot")

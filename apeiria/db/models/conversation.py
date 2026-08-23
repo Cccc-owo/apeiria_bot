@@ -1,3 +1,5 @@
+"""SQLAlchemy ORM models for conversation sessions and messages."""
+
 from __future__ import annotations
 
 from sqlalchemy import JSON, ForeignKey, Integer, String
@@ -7,6 +9,13 @@ from apeiria.db.base import Base, ISOTimestampMixin
 
 
 class Session(Base, ISOTimestampMixin):
+    """SQLAlchemy ORM model for a conversation session.
+
+    A session identifies a single conversation by platform, scene type, and
+    scene id, and owns the messages exchanged within it. Inherits created and
+    updated timestamps.
+    """
+
     __tablename__ = "sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -21,6 +30,12 @@ class Session(Base, ISOTimestampMixin):
 
 
 class Message(Base):
+    """SQLAlchemy ORM model for a single message in a conversation.
+
+    Each message belongs to a session and records its role, content, author and
+    message ids, capture time, and any metadata payload.
+    """
+
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -1,3 +1,5 @@
+"""Implement the ``/plugins`` and ``/plugin`` commands for plugin management."""
+
 from __future__ import annotations
 
 from arclet.alconna import Args, CommandMeta
@@ -32,6 +34,12 @@ _plugin = on_alconna(
 
 @_plugins.handle()
 async def handle_plugins(bot: Bot, event: Event) -> None:
+    """Handle the ``/plugins`` command and list all loaded plugins.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _plugins.finish(owner_error)
@@ -63,6 +71,14 @@ async def handle_plugin(
     action: Match[str],
     plugin_name: Match[str],
 ) -> None:
+    """Handle the ``/plugin`` command to inspect or toggle a single plugin.
+
+    Args:
+        bot: The bot instance used to send responses.
+        event: The message event that triggered the command.
+        action: The command action, one of info/enable/disable.
+        plugin_name: The target plugin name.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _plugin.finish(owner_error)
@@ -90,6 +106,14 @@ async def handle_plugin(
 
 
 def _find_plugin(query: str) -> PluginManifest | None:
+    """Find a loaded plugin by an exact or fuzzy name match.
+
+    Args:
+        query: The plugin name query to match.
+
+    Returns:
+        The matching plugin manifest, or None when no plugin matches.
+    """
     normalized = query.strip().lower()
     for p in scan_plugins():
         if p.name.lower() == normalized:
@@ -101,6 +125,14 @@ def _find_plugin(query: str) -> PluginManifest | None:
 
 
 def _render_info(p: PluginManifest) -> str:
+    """Render a detail block for a single plugin.
+
+    Args:
+        p: The plugin manifest to render.
+
+    Returns:
+        The rendered detail text.
+    """
     return render_block(
         "插件详情",
         [

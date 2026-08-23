@@ -1,3 +1,5 @@
+"""Wire protocol helpers and inbound frame models for the WebChat adapter."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,11 +9,13 @@ from apeiria.webchat.message import Message, MessageSegment
 
 
 class ProtocolError(ValueError):
-    """入站帧不合法。"""
+    """Raised when an inbound frame is malformed."""
 
 
 @dataclass
 class InboundMessage:
+    """An inbound message frame carrying text, an optional image, and an identity."""
+
     text: str
     image: str | None
     identity: dict[str, Any]
@@ -19,16 +23,20 @@ class InboundMessage:
 
 @dataclass
 class InboundClear:
-    pass
+    """An inbound frame requesting that a session be cleared."""
 
 
 @dataclass
 class InboundDelete:
+    """An inbound frame requesting deletion of a message by id."""
+
     message_id: str
 
 
 @dataclass
 class InboundSwitch:
+    """An inbound frame requesting a switch to a new session identity."""
+
     identity: dict[str, Any]
 
 
@@ -36,6 +44,18 @@ InboundFrame = InboundMessage | InboundClear | InboundDelete | InboundSwitch
 
 
 def parse_inbound(raw: Any) -> InboundFrame:
+    """Parse a raw inbound frame into the matching inbound model.
+
+    Args:
+        raw: The decoded inbound frame data.
+
+    Returns:
+        The parsed inbound frame model.
+
+    Raises:
+        ProtocolError: If the frame is not an object, has an unknown type, or
+            is missing required fields.
+    """
     if not isinstance(raw, dict):
         raise ProtocolError("frame must be an object")  # noqa: TRY003
     ftype = raw.get("type")
@@ -64,7 +84,15 @@ def parse_inbound(raw: Any) -> InboundFrame:
 
 
 def build_inbound_message(text: str, image: str | None) -> Message:
-    """把入站文本/图片组装成 WebChat Message。"""
+    """Assemble inbound text and an optional image into a WebChat message.
+
+    Args:
+        text: The inbound text content.
+        image: The inbound image as a URL or a base64 data string.
+
+    Returns:
+        A WebChat message containing the text and/or image segments.
+    """
     msg = Message()
     if text:
         msg.append(MessageSegment.text(text))
@@ -79,7 +107,14 @@ def build_inbound_message(text: str, image: str | None) -> Message:
 
 
 def message_to_wire(message: Message) -> list[dict[str, Any]]:
-    """把出站 Message 逐段序列化为 wire 段；未知段降级为 raw 调试段。"""
+    """Serialize an outbound message into wire segments, degrading unknown types.
+
+    Args:
+        message: The message to serialize.
+
+    Returns:
+        A list of wire-format segment dictionaries.
+    """
     wire: list[dict[str, Any]] = []
     for seg in message:
         if seg.type == "text":
@@ -109,6 +144,19 @@ def wire_message(  # noqa: PLR0913
     session_id: str,
     user_id: str | None = None,
 ) -> dict[str, Any]:
+    """Build a wire-format message object.
+
+    Args:
+        message_id: The id of the message.
+        role: The sender role (user or bot).
+        segments: The wire-format message segments.
+        time: The message timestamp.
+        session_id: The session the message belongs to.
+        user_id: The id of the user who sent the message.
+
+    Returns:
+        A wire-format message dictionary.
+    """
     return {
         "id": message_id,
         "role": role,
@@ -120,20 +168,62 @@ def wire_message(  # noqa: PLR0913
 
 
 def message_frame(wire_msg: dict[str, Any]) -> dict[str, Any]:
+    """Wrap a wire message in a message frame.
+
+    Args:
+        wire_msg: The wire-format message.
+
+    Returns:
+        A message frame dictionary.
+    """
     return {"type": "message", "message": wire_msg}
 
 
 def history_frame(messages: list[dict[str, Any]], session_id: str) -> dict[str, Any]:
+    """Build a history frame carrying a session's messages.
+
+    Args:
+        messages: The wire-format messages to replay.
+        session_id: The session the messages belong to.
+
+    Returns:
+        A history frame dictionary.
+    """
     return {"type": "history", "session_id": session_id, "messages": messages}
 
 
 def cleared_frame(session_id: str) -> dict[str, Any]:
+    """Build a frame notifying that a session was cleared.
+
+    Args:
+        session_id: The session that was cleared.
+
+    Returns:
+        A cleared frame dictionary.
+    """
     return {"type": "cleared", "session_id": session_id}
 
 
 def deleted_frame(message_id: str) -> dict[str, Any]:
+    """Build a frame notifying that a message was deleted.
+
+    Args:
+        message_id: The id of the deleted message.
+
+    Returns:
+        A deleted frame dictionary.
+    """
     return {"type": "deleted", "message_id": message_id}
 
 
 def error_frame(code: str, message: str) -> dict[str, Any]:
+    """Build an error frame with a code and a message.
+
+    Args:
+        code: The error code.
+        message: The human-readable error message.
+
+    Returns:
+        An error frame dictionary.
+    """
     return {"type": "error", "code": code, "message": message}

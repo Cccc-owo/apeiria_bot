@@ -1,3 +1,5 @@
+"""Install, uninstall, and manage adapters in the Apeiria environment."""
+
 from __future__ import annotations
 
 import subprocess
@@ -14,6 +16,12 @@ _ADAPTERS_SECTION = "[tool.nonebot.adapters]"
 
 
 def _read_adapters_yaml() -> dict:
+    """Read adapter package and state records from ``adapters.yaml``.
+
+    Returns:
+        A dict with ``packages`` and ``states`` sub-dicts, or an empty
+        structure if the file is missing.
+    """
     p = Path(".apeiria/adapters.yaml")
     if not p.exists():
         return {"packages": {}, "states": {}}
@@ -21,6 +29,11 @@ def _read_adapters_yaml() -> dict:
 
 
 def _write_adapters_yaml(data: dict) -> None:
+    """Write adapter package and state records to ``adapters.yaml``.
+
+    Args:
+        data: The adapter data dict to persist.
+    """
     p = Path(".apeiria/adapters.yaml")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
@@ -30,6 +43,12 @@ def _write_adapters_yaml(data: dict) -> None:
 
 
 def _toml_add_adapter(name: str, module_name: str) -> None:
+    """Register an adapter entry in the ``.apeiria`` pyproject TOML.
+
+    Args:
+        name: The adapter display name.
+        module_name: The Python module implementing the adapter.
+    """
     lines = _ADAPTERS_TOML.read_text(encoding="utf-8").splitlines()
 
     section_idx = None
@@ -52,6 +71,11 @@ def _toml_add_adapter(name: str, module_name: str) -> None:
 
 
 def _toml_remove_adapter(name: str) -> None:
+    """Remove an adapter entry from the ``.apeiria`` pyproject TOML.
+
+    Args:
+        name: The adapter display name to remove.
+    """
     if not _ADAPTERS_TOML.exists():
         return
     lines = _ADAPTERS_TOML.read_text(encoding="utf-8").splitlines()
@@ -63,6 +87,16 @@ def _toml_remove_adapter(name: str) -> None:
 def install_adapter(
     name: str, pkg_requirement: str, module_name: str
 ) -> tuple[bool, str]:
+    """Install an adapter package into the Apeiria environment.
+
+    Args:
+        name: The adapter display name.
+        pkg_requirement: The package requirement to install.
+        module_name: The Python module implementing the adapter.
+
+    Returns:
+        ``(True, message)`` on success, or ``(False, error)`` on failure.
+    """
     uv = find_uv()
     if uv is None:
         return False, "uv not found"
@@ -96,6 +130,15 @@ def install_adapter(
 
 
 def uninstall_adapter(name: str, *, keep_config: bool = False) -> bool:
+    """Uninstall an adapter package from the Apeiria environment.
+
+    Args:
+        name: The adapter display name to remove.
+        keep_config: If ``True``, keep the adapter's ``config.yaml`` section.
+
+    Returns:
+        ``True`` if the adapter was removed, ``False`` if it was not found.
+    """
     data = _read_adapters_yaml()
     packages = data.get("packages") or {}
     pkg = packages.get(name, "")
@@ -128,6 +171,15 @@ def uninstall_adapter(name: str, *, keep_config: bool = False) -> bool:
 
 
 def set_adapter_state(name: str, enabled: bool) -> bool:  # noqa: FBT001
+    """Set the enabled state for an adapter.
+
+    Args:
+        name: The adapter display name.
+        enabled: Whether the adapter should be enabled.
+
+    Returns:
+        ``True`` when the state is recorded.
+    """
     data = _read_adapters_yaml()
     states = data.setdefault("states", {})
     states[name] = {"enabled": enabled}
@@ -136,6 +188,11 @@ def set_adapter_state(name: str, enabled: bool) -> bool:  # noqa: FBT001
 
 
 def _remove_adapter_config(name: str) -> None:
+    """Remove an adapter's configuration section from ``config.yaml``.
+
+    Args:
+        name: The adapter display name whose config should be dropped.
+    """
     config_path = Path("data/config.yaml")
     if not config_path.exists():
         return

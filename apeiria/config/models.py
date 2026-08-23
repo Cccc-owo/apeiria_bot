@@ -1,3 +1,5 @@
+"""Pydantic models describing the Apeiria configuration schema."""
+
 from __future__ import annotations
 
 from typing import ClassVar
@@ -6,6 +8,12 @@ from pydantic import BaseModel
 
 
 class NoneBotConfig(BaseModel):
+    """Configuration for the underlying NoneBot runtime.
+
+    Holds the NoneBot core settings that are expanded into the process
+    environment at startup.
+    """
+
     driver: str = "~fastapi+~httpx+~websockets"
     host: str = "127.0.0.1"
     port: int = 8080
@@ -18,10 +26,21 @@ class NoneBotConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
+    """Configuration for the application database.
+
+    Defines the path to the SQLite database file.
+    """
+
     path: str = "data/apeiria.db"
 
 
 class WebConfig(BaseModel):
+    """Configuration for the Web UI server.
+
+    Defines the network address, authentication credentials, and proxy
+    handling for the browser-facing Web UI.
+    """
+
     host: str = "127.0.0.1"
     port: int = 8080
     username: str = "admin"
@@ -31,6 +50,11 @@ class WebConfig(BaseModel):
 
 
 class LogConfig(BaseModel):
+    """Configuration for the logging system.
+
+    Defines the log file, level, rotation, retention, and stream buffer.
+    """
+
     file: str = "data/logs/apeiria.log"
     level: str = "INFO"
     rotation: str = "10 MB"
@@ -39,6 +63,12 @@ class LogConfig(BaseModel):
 
 
 class WebChatConfig(BaseModel):
+    """Configuration for the WebChat bridge.
+
+    Defines whether the bridge is enabled and how its WebSocket endpoint and
+    default user are resolved.
+    """
+
     enabled: bool = True
     ws_path: str = "/ws/webchat"
     default_user_id: str = ""
@@ -46,6 +76,11 @@ class WebChatConfig(BaseModel):
 
 
 class ApeiriaConfig(BaseModel):
+    """Apeiria-specific configuration grouping its sub-configs.
+
+    Bundles the database, web, logging, and WebChat configurations.
+    """
+
     database: DatabaseConfig = DatabaseConfig()
     web: WebConfig = WebConfig()
     logging: LogConfig = LogConfig()
@@ -53,6 +88,12 @@ class ApeiriaConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
+    """Top-level application configuration.
+
+    Groups the NoneBot runtime config, plugin configs, adapter configs, and
+    the Apeiria-specific settings.
+    """
+
     nonebot: NoneBotConfig = NoneBotConfig()
     plugins: dict[str, dict] = {}
     adapters: dict[str, dict] = {}

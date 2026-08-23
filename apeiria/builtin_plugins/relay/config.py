@@ -1,3 +1,9 @@
+"""Configuration models for the relay builtin plugin.
+
+This module defines the pydantic configuration model used by the relay
+plugin, along with the accessor that reads the effective configuration.
+"""
+
 from __future__ import annotations
 
 from nonebot import get_plugin_config
@@ -5,6 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RelayConfig(BaseModel):
+    """Configuration model for the relay plugin.
+
+    Defines the target, rate-limit, and message-prefix settings used when
+    forwarding messages.
+    """
+
     model_config = ConfigDict(extra="ignore")
 
     target: str = Field(
@@ -19,4 +31,9 @@ class RelayConfig(BaseModel):
 
 
 def get_relay_config() -> RelayConfig:
+    """Return the effective relay plugin configuration.
+
+    Returns:
+        The configuration loaded for the relay plugin.
+    """
     return get_plugin_config(RelayConfig)

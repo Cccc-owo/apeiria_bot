@@ -1,3 +1,5 @@
+"""NoneBot hooks that persist inbound messages to the conversation store."""
+
 from __future__ import annotations
 
 from nonebot.adapters import Event  # noqa: TC002
@@ -12,6 +14,16 @@ async def _persist_inbound(
     event: Event,
     session: Session | None,
 ) -> None:
+    """Persist a single inbound message to the conversation store.
+
+    The message is skipped when the event is not a message or when the session
+    belongs to the webchat bridge. Persistence failures are logged at debug
+    level and swallowed so that they never break message handling.
+
+    Args:
+        event: The inbound NoneBot event to inspect.
+        session: The resolved uninfo session, when available.
+    """
     if event.get_type() != "message":
         return
     try:
@@ -39,6 +51,20 @@ def _extract_session_meta(
     session_id: str,
     session: Session | None,
 ) -> tuple[str, str, str]:
+    """Extract the platform, scene type, and scene id for a session.
+
+    When the uninfo session is available its scope, scene type, and scene id
+    are used directly. Otherwise the attributes are read from the event with
+    a fallback to the session id.
+
+    Args:
+        event: The inbound NoneBot event to inspect.
+        session_id: The resolved session identifier.
+        session: The resolved uninfo session, when available.
+
+    Returns:
+        A tuple of ``(platform, scene_type, scene_id)``.
+    """
     if session is not None:
         return str(session.scope), session.scene.type.name.lower(), session.scene.id
 
@@ -53,6 +79,16 @@ def _extract_session_meta(
 
 
 def _try_attr(obj: object, name: str) -> str | None:
+    """Return a string attribute of an object, or None when unavailable.
+
+    Args:
+        obj: The object to read the attribute from.
+        name: The attribute name to read.
+
+    Returns:
+        The attribute value coerced to a string, or None when the attribute is
+        missing or cannot be read.
+    """
     try:
         val = getattr(obj, name, None)
         return str(val) if val is not None else None
@@ -64,6 +100,14 @@ async def persist(
     event: Event,
     session: Session | None = Depends(get_session),
 ) -> None:
+    """Persist an inbound message to the conversation store.
+
+    Public NoneBot hook that delegates to the private persist helper.
+
+    Args:
+        event: The inbound NoneBot event to persist.
+        session: The resolved uninfo session, supplied by dependency injection.
+    """
     await _persist_inbound(event, session)
 
 

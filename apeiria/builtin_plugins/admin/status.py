@@ -1,3 +1,9 @@
+"""Provide the ``/status`` command that reports the bot's runtime status.
+
+This module registers an Alconna matcher that replies with a formatted block
+showing uptime, running state, loaded plugin count, and enabled adapters.
+"""
+
 from __future__ import annotations
 
 import time
@@ -22,6 +28,12 @@ _status = on_alconna(
 
 @_status.handle()
 async def handle_status(bot: Bot, event: Event) -> None:
+    """Reply to the status command with a formatted runtime status block.
+
+    Args:
+        bot: The bot instance that invoked the command.
+        event: The triggering event.
+    """
     owner_error = await ensure_owner_message(bot, event)
     if owner_error:
         await _status.finish(owner_error)

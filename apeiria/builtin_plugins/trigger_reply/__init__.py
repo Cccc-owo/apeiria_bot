@@ -1,3 +1,5 @@
+"""Trigger-reply plugin: respond to specific messages via standalone rule files."""
+
 from __future__ import annotations
 
 from contextlib import suppress
@@ -41,6 +43,17 @@ def _extract_input(
     event: Event,
     session: Uninfo | None,
 ) -> TriggerInput | None:
+    """Build a trigger input from a message event and session context.
+
+    Args:
+        bot: The adapter bot instance handling the event.
+        event: The incoming event.
+        session: Session info, or ``None`` when unavailable.
+
+    Returns:
+        A :class:`TriggerInput` for message events, or ``None`` when the event
+        is not a message.
+    """
     with suppress(Exception):
         if event.get_type() != "message":
             return None
@@ -102,6 +115,17 @@ def _extract_input(
 
 
 def _get_rule_set(config: TriggerReplyConfig) -> TriggerRuleSet | None:
+    """Load or reload the trigger rule set as needed.
+
+    Rebuilds the rule set when no set is cached yet or when the rule files
+    change; on reload errors the previously cached rules are kept.
+
+    Args:
+        config: The trigger-reply configuration.
+
+    Returns:
+        The current rule set.
+    """
     global _rule_set, _rule_paths  # noqa: PLW0603
 
     paths = tuple(collect_rule_files(config))
@@ -131,6 +155,18 @@ async def _rule_checker(
     state: T_State,
     session: Uninfo,
 ) -> bool:
+    """Check whether an event matches any trigger rule.
+
+    Args:
+        bot: The adapter bot instance handling the event.
+        event: The incoming event.
+        state: The message-processing state.
+        session: Session info for the message.
+
+    Returns:
+        ``True`` when a rule matches and the result is stored in ``state``,
+        otherwise ``False``.
+    """
     config = get_trigger_reply_config()
     if not config.enabled:
         return False
@@ -160,6 +196,12 @@ _message = on_message(
 
 @_message.handle()
 async def handle_trigger_message(matcher: Matcher, state: T_State) -> None:
+    """Send the matched trigger reply for a message.
+
+    Args:
+        matcher: The active matcher for the message.
+        state: The message-processing state containing the match result.
+    """
     result: MatchResult | None = state.get("_trigger_reply_result")
     if result is None:
         return
