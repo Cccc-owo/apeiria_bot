@@ -347,6 +347,8 @@ export default {
     reorderSuccess: "排序已更新",
     validationError: "请检查输入",
     dragHint: "拖拽排序",
+    moveUp: "上移",
+    moveDown: "下移",
   },
   update: {
     title: "系统更新",

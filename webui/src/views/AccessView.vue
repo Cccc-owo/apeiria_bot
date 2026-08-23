@@ -250,6 +250,7 @@ const pluginComboboxOpen = ref(false);
                         variant="ghost"
                         size="icon"
                         class="size-7"
+                        :aria-label="t('access.moveUp')"
                         @click="moveUp(idx)"
                         :disabled="idx === 0"
                       >
@@ -259,6 +260,7 @@ const pluginComboboxOpen = ref(false);
                         variant="ghost"
                         size="icon"
                         class="size-7 rotate-180"
+                        :aria-label="t('access.moveDown')"
                         @click="moveDown(idx)"
                         :disabled="idx === rules.length - 1"
                       >
@@ -286,13 +288,20 @@ const pluginComboboxOpen = ref(false);
             <TableCell class="font-mono text-sm">{{ rule.priority }}</TableCell>
             <TableCell>
               <div class="flex gap-1">
-                <Button variant="ghost" size="icon" class="size-8" @click="openEdit(rule)">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-8"
+                  :aria-label="t('access.editRule')"
+                  @click="openEdit(rule)"
+                >
                   <Search class="size-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
                   class="size-8 text-destructive"
+                  :aria-label="t('access.deleteRule')"
                   @click="confirmDelete(rule)"
                 >
                   <Trash2 class="size-3.5" />
