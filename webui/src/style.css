@@ -3,24 +3,73 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * @theme inline — registers every color utility. shadcn-vue components and
+ * views reference the semantic names below; the values resolve to a CSS var
+ * so the `.dark` block can re-cascade them. New Material 3 role utilities
+ * (border-primary-container, bg-on-surface, outline-outline, etc.) are
+ * registered here so both existing and M3-aware classes compile.
+ */
 @theme inline {
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
-    sans-serif;
+    system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-heading: var(--font-sans);
   --font-mono:
-    "SF Mono", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono",
-    Menlo, Courier, "PingFang SC", "Microsoft YaHei", monospace;
+    ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Consolas,
+    "Liberation Mono", Menlo, Courier, "PingFang SC", "Microsoft YaHei",
+    monospace;
 
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
+  /* shadcn semantic surfaces */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* shadcn semantic colors */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Material 3 roles */
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-surface: var(--surface);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-dim: var(--surface-dim);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
+  --color-on-error-container: var(--on-error-container);
+
+  /* charts & log levels */
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -32,153 +81,206 @@
   --color-log-warning: var(--log-warning);
   --color-log-error: var(--log-error);
   --color-log-critical: var(--log-critical);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* sidebar */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
 }
 
 /*
- * Elevation shadows (DeepSeek-style: low contrast + large blur + a hairline
- * 1px ring). These override Tailwind's defaults and map onto the four tiers
- * the shadcn-vue components already use: xs (inputs) → sm (cards) →
- * md (popovers/menus) → lg (dialogs/sheets).
+ * @theme — static values: Material 3 shape scale + elevation shadows.
+ * `rounded-*` utilities and `shadow-*` resolve from here.
  */
 @theme {
-  --shadow-xs: 0 1px 2px 0 rgb(31 41 51 / 0.04);
-  --shadow-sm:
-    0 2px 8px 0 rgb(31 41 51 / 0.04), 0 4px 12px 0 rgb(31 41 51 / 0.02);
-  --shadow-md:
-    0 0 1px 0 rgb(31 41 51 / 0.16), 0 4px 12px 0 rgb(31 41 51 / 0.06),
-    0 12px 32px 0 rgb(31 41 51 / 0.08);
-  --shadow-lg:
-    0 0 1px 0 rgb(31 41 51 / 0.18), 0 8px 16px -4px rgb(31 41 51 / 0.08),
-    0 24px 48px -12px rgb(31 41 51 / 0.12);
+  /* Material 3 shape scale (inner-tight, outer-soft) */
+  --radius-xs: 0.5rem; /* 8px */
+  --radius-sm: 0.625rem; /* 10px — badges / small */
+  --radius-md: 0.75rem; /* 12px — buttons / inputs */
+  --radius-lg: 0.875rem; /* 14px — lists / menu cells */
+  --radius-xl: 1rem; /* 16px — cards */
+  --radius-2xl: 1.25rem; /* 20px — panels */
+  --radius-3xl: 1.75rem; /* 28px — big surfaces */
+
+  /* Material 3 elevation tiers: low-contrast, tinted. Cards lift on hover. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 10px 24px -8px rgb(0 0 0 / 0.07);
+  --shadow-md: 0 2px 6px -1px rgb(0 0 0 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 4px 12px -2px rgb(0 0 0 / 0.1), 0 24px 56px -12px rgb(0 0 0 / 0.14);
   --default-transition-duration: 200ms;
 }
 
-/*
- * Design tokens. Colors keep the original Material-blue palette (#1565c0);
- * the "visual treatment" layer below (hairline borders, layered surfaces,
- * system font stack) moves the look toward DeepSeek Harness.
- */
+/* ===== Light: Material 3 roles ===== */
 :root {
-  --radius: 0.625rem;
-
-  --background: #f4f6f8;
-  --foreground: #1f2933;
+  --background: #f6f7f9;
+  --foreground: #1b1c1f;
   --card: #ffffff;
-  --card-foreground: #1f2933;
+  --card-foreground: #1b1c1f;
   --popover: #ffffff;
-  --popover-foreground: #1f2933;
+  --popover-foreground: #1b1c1f;
 
   --primary: #1565c0;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f5;
-  --secondary-foreground: #1f2933;
-  --muted: #f1f3f5;
-  --muted-foreground: #6b7280;
-  --accent: #e3f2fd;
-  --accent-foreground: #1565c0;
+  --primary-container: #d8e3ff;
+  --on-primary-container: #06325a;
+  --secondary: #5b6472;
+  --secondary-foreground: #ffffff;
+  --secondary-container: #dbe2ee;
+  --on-secondary-container: #2a3546;
+  --tertiary: #7c3aed;
+  --tertiary-foreground: #ffffff;
+  --tertiary-container: #eaddff;
+  --on-tertiary-container: #38156b;
+  --muted: #e9ebef;
+  --muted-foreground: #45474e;
+  --accent: #d8e3ff;
+  --accent-foreground: #06325a;
 
   --destructive: #dc2626;
-  /* hairline: same blue-grey family (#1f2933), lowered to a faint tint */
-  --border: rgb(31 41 51 / 0.1);
-  --input: rgb(31 41 51 / 0.14);
-  --ring: #2196f3;
+  --destructive-foreground: #ffffff;
+  --error-container: #f7d6d6;
+  --on-error: #ffffff;
+  --on-error-container: #6e1b1b;
+  --success: #0e8a5f;
+  --warning: #b26a00;
 
-  --chart-1: #2196f3;
+  --border: #c5c8d0;
+  --input: #73777f;
+  --ring: #1565c0;
+
+  --on-surface: #1b1c1f;
+  --on-surface-variant: #45474e;
+  --surface: #ffffff;
+  --surface-container-low: #f0f1f4;
+  --surface-container: #e9ebef;
+  --surface-container-high: #e3e5e9;
+  --surface-dim: #d8dbe0;
+  --outline: #73777f;
+  --outline-variant: #c5c8d0;
+  --inverse-surface: #303237;
+  --inverse-on-surface: #f1f2f5;
+
+  --chart-1: #1565c0;
   --chart-2: #7c3aed;
-  --chart-3: #10b981;
-  --chart-4: #f59e0b;
-  --chart-5: #ef4444;
+  --chart-3: #0e8a5f;
+  --chart-4: #b26a00;
+  --chart-5: #dc2626;
 
-  --log-debug: #6b7280;
-  --log-info: #2196f3;
-  --log-success: #10b981;
-  --log-warning: #f59e0b;
-  --log-error: #ef4444;
+  --log-debug: #45474e;
+  --log-info: #1565c0;
+  --log-success: #0e8a5f;
+  --log-warning: #b26a00;
+  --log-error: #dc2626;
   --log-critical: #d11149;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #1f2933;
+  --sidebar-foreground: #1b1c1f;
   --sidebar-primary: #1565c0;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e3f2fd;
-  --sidebar-accent-foreground: #1565c0;
-  --sidebar-border: rgb(31 41 51 / 0.08);
-  --sidebar-ring: #2196f3;
+  --sidebar-accent: #d8e3ff;
+  --sidebar-accent-foreground: #06325a;
+  --sidebar-border: #c5c8d0;
+  --sidebar-ring: #1565c0;
 
-  --scrollbar-thumb: rgb(31 41 51 / 0.14);
-  --scrollbar-thumb-hover: rgb(31 41 51 / 0.26);
+  /* Material 3 state layers */
+  --state-hover: rgba(27, 28, 31, 0.08);
+  --state-focus: rgba(27, 28, 31, 0.12);
+  --state-pressed: rgba(27, 28, 31, 0.12);
+  --state-selected: rgba(27, 28, 31, 0.08);
+  --state-onhover: rgba(255, 255, 255, 0.08);
+  --state-onpressed: rgba(255, 255, 255, 0.14);
+
+  --scrollbar-thumb: rgba(27, 28, 31, 0.16);
+  --scrollbar-thumb-hover: rgba(27, 28, 31, 0.28);
 }
 
+/* ===== Dark: Material 3 roles ===== */
 .dark {
-  /* three-tier surface ladder: base < card < popover */
-  --background: #0f1620;
-  --foreground: #e6e9ee;
-  --card: #161e2b;
-  --card-foreground: #e6e9ee;
-  --popover: #1c2736;
-  --popover-foreground: #e6e9ee;
+  --background: #121316;
+  --foreground: #e3e2e6;
+  --card: #1c1d21;
+  --card-foreground: #e3e2e6;
+  --popover: #202126;
+  --popover-foreground: #e3e2e6;
 
-  --primary: #2196f3;
-  --primary-foreground: #0b1220;
-  --secondary: #1f2937;
-  --secondary-foreground: #e6e9ee;
-  --muted: #1f2937;
-  --muted-foreground: #9aa4b2;
-  --accent: #18324a;
-  --accent-foreground: #90caf9;
+  --primary: #94c1fa;
+  --primary-foreground: #00315f;
+  --primary-container: #154a7c;
+  --on-primary-container: #d6e3fc;
+  --secondary: #b7c2d4;
+  --secondary-foreground: #1c2a3d;
+  --secondary-container: #3c4657;
+  --on-secondary-container: #dde2ec;
+  --tertiary: #cbb8f7;
+  --tertiary-foreground: #2a1457;
+  --tertiary-container: #4a3a6b;
+  --on-tertiary-container: #efe3ff;
+  --muted: #232529;
+  --muted-foreground: #c5c6d0;
+  --accent: #154a7c;
+  --accent-foreground: #d6e3fc;
 
-  --destructive: #ef4444;
-  --border: rgb(255 255 255 / 0.08);
-  --input: rgb(255 255 255 / 0.14);
-  --ring: #2196f3;
+  --destructive: #f2b8b5;
+  --destructive-foreground: #601410;
+  --error-container: #8c1d18;
+  --on-error: #601410;
+  --on-error-container: #f9dedc;
+  --success: #66bb9a;
+  --warning: #e0a55c;
 
-  --chart-1: #42a5f5;
-  --chart-2: #a78bfa;
-  --chart-3: #34d399;
-  --chart-4: #fbbf24;
-  --chart-5: #f87171;
+  --border: #43454c;
+  --input: #8b8f9a;
+  --ring: #94c1fa;
 
-  --log-debug: #9aa4b2;
-  --log-info: #42a5f5;
-  --log-success: #34d399;
-  --log-warning: #fbbf24;
-  --log-error: #f87171;
-  --log-critical: #f472b6;
+  --on-surface: #e3e2e6;
+  --on-surface-variant: #c5c6d0;
+  --surface: #1c1d21;
+  --surface-container-low: #1a1b1f;
+  --surface-container: #232529;
+  --surface-container-high: #2a2c31;
+  --surface-dim: #0e0f12;
+  --outline: #8b8f9a;
+  --outline-variant: #43454c;
+  --inverse-surface: #e3e2e6;
+  --inverse-on-surface: #303237;
 
-  --sidebar: #131a26;
-  --sidebar-foreground: #e6e9ee;
-  --sidebar-primary: #2196f3;
-  --sidebar-primary-foreground: #0b1220;
-  --sidebar-accent: #18324a;
-  --sidebar-accent-foreground: #90caf9;
-  --sidebar-border: rgb(255 255 255 / 0.06);
-  --sidebar-ring: #2196f3;
+  --chart-1: #94c1fa;
+  --chart-2: #cbb8f7;
+  --chart-3: #66bb9a;
+  --chart-4: #e0a55c;
+  --chart-5: #f2b8b5;
 
-  --scrollbar-thumb: rgb(255 255 255 / 0.14);
-  --scrollbar-thumb-hover: rgb(255 255 255 / 0.26);
+  --log-debug: #c5c6d0;
+  --log-info: #a6c9f5;
+  --log-success: #66bb9a;
+  --log-warning: #e0a55c;
+  --log-error: #f2b8b5;
+  --log-critical: #f47fb8;
+
+  --sidebar: #1a1b1f;
+  --sidebar-foreground: #e3e2e6;
+  --sidebar-primary: #94c1fa;
+  --sidebar-primary-foreground: #00315f;
+  --sidebar-accent: #154a7c;
+  --sidebar-accent-foreground: #d6e3fc;
+  --sidebar-border: #2c2e33;
+  --sidebar-ring: #94c1fa;
+
+  /* Material 3 state layers */
+  --state-hover: rgba(227, 226, 230, 0.08);
+  --state-focus: rgba(227, 226, 230, 0.12);
+  --state-pressed: rgba(227, 226, 230, 0.12);
+  --state-selected: rgba(227, 226, 230, 0.08);
+  --state-onhover: rgba(0, 0, 0, 0.1);
+  --state-onpressed: rgba(0, 0, 0, 0.16);
+
+  --scrollbar-thumb: rgba(227, 226, 230, 0.16);
+  --scrollbar-thumb-hover: rgba(227, 226, 230, 0.28);
 }
 
 @layer base {
@@ -218,6 +320,41 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
   }
+}
+
+/*
+ * Material 3 mechanics: interaction is a translucent state layer over the
+ * surface/color, not a background-color swap. Cards get a faint tonal tint.
+ *
+ * NOTE: these are intentionally UNLAYERED — author rules outside any @layer
+ * win over Tailwind's `@layer utilities` (e.g. bg-primary / bg-transparent),
+ * so the state layer reliably applies on hover/active.
+ */
+[data-slot="card"] {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--primary) 3%, transparent),
+    color-mix(in srgb, var(--primary) 3%, transparent)
+  );
+}
+
+/* Filled buttons: overlay via on-color state layer (hover/pressed) */
+[data-slot="button"].bg-primary:hover,
+[data-slot="button"].bg-secondary:hover,
+[data-slot="button"].bg-destructive:hover {
+  background-image: linear-gradient(var(--state-onhover), var(--state-onhover));
+}
+[data-slot="button"].bg-primary:active,
+[data-slot="button"].bg-secondary:active,
+[data-slot="button"].bg-destructive:active {
+  background-image: linear-gradient(var(--state-onpressed), var(--state-onpressed));
+}
+
+/* Ghost / outline buttons: neutral on-surface state layer */
+[data-slot="button"].bg-transparent:hover {
+  background-color: var(--state-hover);
+}
+[data-slot="button"].bg-transparent:active {
+  background-color: var(--state-pressed);
 }
 
 /* vue-sonner toasts: align normal toasts with the design tokens */
