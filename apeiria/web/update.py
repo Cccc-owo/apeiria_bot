@@ -188,6 +188,30 @@ async def update_preview(
     )
 
 
+@router.get("/preview/{ref}/locate")
+async def update_preview_locate(
+    ref: str,
+    commit: Annotated[str, Query(min_length=4)],
+    ref_type: Annotated[str, Query(alias="type", pattern="^(branch|tag)$")] = "branch",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> JSONResponse:
+    """Find the page that contains a commit short-hash in a ref's history."""
+    try:
+        log_ref, *_ = await _resolve_preview_ref(ref, ref_type)
+        _, log_full, _ = await _run_git("log", log_ref, "--format=%H")
+    except _GitError as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+
+    hashes = log_full.splitlines()
+    matches = [i for i, h in enumerate(hashes) if h.startswith(commit)]
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"在历史中未找到提交 '{commit}'")
+    idx = matches[0]
+    return JSONResponse(
+        content={"offset": (idx // limit) * limit, "page": idx // limit + 1}
+    )
+
+
 async def _maybe_fetch_ref(ref: str, ref_type: str, label: str) -> str:
     """Fetch a ref's remote-tracking data, but at most once per _REF_FETCH_TTL.
 

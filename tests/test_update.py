@@ -255,6 +255,39 @@ async def test_build_commit_list_paginates_with_offset(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_locate_returns_page_for_commit(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "fetch origin main": (0, "", ""),
+        "rev-parse --short origin/main": (0, "cafe123", ""),
+        "log -1 --format=%s origin/main": (0, "remote msg", ""),
+        "rev-list --count HEAD..origin/main": (0, "3", ""),
+        "log origin/main --format=%H": (
+            0,
+            "aaaaaaaa111122223333\nbbbbbbbb111122223333\ncccccccc111122223333\n"
+            "dddddddd111122223333",
+            "",
+        ),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    resp = await update.update_preview_locate("main", limit=2, commit="cccc")
+    assert resp.status_code == 200
+    data = json.loads(resp.body)
+    assert data["offset"] == 2
+    assert data["page"] == 2
+
+    with pytest.raises(update.HTTPException) as exc:
+        await update.update_preview_locate("main", limit=2, commit="zzzz")
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_execute_update_reset_failure_rolls_back(monkeypatch) -> None:
     from apeiria.jobs import git_update
 
