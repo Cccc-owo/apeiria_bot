@@ -118,7 +118,7 @@ onUnmounted(() => stopStream());
 <template>
   <Dialog :open="open" @update:open="(v) => !v && handleClose()">
     <DialogContent
-      class="max-w-lg max-h-[80vh] flex flex-col"
+      class="max-w-lg h-[min(72vh,600px)] min-h-[320px] flex flex-col overflow-hidden"
       :show-close-button="
         status === 'done' || status === 'error' || status === 'cancelled'
       "
@@ -145,7 +145,7 @@ onUnmounted(() => stopStream());
         </DialogDescription>
       </DialogHeader>
 
-      <ScrollArea class="flex-1 min-h-[200px] max-h-[50vh] rounded-md border bg-black p-3">
+      <ScrollArea class="flex-1 min-h-0 overflow-hidden rounded-md border bg-black p-3">
         <pre
           class="font-mono text-xs text-green-400 whitespace-pre-wrap break-all leading-relaxed"
         ><template v-for="(line, i) in lines" :key="i">{{ line + '\n' }}</template><span
