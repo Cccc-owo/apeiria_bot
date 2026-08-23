@@ -358,6 +358,7 @@ function confirmUninstall() {
             <TableHead>{{ $t("plugins.description") }}</TableHead>
             <TableHead>{{ $t("plugins.type") }}</TableHead>
             <TableHead>{{ $t("plugins.source") }}</TableHead>
+            <TableHead>{{ $t("plugins.version") }}</TableHead>
             <TableHead>{{ $t("plugins.enabled") }}</TableHead>
             <TableHead class="text-right">{{
               $t("plugins.actions")
@@ -366,19 +367,19 @@ function confirmUninstall() {
         </TableHeader>
         <TableBody>
           <TableRow v-if="isLoading">
-            <TableCell colspan="6" class="py-4">
+            <TableCell colspan="7" class="py-4">
               <div class="space-y-2">
                 <Skeleton v-for="i in 4" :key="i" class="h-9 w-full" />
               </div>
             </TableCell>
           </TableRow>
           <TableRow v-else-if="!data || !data.plugins.length">
-            <TableCell colspan="6" class="text-center text-muted-foreground">
+            <TableCell colspan="7" class="text-center text-muted-foreground">
               {{ $t("plugins.empty") }}
             </TableCell>
           </TableRow>
           <TableRow v-else-if="!filteredPlugins.length">
-            <TableCell colspan="6" class="text-center text-muted-foreground">
+            <TableCell colspan="7" class="text-center text-muted-foreground">
               {{ $t("plugins.noMatch") }}
             </TableCell>
           </TableRow>
@@ -422,6 +423,12 @@ function confirmUninstall() {
             </TableCell>
             <TableCell :data-label="$t('plugins.source')">
               <Badge variant="secondary">{{ p.source }}</Badge>
+            </TableCell>
+            <TableCell
+              class="whitespace-nowrap font-mono text-xs"
+              :data-label="$t('plugins.version')"
+            >
+              {{ p.installed_version || "—" }}
             </TableCell>
             <TableCell :data-label="$t('plugins.enabled')">
               <TooltipProvider v-if="!p.can_disable" :delay-duration="200">

@@ -279,6 +279,7 @@ function confirmUninstall() {
             <TableHead>{{ $t("adapters.name") }}</TableHead>
             <TableHead>{{ $t("adapters.moduleName") }}</TableHead>
             <TableHead>{{ $t("adapters.source") }}</TableHead>
+            <TableHead>{{ $t("adapters.version") }}</TableHead>
             <TableHead>{{ $t("adapters.enabled") }}</TableHead>
             <TableHead class="text-right">{{
               $t("adapters.actions")
@@ -287,14 +288,14 @@ function confirmUninstall() {
         </TableHeader>
         <TableBody>
           <TableRow v-if="isLoading">
-            <TableCell colspan="5" class="py-4">
+            <TableCell colspan="6" class="py-4">
               <div class="space-y-2">
                 <Skeleton v-for="i in 4" :key="i" class="h-9 w-full" />
               </div>
             </TableCell>
           </TableRow>
           <TableRow v-else-if="!data || !data.adapters.length">
-            <TableCell colspan="5" class="text-center text-muted-foreground">
+            <TableCell colspan="6" class="text-center text-muted-foreground">
               {{ $t("adapters.empty") }}
             </TableCell>
           </TableRow>
@@ -318,6 +319,12 @@ function confirmUninstall() {
             </TableCell>
             <TableCell :data-label="$t('adapters.source')">
               <Badge variant="secondary">{{ a.source }}</Badge>
+            </TableCell>
+            <TableCell
+              class="whitespace-nowrap font-mono text-xs"
+              :data-label="$t('adapters.version')"
+            >
+              {{ a.installed_version || "—" }}
             </TableCell>
             <TableCell :data-label="$t('adapters.enabled')">
               <Switch
