@@ -111,6 +111,7 @@ watch(
 );
 
 function onSend() {
+  if (!draft.value.trim()) return;
   send(draft.value, pendingImage.value ?? undefined);
   draft.value = "";
   pendingImage.value = null;
@@ -448,7 +449,10 @@ function avatarText(m: WebchatMessage): string {
             @keydown="onKeydown"
           />
         </div>
-        <Button :disabled="!connected || !currentConversation" @click="onSend">
+        <Button
+          :disabled="!connected || !currentConversation || !draft.trim()"
+          @click="onSend"
+        >
           <Send class="size-4" />
           {{ $t("webchat.send") }}
         </Button>
