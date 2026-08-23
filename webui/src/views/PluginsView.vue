@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { ArrowUpCircle, Info, Plus, RefreshCw, Settings2, Trash2, X } from "@lucide/vue";
+import { ArrowUpCircle, Info, Plus, RefreshCw, Search, Settings2, Trash2, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import ConfigEditor from "@/components/ConfigEditor.vue";
 import ErrorState from "@/components/ErrorState.vue";
@@ -65,6 +65,33 @@ const { pendingChanges, markChanged, clearChanges } = usePendingChanges();
 const { data, isLoading, isError, error, refetch } = usePluginsQuery();
 void isLoading;
 const { install, uninstall, setState, update, checkUpdates } = usePluginMutations();
+
+const searchQuery = ref("");
+const statusFilter = ref<"all" | "enabled" | "disabled">("all");
+const sourceFilter = ref("all");
+
+const sources = computed(() => {
+  const set = new Set<string>();
+  for (const p of data.value?.plugins ?? []) {
+    if (p.source) set.add(p.source);
+  }
+  return Array.from(set).sort();
+});
+
+const filteredPlugins = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  return (data.value?.plugins ?? []).filter((p) => {
+    if (statusFilter.value === "enabled" && !p.enabled) return false;
+    if (statusFilter.value === "disabled" && p.enabled) return false;
+    if (sourceFilter.value !== "all" && p.source !== sourceFilter.value) return false;
+    if (q) {
+      const hay =
+        `${p.name} ${p.display_name ?? ""} ${p.module} ${p.description ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+});
 
 const updates = ref<Record<string, UpdateInfo>>({});
 const updateOpen = ref(false);
@@ -279,6 +306,50 @@ function confirmUninstall() {
       @retry="() => refetch()"
     />
 
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+      <div class="relative min-w-56 flex-1 sm:max-w-xs">
+        <Search
+          class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          v-model="searchQuery"
+          :placeholder="$t('plugins.searchPlaceholder')"
+          class="pl-9"
+          :aria-label="$t('plugins.searchPlaceholder')"
+        />
+      </div>
+      <Select v-model="statusFilter">
+        <SelectTrigger class="w-36" :aria-label="$t('plugins.statusFilter')">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{
+            $t("plugins.statusAll")
+          }}</SelectItem>
+          <SelectItem value="enabled">{{
+            $t("plugins.statusEnabled")
+          }}</SelectItem>
+          <SelectItem value="disabled">{{
+            $t("plugins.statusDisabled")
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select v-model="sourceFilter">
+        <SelectTrigger class="w-36" :aria-label="$t('plugins.sourceFilter')">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{{
+            $t("plugins.sourceAll")
+          }}</SelectItem>
+          <SelectItem v-for="s in sources" :key="s" :value="s">{{
+            s
+          }}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
     <div class="rounded-xl border bg-card shadow-sm">
       <Table>
         <TableHeader>
@@ -306,7 +377,12 @@ function confirmUninstall() {
               {{ $t("plugins.empty") }}
             </TableCell>
           </TableRow>
-          <TableRow v-for="p in data?.plugins ?? []" :key="p.name">
+          <TableRow v-else-if="!filteredPlugins.length">
+            <TableCell colspan="6" class="text-center text-muted-foreground">
+              {{ $t("plugins.noMatch") }}
+            </TableCell>
+          </TableRow>
+          <TableRow v-for="p in filteredPlugins" :key="p.name">
             <TableCell>
               <div class="flex items-center gap-2">
                 <span class="font-medium">{{ p.display_name || p.name }}</span>
