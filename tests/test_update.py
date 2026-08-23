@@ -9,6 +9,15 @@ from apeiria.jobs.base import JobRunner, JobStatus
 from apeiria.jobs.git_update import GitUpdateJob
 
 
+@pytest.fixture(autouse=True)
+def _reset_update_caches():
+    from apeiria.web import update
+
+    update._ref_fetch_cache.clear()
+    update._refs_cache["fetched_at"] = 0.0
+    yield
+
+
 async def _wait_terminal(runner: JobRunner, job_id: str, max_wait: float = 2.0) -> dict:
     deadline = asyncio.get_running_loop().time() + max_wait
     while asyncio.get_running_loop().time() < deadline:
@@ -59,6 +68,7 @@ async def test_update_preview_falls_back_to_cached_ref(monkeypatch) -> None:
         "rev-parse --short origin/main": (0, "cafe123", ""),
         "log -1 --format=%s origin/main": (0, "remote msg", ""),
         "rev-list --count HEAD..origin/main": (0, "3", ""),
+        "rev-list --count origin/main": (0, "42", ""),
         "log origin/main --format=%H|%h|%s|%an|%aI -n 20": (0, "", ""),
         "rev-parse --short HEAD": (0, "deadbee", ""),
         "log -1 --format=%s": (0, "local msg", ""),
@@ -76,6 +86,9 @@ async def test_update_preview_falls_back_to_cached_ref(monkeypatch) -> None:
     data = json.loads(resp.body)
     assert data["remote_commit_hash"] == "cafe123"
     assert data["fetch_warning"] == "Fetch 失败: offline"
+    assert data["total"] == 42
+    assert data["offset"] == 0
+    assert data["limit"] == 20
 
 
 @pytest.mark.asyncio
@@ -177,7 +190,7 @@ async def test_build_commit_list_detects_diverged_local_only(monkeypatch) -> Non
 
 
 @pytest.mark.asyncio
-async def test_build_commit_list_filters_common_ancestors(monkeypatch) -> None:
+async def test_build_commit_list_keeps_history_with_direction(monkeypatch) -> None:
     from apeiria.web import update
 
     responses: dict[str, tuple[int, str, str]] = {
@@ -203,7 +216,42 @@ async def test_build_commit_list_filters_common_ancestors(monkeypatch) -> None:
 
     commits, _, _ = await update._build_commit_list("origin/main")
 
-    assert [c["hash"] for c in commits] == ["remote"]
+    # The full history is kept (not filtered to ahead/current only), so a common
+    # ancestor is still listed, tagged as "behind" (a valid rollback target).
+    assert [c["hash"] for c in commits] == ["remote", "common"]
+    assert commits[0]["direction"] == "ahead"
+    assert commits[1]["direction"] == "behind"
+
+
+@pytest.mark.asyncio
+async def test_build_commit_list_paginates_with_offset(monkeypatch) -> None:
+    from apeiria.web import update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "log origin/main --format=%H|%h|%s|%an|%aI --skip 20 -n 10": (
+            0,
+            "full_pag|pag|pag msg|author|2026-01-01T00:00:00+08:00",
+            "",
+        ),
+        "rev-parse HEAD": (0, "full_local", ""),
+        "rev-list origin/main --not HEAD": (0, "", ""),
+        "log HEAD --not origin/main --format=%H|%h|%s|%an|%aI -n 20": (
+            0,
+            "",
+            "",
+        ),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    monkeypatch.setattr(update, "_run_git", fake_run_git)
+
+    commits, _, _ = await update._build_commit_list("origin/main", offset=20, limit=10)
+
+    assert len(commits) == 1
+    assert commits[0]["hash"] == "pag"
+    assert commits[0]["direction"] == "behind"
 
 
 @pytest.mark.asyncio
@@ -288,3 +336,121 @@ async def test_execute_update_sync_failure_rolls_back(monkeypatch) -> None:
         event.get("stage") == "rollback" and "回滚完成" in event.get("line", "")
         for event in events
     )
+
+
+@pytest.mark.asyncio
+async def test_execute_update_blocks_when_dirty_and_block_strategy(
+    monkeypatch,
+) -> None:
+    from apeiria.jobs import git_update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "status --porcelain": (0, " M apeiria/web/update.py", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    async def fake_sync(_job: object, _cwd: object) -> int:
+        return 0
+
+    monkeypatch.setattr(git_update, "_run_git", fake_run_git)
+    monkeypatch.setattr(git_update, "run_uv_sync", fake_sync)
+
+    runner = JobRunner()
+    job = GitUpdateJob("main", restart=False)
+    queue = job.subscribe()
+    job_id = await runner.start(job)
+    await _wait_terminal(runner, job_id)
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    assert any(
+        event["type"] == "error" and "工作区存在未提交" in event["message"]
+        for event in events
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_update_stash_then_restore(monkeypatch) -> None:
+    from apeiria.jobs import git_update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "status --porcelain": (0, " M apeiria/web/update.py\n?? .tools/", ""),
+        "rev-parse HEAD": (0, "originalcommit", ""),
+        "branch --show-current": (0, "main", ""),
+        "stash push --include-untracked -m apeiria-update": (
+            0,
+            "Saved working directory and index state",
+            "",
+        ),
+        "checkout main": (0, "Already on 'main'", ""),
+        "fetch origin main": (0, "", ""),
+        "reset --hard origin/main": (0, "", ""),
+        "stash pop": (0, "Dropped refs/stash@{0}", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    async def fake_sync(_job: object, _cwd: object) -> int:
+        return 0
+
+    monkeypatch.setattr(git_update, "_run_git", fake_run_git)
+    monkeypatch.setattr(git_update, "run_uv_sync", fake_sync)
+
+    runner = JobRunner()
+    job = GitUpdateJob("main", restart=False, dirty_strategy="stash")
+    queue = job.subscribe()
+    job_id = await runner.start(job)
+    await _wait_terminal(runner, job_id)
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    assert any(
+        event.get("stage") == "stash" and "Saved" in event.get("line", "")
+        for event in events
+    )
+    assert any(
+        event.get("stage") == "stash" and "Dropped" in event.get("line", "")
+        for event in events
+    )
+    assert any(event["type"] == "done" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_execute_update_discard_proceeds(monkeypatch) -> None:
+    from apeiria.jobs import git_update
+
+    responses: dict[str, tuple[int, str, str]] = {
+        "status --porcelain": (0, " M apeiria/web/update.py", ""),
+        "rev-parse HEAD": (0, "originalcommit", ""),
+        "branch --show-current": (0, "main", ""),
+        "checkout main": (0, "Already on 'main'", ""),
+        "fetch origin main": (0, "", ""),
+        "reset --hard origin/main": (0, "", ""),
+    }
+
+    async def fake_run_git(*args: str, **_kwargs: object) -> tuple[int, str, str]:
+        return responses.get(" ".join(args), (0, "", ""))
+
+    async def fake_sync(_job: object, _cwd: object) -> int:
+        return 0
+
+    monkeypatch.setattr(git_update, "_run_git", fake_run_git)
+    monkeypatch.setattr(git_update, "run_uv_sync", fake_sync)
+
+    runner = JobRunner()
+    job = GitUpdateJob("main", restart=False, dirty_strategy="discard")
+    queue = job.subscribe()
+    job_id = await runner.start(job)
+    await _wait_terminal(runner, job_id)
+
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    # Discard strategy runs without stashing and completes.
+    assert not any(event.get("stage") == "stash" for event in events)
+    assert any(event["type"] == "done" for event in events)

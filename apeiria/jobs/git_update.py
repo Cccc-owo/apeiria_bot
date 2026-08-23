@@ -32,7 +32,7 @@ async def _run_git(*args: str, cwd: Path | None = None) -> tuple[int, str, str]:
 class GitUpdateJob(Job):
     """Self-update a git checkout and restart the bot."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         branch: str,
         commit: str | None = None,
@@ -40,6 +40,7 @@ class GitUpdateJob(Job):
         ref_type: str = "branch",
         project_root: Path | None = None,
         restart: bool = True,
+        dirty_strategy: str = "block",
     ) -> None:
         super().__init__(kind="git_update", lock_name="git")
         self.branch = branch
@@ -47,8 +48,10 @@ class GitUpdateJob(Job):
         self.ref_type = ref_type
         self.project_root = project_root or Path.cwd()
         self.restart = restart
+        self.dirty_strategy = dirty_strategy
         self._original_branch: str | None = None
         self._original_commit: str | None = None
+        self._stash_created = False
 
     def _emit_stage(self, stage: str, line: str) -> None:
         self.emit({"type": "stage", "stage": stage, "line": line})
@@ -60,7 +63,8 @@ class GitUpdateJob(Job):
 
     async def run(self) -> None:
         rc, dirty, _ = await _run_git("status", "--porcelain", cwd=self.project_root)
-        if rc == 0 and dirty:
+        has_dirty = rc == 0 and bool(dirty)
+        if has_dirty and self.dirty_strategy == "block":
             raise JobError(_DIRTY_BLOCK_MESSAGE)
 
         _, self._original_commit, _ = await _run_git(
@@ -78,6 +82,10 @@ class GitUpdateJob(Job):
             (self._original_commit or "")[:7],
         )
 
+        if has_dirty and self.dirty_strategy == "stash":
+            await self._stash_dirty_changes()
+            self.rollback_needed = True
+
         if self.ref_type == "tag":
             await self._run_tag_update()
         else:
@@ -87,6 +95,9 @@ class GitUpdateJob(Job):
         if rc != 0:
             msg = f"uv sync 返回码: {rc}"
             raise JobError(msg)
+
+        if self._stash_created:
+            await self._restore_stash()
 
         self._emit_stage("done", "更新完成，即将重启...")
         logger.success(
@@ -100,6 +111,34 @@ class GitUpdateJob(Job):
 
             await asyncio.sleep(0.8)
             await graceful_restart()
+
+    async def _stash_dirty_changes(self) -> None:
+        self._emit_stage("stash", "$ git stash push --include-untracked")
+        rc, out, err = await _run_git(
+            "stash",
+            "push",
+            "--include-untracked",
+            "-m",
+            "apeiria-update",
+            cwd=self.project_root,
+        )
+        if rc != 0:
+            raise JobError(f"暂存未提交变更失败: {err or out}")  # noqa: TRY003
+        self._stash_created = True
+        self._emit_stage("stash", out or "已暂存未提交变更，更新后将恢复")
+
+    async def _restore_stash(self) -> None:
+        if not self._stash_created:
+            return
+        self._emit_stage("stash", "$ git stash pop")
+        rc, out, err = await _run_git("stash", "pop", cwd=self.project_root)
+        if rc != 0:
+            # Leave the stash intact so no work is lost; surface the problem.
+            logger.warning("恢复暂存变更失败: {}", err or out)
+            self._emit_stage("stash", f"恢复暂存变更失败: {err or out}")
+            return
+        self._stash_created = False
+        self._emit_stage("stash", out or "已恢复暂存的变更")
 
     async def _run_branch_update(self) -> None:
         self._emit_stage("checkout", f"$ git checkout {self.branch}")
@@ -191,6 +230,9 @@ class GitUpdateJob(Job):
         if rc != 0:
             msg = f"回滚 reset 失败: {err}"
             raise JobError(msg)
+
+        if self._stash_created:
+            await self._restore_stash()
 
         self._emit_stage("rollback", "回滚完成")
         logger.info("Rollback complete")
