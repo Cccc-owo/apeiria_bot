@@ -4,6 +4,10 @@ import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import {
   AlertTriangle,
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
   GitBranch,
   GitCommit as GitCommitIcon,
   Loader2,
@@ -18,6 +22,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -26,6 +39,14 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type {
   GitCommit,
   TaskEvent,
@@ -42,6 +63,19 @@ const statusError = ref("");
 const preview = ref<UpdatePreviewResponse | null>(null);
 const previewLoading = ref(false);
 
+const PAGE_SIZE = 10;
+const commitRows = ref<GitCommit[]>([]);
+const commitsTotal = ref(0);
+const page = ref(1);
+const jumpInput = ref("");
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(commitsTotal.value / PAGE_SIZE)),
+);
+const hasPrev = computed(() => page.value > 1);
+const hasNext = computed(() => page.value < totalPages.value);
+const hasCommits = computed(() => commitRows.value.length > 0);
+
 const sourceType = ref<"branch" | "tag">("branch");
 const selectedRef = ref("");
 
@@ -56,6 +90,29 @@ const updateTaskId = ref("");
 const polling = ref(false);
 const terminalEl = ref<HTMLElement | null>(null);
 let updateClient: SseClient | null = null;
+
+const confirmOpen = ref(false);
+const pendingCommit = ref<string | null>(null);
+
+const hasTrackedChanges = computed(
+  () => !!status.value?.has_tracked_changes,
+);
+const dirtyOnlyUntracked = computed(
+  () => !!status.value?.is_dirty && !status.value?.has_tracked_changes,
+);
+
+const pendingCommitInfo = computed<GitCommit | null>(() => {
+  if (!pendingCommit.value || !preview.value) return null;
+  return (
+    preview.value.commits.find((c) => c.hash === pendingCommit.value) ?? null
+  );
+});
+
+function requestExecute(commit: string) {
+  if (executing.value) return;
+  pendingCommit.value = commit;
+  confirmOpen.value = true;
+}
 
 async function fetchStatus() {
   statusLoading.value = true;
@@ -72,20 +129,79 @@ async function fetchStatus() {
   }
 }
 
-async function fetchPreview() {
+async function fetchPage(target: number) {
+  const data = await api.update.preview(
+    selectedRef.value,
+    sourceType.value,
+    (target - 1) * PAGE_SIZE,
+    PAGE_SIZE,
+  );
+  preview.value = data;
+  commitRows.value = data.commits;
+  commitsTotal.value = data.total;
+  page.value = target;
+}
+
+async function loadPage(target: number) {
   if (!selectedRef.value) return;
   previewLoading.value = true;
-  preview.value = null;
   try {
-    preview.value = await api.update.preview(
-      selectedRef.value,
-      sourceType.value,
-    );
+    await fetchPage(target);
   } catch {
-    preview.value = null;
+    // Keep the current page rows; the paginator lets the user retry.
   } finally {
     previewLoading.value = false;
   }
+}
+
+async function fetchPreview() {
+  if (!selectedRef.value) return;
+  preview.value = null;
+  commitRows.value = [];
+  commitsTotal.value = 0;
+  page.value = 1;
+  await loadPage(1);
+}
+
+function goToPage(target: number) {
+  if (previewLoading.value || target < 1 || target > totalPages.value) return;
+  if (target === page.value) return;
+  void loadPage(target);
+}
+
+function goFirst() {
+  if (page.value !== 1) void loadPage(1);
+}
+
+function goLast() {
+  if (page.value !== totalPages.value) void loadPage(totalPages.value);
+}
+
+async function jumpByHash(hash: string) {
+  if (!selectedRef.value || previewLoading.value) return;
+  try {
+    const res = await api.update.locate(
+      selectedRef.value,
+      hash,
+      sourceType.value,
+      PAGE_SIZE,
+    );
+    goToPage(res.page);
+    jumpInput.value = "";
+  } catch {
+    toast.error(t("update.commitNotFound"));
+  }
+}
+
+function onJump() {
+  const value = jumpInput.value.trim();
+  if (!value || previewLoading.value) return;
+  const asPage = Number(value);
+  if (Number.isInteger(asPage) && asPage >= 1) {
+    goToPage(asPage);
+    return;
+  }
+  void jumpByHash(value);
 }
 
 watch(selectedRef, () => fetchPreview());
@@ -110,6 +226,10 @@ const dirtyFiles = computed(() => {
   return status.value.dirty_files;
 });
 
+const fetchWarning = computed(
+  () => status.value?.fetch_warning || preview.value?.fetch_warning || "",
+);
+
 const sourceOptions = computed(() => {
   if (!status.value) return [];
   return sourceType.value === "branch"
@@ -120,7 +240,6 @@ const sourceOptions = computed(() => {
 function canExecuteRow(hash: string): boolean {
   return !!(
     status.value &&
-    !status.value.is_dirty &&
     !executing.value &&
     !updateDone.value &&
     hash !== status.value.commit_hash
@@ -144,6 +263,7 @@ function stageLabel(s: string): string {
     pull: t("update.pull"),
     sync: t("update.sync"),
     rollback: t("update.rollback"),
+    stash: t("update.stash"),
     error: t("update.failed"),
     done: t("update.success"),
   };
@@ -157,7 +277,7 @@ async function scrollTerminal() {
   }
 }
 
-async function executeUpdate(commit: string) {
+async function executeUpdate(commit: string, dirtyStrategy: "stash" | "discard" | "block") {
   if (!selectedRef.value || executing.value) return;
   executing.value = true;
   cancelling.value = false;
@@ -206,12 +326,41 @@ async function executeUpdate(commit: string) {
       terminalLines.value.push(`Connection lost: ${err.message}`);
       updateFailed.value = true;
     },
+    dirtyStrategy,
   );
 
   await updateClient.done;
   executing.value = false;
   cancelling.value = false;
   updateClient = null;
+}
+
+function onConfirmOpen(v: boolean) {
+  confirmOpen.value = v;
+  if (!v) pendingCommit.value = null;
+}
+
+function confirmStashAndRun() {
+  const commit = pendingCommit.value;
+  confirmOpen.value = false;
+  pendingCommit.value = null;
+  if (commit) void executeUpdate(commit, "stash");
+}
+
+function confirmDiscardAndRun() {
+  const commit = pendingCommit.value;
+  confirmOpen.value = false;
+  pendingCommit.value = null;
+  if (commit) void executeUpdate(commit, "discard");
+}
+
+function confirmRun() {
+  const commit = pendingCommit.value;
+  confirmOpen.value = false;
+  pendingCommit.value = null;
+  // No tracked changes: proceed directly; untracked files are left untouched by
+  // `git reset --hard`, so "discard" here simply means "run without stashing".
+  if (commit) void executeUpdate(commit, "discard");
 }
 
 function pollUntilUp() {
@@ -282,7 +431,21 @@ fetchStatus();
       @retry="fetchStatus()"
     />
 
-    <template v-else>
+    <div v-else class="flex min-h-0 flex-1 flex-col gap-5">
+      <!-- Remote refresh warning -->
+      <div
+        v-if="fetchWarning"
+        class="flex items-start gap-2 rounded-md border border-yellow-600/40 bg-yellow-600/10 p-3"
+      >
+        <AlertTriangle class="mt-0.5 size-4 shrink-0 text-yellow-500" />
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-medium text-yellow-500">
+            {{ t("update.fetchWarning") }}
+          </p>
+          <p class="mt-1 text-xs text-yellow-400/80">{{ fetchWarning }}</p>
+        </div>
+      </div>
+
       <!-- Status Card -->
       <Card class="flex-none">
         <CardHeader>
@@ -315,7 +478,17 @@ fetchStatus();
               <AlertTriangle class="mt-0.5 size-4 shrink-0 text-yellow-500" />
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-yellow-500">
-                  {{ t("update.dirtyWarning") }}
+                  {{
+                    hasTrackedChanges
+                      ? t("update.dirtyWarning")
+                      : t("update.untrackedOnly")
+                  }}
+                </p>
+                <p
+                  v-if="hasTrackedChanges"
+                  class="mt-1 text-xs text-yellow-500/80"
+                >
+                  {{ t("update.dirtyHint") }}
                 </p>
                 <p class="mt-1 text-xs font-medium text-yellow-400/80">
                   {{ t("update.dirtyFiles") }}:
@@ -324,7 +497,7 @@ fetchStatus();
                   <li
                     v-for="f in dirtyFiles"
                     :key="f"
-                    class="font-mono text-xs text-yellow-300/80 truncate"
+                    class="truncate font-mono text-xs text-yellow-300/80"
                   >
                     {{ f }}
                   </li>
@@ -366,10 +539,13 @@ fetchStatus();
                   : t("update.selectTag")
               }}:
             </label>
+            <template v-if="statusLoading">
+              <Skeleton class="h-9 w-56" />
+            </template>
             <Select
-              v-if="sourceOptions.length > 0"
+              v-else-if="sourceOptions.length > 0"
               v-model="selectedRef"
-              :disabled="status?.is_dirty || executing"
+              :disabled="executing"
             >
               <SelectTrigger class="w-56">
                 <SelectValue />
@@ -390,14 +566,14 @@ fetchStatus();
           </div>
 
           <!-- Commit List Table -->
-          <div v-if="previewLoading" class="space-y-2">
+          <div v-if="previewLoading && commitRows.length === 0" class="space-y-2">
             <Skeleton class="h-4 w-full" />
             <Skeleton class="h-4 w-3/4" />
             <Skeleton class="h-4 w-5/6" />
           </div>
-          <template v-else-if="preview && preview.commits.length > 0">
+          <template v-else-if="preview && hasCommits">
             <p class="text-sm font-medium text-muted-foreground">
-              {{ t("update.selectCommit") }} ({{ preview.commits.length }})
+              {{ t("update.selectCommit") }} ({{ commitsTotal }})
             </p>
             <div
               v-if="
@@ -424,35 +600,35 @@ fetchStatus();
                 </ul>
               </div>
             </div>
-            <div class="max-h-80 overflow-auto rounded-md border">
-              <table class="w-full text-xs">
-                <thead class="sticky top-0 bg-muted">
-                  <tr class="text-left text-muted-foreground">
-                    <th class="px-3 py-2">Commit</th>
-                    <th class="px-3 py-2">{{ t("update.commitMessage") }}</th>
-                    <th class="hidden px-3 py-2 sm:table-cell">
+            <Table class="max-h-80 overflow-auto rounded-md border">
+              <TableHeader
+                class="sticky top-0 z-10 bg-muted"
+              >
+                  <TableRow class="hover:bg-transparent">
+                    <TableHead class="px-3 py-2">Commit</TableHead>
+                    <TableHead class="px-3 py-2">
+                      {{ t("update.commitMessage") }}
+                    </TableHead>
+                    <TableHead class="hidden px-3 py-2 sm:table-cell">
                       {{ t("update.commitAuthor") }}
-                    </th>
-                    <th class="hidden px-3 py-2 sm:table-cell">
+                    </TableHead>
+                    <TableHead class="hidden px-3 py-2 sm:table-cell">
                       {{ t("update.commitDate") }}
-                    </th>
-                    <th class="w-24 px-3 py-2 text-center">
+                    </TableHead>
+                    <TableHead class="w-24 px-3 py-2 text-center">
                       {{ t("update.action") }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="c in preview.commits"
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow
+                    v-for="c in commitRows"
                     :key="c.hash"
-                    :class="[
-                      'border-t transition-colors',
-                      isCurrentCommit(c.hash)
-                        ? 'bg-emerald-500/5'
-                        : 'hover:bg-muted/30',
-                    ]"
+                    :class="
+                      isCurrentCommit(c.hash) ? 'bg-emerald-500/5' : ''
+                    "
                   >
-                    <td class="whitespace-nowrap px-3 py-2 font-mono">
+                    <TableCell class="whitespace-nowrap px-3 py-2 font-mono">
                       <code>{{ c.hash }}</code>
                       <Badge
                         v-if="isCurrentCommit(c.hash)"
@@ -461,33 +637,103 @@ fetchStatus();
                       >
                         {{ t("update.currentLabel") }}
                       </Badge>
-                    </td>
-                    <td class="max-w-64 truncate px-3 py-2">{{ c.message }}</td>
-                    <td
+                    </TableCell>
+                    <TableCell class="max-w-64 truncate px-3 py-2">
+                      {{ c.message }}
+                    </TableCell>
+                    <TableCell
                       class="hidden px-3 py-2 text-muted-foreground sm:table-cell"
                     >
                       {{ c.author }}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       class="hidden whitespace-nowrap px-3 py-2 text-muted-foreground sm:table-cell"
                     >
                       {{ formatDate(c.date) }}
-                    </td>
-                    <td class="px-2 py-1 text-center">
+                    </TableCell>
+                    <TableCell class="px-2 py-1 text-center">
                       <Button
                         v-if="!isCurrentCommit(c.hash)"
                         size="sm"
                         variant="outline"
                         :disabled="!canExecuteRow(c.hash)"
-                        @click.stop="executeUpdate(c.hash)"
+                        @click.stop="requestExecute(c.hash)"
                       >
                         {{ buttonLabel(c) }}
                       </Button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                      <span v-else class="text-xs text-muted-foreground">—</span>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+              <div
+                v-if="totalPages > 1"
+                class="mt-2 flex flex-wrap items-center justify-between gap-2"
+              >
+                <div class="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    :aria-label="t('update.firstPage')"
+                    :disabled="!hasPrev || previewLoading"
+                    @click="goFirst"
+                  >
+                    <ChevronFirst class="size-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    :aria-label="t('update.prevPage')"
+                    :disabled="!hasPrev || previewLoading"
+                    @click="goToPage(page - 1)"
+                  >
+                    <ChevronLeft class="size-4" />
+                  </Button>
+                  <span
+                    class="min-w-24 text-center text-sm text-muted-foreground"
+                  >
+                    <Loader2
+                      v-if="previewLoading"
+                      class="mr-1 inline-block size-3.5 animate-spin"
+                    />
+                    {{ t("update.pageIndicator", { page, total: totalPages }) }}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    :aria-label="t('update.nextPage')"
+                    :disabled="!hasNext || previewLoading"
+                    @click="goToPage(page + 1)"
+                  >
+                    <ChevronRight class="size-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    :aria-label="t('update.lastPage')"
+                    :disabled="!hasNext || previewLoading"
+                    @click="goLast"
+                  >
+                    <ChevronLast class="size-4" />
+                  </Button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Input
+                    v-model="jumpInput"
+                    class="h-8 w-44"
+                    :placeholder="t('update.jumpPlaceholder')"
+                    @keydown.enter="onJump"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="previewLoading || !jumpInput.trim()"
+                    @click="onJump"
+                  >
+                    {{ t("update.jump") }}
+                  </Button>
+                </div>
+              </div>
           </template>
           <p v-else-if="preview" class="text-sm text-muted-foreground">
             {{ t("update.noCommits") }}
@@ -555,6 +801,68 @@ fetchStatus();
         >{{ t("update.cancelled") }}</span>
         <span v-else class="text-emerald-500">{{ t("update.success") }}</span>
       </div>
-    </template>
+    </div>
+
+    <!-- Dangerous-action confirmation -->
+    <Dialog :open="confirmOpen" @update:open="onConfirmOpen">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{{ t("update.confirmTitle") }}</DialogTitle>
+          <DialogDescription>
+            <template v-if="pendingCommitInfo">
+              <span class="font-medium">{{ buttonLabel(pendingCommitInfo) }}</span>
+              <code class="ml-1 font-mono text-xs">{{ pendingCommitInfo.hash }}</code>
+              <span class="ml-1 text-xs text-muted-foreground">
+                {{ pendingCommitInfo.message }}
+              </span>
+            </template>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div
+          v-if="hasTrackedChanges"
+          class="flex items-start gap-2 rounded-md border border-yellow-600/40 bg-yellow-600/10 p-3"
+        >
+          <AlertTriangle class="mt-0.5 size-4 shrink-0 text-yellow-500" />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-yellow-500">
+              {{ t("update.dirtyConfirmMsg") }}
+            </p>
+            <p class="mt-1 text-xs text-yellow-500/80">
+              {{ t("update.dirtyHint") }}
+            </p>
+          </div>
+        </div>
+        <div
+          v-else-if="dirtyOnlyUntracked"
+          class="flex items-start gap-2 rounded-md border border-yellow-600/40 bg-yellow-600/10 p-3"
+        >
+          <AlertTriangle class="mt-0.5 size-4 shrink-0 text-yellow-500" />
+          <p class="text-sm text-yellow-500">{{ t("update.untrackedNote") }}</p>
+        </div>
+
+        <DialogFooter>
+          <template v-if="hasTrackedChanges">
+            <Button variant="ghost" @click="confirmOpen = false">
+              {{ $t("common.cancel") }}
+            </Button>
+            <Button variant="destructive" @click="confirmDiscardAndRun">
+              {{ t("update.discardContinue") }}
+            </Button>
+            <Button @click="confirmStashAndRun">
+              {{ t("update.stashContinue") }}
+            </Button>
+          </template>
+          <template v-else>
+            <Button variant="ghost" @click="confirmOpen = false">
+              {{ $t("common.cancel") }}
+            </Button>
+            <Button @click="confirmRun">
+              {{ t("update.confirmContinue") }}
+            </Button>
+          </template>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

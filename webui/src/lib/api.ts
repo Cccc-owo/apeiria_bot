@@ -228,10 +228,15 @@ export const api = {
   },
   update: {
     status: () => request<UpdateStatusResponse>("GET", "/update/status"),
-    preview: (ref: string, type: string = "branch") =>
+    preview: (ref: string, type: string = "branch", offset = 0, limit = 20) =>
       request<UpdatePreviewResponse>(
         "GET",
-        `/update/preview/${ref}?type=${type}`,
+        `/update/preview/${ref}?type=${type}&offset=${offset}&limit=${limit}`,
+      ),
+    locate: (ref: string, commit: string, type: string = "branch", limit = 20) =>
+      request<{ offset: number; page: number }>(
+        "GET",
+        `/update/preview/${ref}/locate?type=${type}&commit=${encodeURIComponent(commit)}&limit=${limit}`,
       ),
     execute: (
       ref: string,
@@ -239,6 +244,7 @@ export const api = {
       type: string,
       onMessage: (data: string) => void,
       onError?: (err: Error) => void,
+      dirtyStrategy?: "stash" | "discard" | "block",
     ): SseClient => {
       const auth = useAuthStore();
       return createSseClient(
@@ -248,7 +254,12 @@ export const api = {
         onError,
         {
           method: "POST",
-          body: { branch: ref, commit: commit ?? undefined, type },
+          body: {
+            branch: ref,
+            commit: commit ?? undefined,
+            type,
+            dirty_strategy: dirtyStrategy ?? "block",
+          },
           autoReconnect: false,
         },
       );

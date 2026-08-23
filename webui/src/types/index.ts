@@ -283,8 +283,10 @@ export interface UpdateStatusResponse {
   commit_message: string;
   is_dirty: boolean;
   dirty_files: string[];
+  has_tracked_changes: boolean;
   available_branches: string[];
   available_tags: string[];
+  fetch_warning?: string;
 }
 
 export interface UpdatePreviewResponse {
@@ -294,6 +296,9 @@ export interface UpdatePreviewResponse {
   remote_commit_message: string;
   commits_behind: number;
   commits: GitCommit[];
+  total: number;
+  offset: number;
+  limit: number;
   local_only_commits: GitCommit[];
   has_diverged: boolean;
   fetch_warning?: string;
