@@ -357,6 +357,11 @@
   background-color: var(--state-pressed);
 }
 
+/* While dragging the sidebar, disable width transitions so it tracks the cursor */
+html.sidebar-resizing [data-slot="sidebar"] {
+  transition: none !important;
+}
+
 /* vue-sonner toasts: align normal toasts with the design tokens */
 [data-sonner-toaster] {
   --border-radius: var(--radius-lg);

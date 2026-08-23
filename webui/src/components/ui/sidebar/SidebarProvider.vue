@@ -14,9 +14,24 @@ import {
   SIDEBAR_COOKIE_MAX_AGE,
   SIDEBAR_COOKIE_NAME,
   SIDEBAR_KEYBOARD_SHORTCUT,
-  SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_DEFAULT,
   SIDEBAR_WIDTH_ICON,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+  SIDEBAR_WIDTH_STORAGE,
 } from "./utils";
+
+function clampWidth(value: number): number {
+  return Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, value));
+}
+
+function readStoredWidth(): number {
+  const raw = Number(
+    defaultDocument?.defaultView?.localStorage?.getItem(SIDEBAR_WIDTH_STORAGE),
+  );
+  if (Number.isFinite(raw) && raw > 0) return clampWidth(raw);
+  return SIDEBAR_WIDTH_DEFAULT;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -76,6 +91,15 @@ useEventListener("keydown", (event: KeyboardEvent) => {
 // This makes it easier to style the sidebar with Tailwind classes.
 const state = computed(() => (open.value ? "expanded" : "collapsed"));
 
+const sidebarWidth = ref(readStoredWidth());
+function setSidebarWidth(value: number) {
+  sidebarWidth.value = clampWidth(value);
+  defaultDocument?.defaultView?.localStorage?.setItem(
+    SIDEBAR_WIDTH_STORAGE,
+    String(sidebarWidth.value),
+  );
+}
+
 provideSidebarContext({
   state,
   open,
@@ -84,6 +108,8 @@ provideSidebarContext({
   openMobile,
   setOpenMobile,
   toggleSidebar,
+  sidebarWidth,
+  setSidebarWidth,
 });
 </script>
 
@@ -92,7 +118,7 @@ provideSidebarContext({
     <div
       data-slot="sidebar-wrapper"
       :style="{
-        '--sidebar-width': SIDEBAR_WIDTH,
+        '--sidebar-width': `${sidebarWidth}px`,
         '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
       }"
       :class="

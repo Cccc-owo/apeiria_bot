@@ -7,6 +7,10 @@ export const SIDEBAR_WIDTH = "16rem";
 export const SIDEBAR_WIDTH_MOBILE = "18rem";
 export const SIDEBAR_WIDTH_ICON = "3rem";
 export const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+export const SIDEBAR_WIDTH_STORAGE = "sidebar_width";
+export const SIDEBAR_WIDTH_DEFAULT = 256;
+export const SIDEBAR_WIDTH_MIN = 224;
+export const SIDEBAR_WIDTH_MAX = 384;
 
 export const [useSidebar, provideSidebarContext] = createContext<{
   state: ComputedRef<"expanded" | "collapsed">;
@@ -16,4 +20,6 @@ export const [useSidebar, provideSidebarContext] = createContext<{
   openMobile: Ref<boolean>;
   setOpenMobile: (value: boolean) => void;
   toggleSidebar: () => void;
+  sidebarWidth: Ref<number>;
+  setSidebarWidth: (value: number) => void;
 }>("Sidebar");
