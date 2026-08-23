@@ -195,7 +195,7 @@ const pluginComboboxOpen = ref(false);
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 p-6">
+  <div class="flex flex-col gap-6 p-6 lg:p-8">
     <PageHeader :title="t('access.title')" :subtitle="t('access.subtitle')">
       <template #actions>
         <Button @click="previewOpen = true" variant="outline">

@@ -7,7 +7,7 @@ defineProps<{ title: string; subtitle?: string }>();
        content header only carries the subtitle + primary actions. -->
   <div
     v-if="subtitle || $slots.actions"
-    class="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+    class="mb-5 flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2"
   >
     <p v-if="subtitle" class="min-w-0 text-sm text-muted-foreground">
       {{ subtitle }}
