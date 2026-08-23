@@ -383,7 +383,7 @@ function confirmUninstall() {
             </TableCell>
           </TableRow>
           <TableRow v-for="p in filteredPlugins" :key="p.name">
-            <TableCell>
+            <TableCell :data-label="$t('plugins.name')">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{{ p.display_name || p.name }}</span>
                 <Badge
@@ -400,7 +400,7 @@ function confirmUninstall() {
                 {{ p.module }}
               </div>
             </TableCell>
-            <TableCell class="max-w-xs">
+            <TableCell class="max-w-xs" :data-label="$t('plugins.description')">
               <TooltipProvider :delay-duration="200">
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -416,14 +416,14 @@ function confirmUninstall() {
                 </Tooltip>
               </TooltipProvider>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('plugins.type')">
               <Badge v-if="p.type" variant="outline">{{ p.type }}</Badge>
               <span v-else class="text-muted-foreground">—</span>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('plugins.source')">
               <Badge variant="secondary">{{ p.source }}</Badge>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('plugins.enabled')">
               <TooltipProvider v-if="!p.can_disable" :delay-duration="200">
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -442,7 +442,7 @@ function confirmUninstall() {
                 @update:model-value="(v: boolean) => toggle(p.name, v)"
               />
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right" :data-label="$t('plugins.actions')">
               <div class="flex items-center justify-end gap-0.5">
                 <Button
                   variant="ghost"

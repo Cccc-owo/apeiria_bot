@@ -299,7 +299,7 @@ function confirmUninstall() {
             </TableCell>
           </TableRow>
           <TableRow v-for="a in data?.adapters ?? []" :key="a.name">
-            <TableCell>
+            <TableCell :data-label="$t('adapters.name')">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{{ a.name }}</span>
                 <Badge
@@ -310,19 +310,22 @@ function confirmUninstall() {
                 </Badge>
               </div>
             </TableCell>
-            <TableCell class="font-mono text-xs text-muted-foreground">
+            <TableCell
+              class="font-mono text-xs text-muted-foreground"
+              :data-label="$t('adapters.moduleName')"
+            >
               {{ a.module_name }}
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('adapters.source')">
               <Badge variant="secondary">{{ a.source }}</Badge>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('adapters.enabled')">
               <Switch
                 :model-value="a.enabled"
                 @update:model-value="(v: boolean) => toggle(a.name, v)"
               />
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right" :data-label="$t('adapters.actions')">
               <div class="flex items-center justify-end gap-0.5">
                 <Button
                   variant="ghost"

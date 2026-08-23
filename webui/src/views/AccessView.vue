@@ -251,7 +251,7 @@ const pluginComboboxOpen = ref(false);
             </TableCell>
           </TableRow>
           <TableRow v-for="(rule, idx) in rules" :key="rule.id">
-            <TableCell>
+            <TableCell data-label="">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -282,21 +282,27 @@ const pluginComboboxOpen = ref(false);
                 </Tooltip>
               </TooltipProvider>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('access.subjectType')">
               <Badge variant="outline">{{ typeLabel(rule.subject_type) }}</Badge>
             </TableCell>
-            <TableCell class="font-mono text-sm">{{ rule.subject_id }}</TableCell>
-            <TableCell>
+            <TableCell
+              class="font-mono text-sm"
+              :data-label="$t('access.subjectId')"
+            >{{ rule.subject_id }}</TableCell>
+            <TableCell :data-label="$t('access.pluginName')">
               <Badge variant="secondary" v-if="rule.plugin_name">{{ rule.plugin_name }}</Badge>
               <span v-else class="text-muted-foreground text-sm">{{ t("access.allPlugins") }}</span>
             </TableCell>
-            <TableCell>
+            <TableCell :data-label="$t('access.action')">
               <Badge :variant="actionBadgeVariant(rule.action)">
                 {{ rule.action === "allow" ? t("access.allow") : t("access.deny") }}
               </Badge>
             </TableCell>
-            <TableCell class="font-mono text-sm">{{ rule.priority }}</TableCell>
-            <TableCell>
+            <TableCell
+              class="font-mono text-sm"
+              :data-label="$t('access.priority')"
+            >{{ rule.priority }}</TableCell>
+            <TableCell :data-label="$t('plugins.actions')">
               <div class="flex gap-1">
                 <Button
                   variant="ghost"

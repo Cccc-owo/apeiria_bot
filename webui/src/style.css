@@ -362,6 +362,59 @@ html.sidebar-resizing [data-slot="sidebar"] {
   transition: none !important;
 }
 
+/*
+ * Responsive data tables: on small screens reflow the table into stacked
+ * cards. Each <td data-label="名称"> shows the column name via ::before.
+ */
+@media (max-width: 767px) {
+  [data-slot="table-container"] {
+    overflow: visible;
+  }
+  [data-slot="table-container"] table,
+  [data-slot="table-container"] thead,
+  [data-slot="table-container"] tbody,
+  [data-slot="table-container"] tbody tr,
+  [data-slot="table-container"] tbody td {
+    display: block;
+    width: 100%;
+  }
+  [data-slot="table-container"] thead {
+    display: none;
+  }
+  [data-slot="table-container"] tbody tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background-color: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+  [data-slot="table-container"] tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border: none;
+    white-space: normal;
+    max-width: none !important;
+  }
+  [data-slot="table-container"] tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    padding-right: 1rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  [data-slot="table-container"] tbody td[data-label=""] {
+    justify-content: flex-end;
+  }
+  [data-slot="table-container"] tbody td[data-label=""]::before {
+    display: none;
+  }
+}
+
 /* vue-sonner toasts: align normal toasts with the design tokens */
 [data-sonner-toaster] {
   --border-radius: var(--radius-lg);
