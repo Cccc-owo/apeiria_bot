@@ -13,6 +13,14 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -50,6 +58,17 @@ const currentLabel = computed(() => {
   const key =
     typeof route.name === "string" ? routeTitleMap[route.name] : undefined;
   return key ? t(key) : "";
+});
+
+const breadcrumbs = computed(() => {
+  const name = typeof route.name === "string" ? route.name : "";
+  if (name === "settings-nonebot" || name === "settings-apeiria") {
+    return [
+      { label: t("nav.settings"), to: { name: "settings-nonebot" } },
+      { label: currentLabel.value },
+    ];
+  }
+  return [{ label: currentLabel.value }];
 });
 
 const initial = computed(() =>
@@ -145,7 +164,22 @@ function logout() {
       >
         <SidebarTrigger class="-ml-1" />
         <div class="h-4 w-px bg-border" />
-        <h1 class="text-sm font-medium">{{ currentLabel }}</h1>
+        <Breadcrumb v-if="breadcrumbs.length > 1">
+          <BreadcrumbList>
+            <template v-for="(b, i) in breadcrumbs" :key="i">
+              <BreadcrumbItem v-if="i < breadcrumbs.length - 1">
+                <BreadcrumbLink as-child>
+                  <RouterLink :to="b.to!">{{ b.label }}</RouterLink>
+                </BreadcrumbLink>
+                <BreadcrumbSeparator />
+              </BreadcrumbItem>
+              <BreadcrumbPage v-else class="text-sm font-medium">{{
+                b.label
+              }}</BreadcrumbPage>
+            </template>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <h1 v-else class="text-sm font-medium">{{ currentLabel }}</h1>
         <div class="ml-auto flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>

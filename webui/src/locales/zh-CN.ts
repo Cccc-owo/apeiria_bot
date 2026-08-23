@@ -349,6 +349,7 @@ export default {
     searchPlaceholder: "输入 ID 搜索…",
     noSubjects: "无匹配结果",
     noRules: "暂无访问规则",
+    noRulesMsg: "添加一条规则来控制插件对用户/群组的访问",
     createSuccess: "规则已创建",
     updateSuccess: "规则已更新",
     deleteSuccess: "规则已删除",

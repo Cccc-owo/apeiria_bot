@@ -7,9 +7,11 @@ import {
   GripVertical,
   Plus,
   Search,
+  Shield,
   Trash2,
 } from "@lucide/vue";
 import { toast } from "vue-sonner";
+import EmptyState from "@/components/EmptyState.vue";
 import ErrorState from "@/components/ErrorState.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { Badge } from "@/components/ui/badge";
@@ -236,8 +238,18 @@ const pluginComboboxOpen = ref(false);
             </TableCell>
           </TableRow>
           <TableRow v-else-if="rules.length === 0">
-            <TableCell colspan="7" class="text-center text-muted-foreground py-8">
-              {{ t("access.noRules") }}
+            <TableCell colspan="7">
+              <EmptyState
+                :title="t('access.noRules')"
+                :message="t('access.noRulesMsg')"
+                :icon="Shield"
+                class="py-8"
+              >
+                <Button size="sm" @click="openCreate">
+                  <Plus class="size-4" />
+                  {{ t("access.addRule") }}
+                </Button>
+              </EmptyState>
             </TableCell>
           </TableRow>
           <TableRow v-for="(rule, idx) in rules" :key="rule.id">
