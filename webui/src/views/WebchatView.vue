@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import {
+  ArrowLeft,
   ImagePlus,
   MessageCircle,
   Plus,
@@ -33,7 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useWebchat } from "@/composables/useWebchat";
 import { cn } from "@/lib/utils";
-import type { WebchatMessage } from "@/types";
+import type { WebchatConversation, WebchatMessage } from "@/types";
 import ImageLightbox from "@/components/webchat/ImageLightbox.vue";
 
 const {
@@ -66,6 +68,18 @@ const newGroupId = ref("");
 const newGroupName = ref("");
 const lightboxOpen = ref(false);
 const lightboxIndex = ref(0);
+
+const isMobile = useMediaQuery("(max-width: 768px)");
+const mobilePane = ref<"list" | "chat">("list");
+
+function openConversation(c: WebchatConversation) {
+  selectConversation(c);
+  if (isMobile.value) mobilePane.value = "chat";
+}
+
+function backToList() {
+  mobilePane.value = "list";
+}
 
 interface ImageEntry {
   url: string;
@@ -185,7 +199,18 @@ function avatarText(m: WebchatMessage): string {
 
 <template>
   <div class="flex h-full min-h-0">
-    <aside class="flex min-h-0 w-60 shrink-0 flex-col border-r bg-card/40">
+    <aside
+      :class="
+        cn(
+          'flex min-h-0 flex-col border-r bg-card/40',
+          isMobile
+            ? mobilePane === 'chat'
+              ? 'hidden'
+              : 'w-full'
+            : 'w-60 shrink-0',
+        )
+      "
+    >
       <div class="flex shrink-0 items-center gap-2 border-b p-3">
         <Select v-model="currentUser">
           <SelectTrigger class="flex-1">
@@ -229,8 +254,8 @@ function avatarText(m: WebchatMessage): string {
                 : 'hover:bg-secondary',
             )
           "
-          @click="selectConversation(c)"
-          @keydown.enter="selectConversation(c)"
+          @click="openConversation(c)"
+          @keydown.enter="openConversation(c)"
         >
           <component
             :is="c.type === 'group' ? Users : MessageCircle"
@@ -259,9 +284,30 @@ function avatarText(m: WebchatMessage): string {
       </div>
     </aside>
 
-    <section class="flex min-h-0 min-w-0 flex-1 flex-col p-4 lg:p-6">
-      <div class="mb-3 flex shrink-0 items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-2">
+    <section
+      :class="
+        cn(
+          'flex min-h-0 min-w-0 flex-col p-4 lg:p-6',
+          isMobile
+            ? mobilePane === 'list'
+              ? 'hidden'
+              : 'w-full'
+            : 'flex-1',
+        )
+      "
+    >
+      <div class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <Button
+            v-if="isMobile"
+            variant="ghost"
+            size="icon"
+            class="-ml-1 size-8 shrink-0"
+            :aria-label="$t('webchat.back')"
+            @click="backToList"
+          >
+            <ArrowLeft class="size-4" />
+          </Button>
           <component
             :is="currentConversation?.type === 'group' ? Users : MessageCircle"
             class="size-4 shrink-0 text-muted-foreground"
@@ -269,7 +315,7 @@ function avatarText(m: WebchatMessage): string {
           <h2 class="truncate text-sm font-medium">
             {{ currentConversation?.name ?? $t("webchat.title") }}
           </h2>
-          <Badge variant="secondary" class="shrink-0">
+          <Badge variant="secondary" class="max-w-[42vw] shrink-0 truncate">
             {{ $t("webchat.actingAs", { user: store.currentUserId }) }}
           </Badge>
         </div>
@@ -283,9 +329,9 @@ function avatarText(m: WebchatMessage): string {
                 )
               "
             />
-            {{
+            <span class="max-sm:hidden">{{
               connected ? $t("webchat.connected") : $t("webchat.disconnected")
-            }}
+            }}</span>
           </span>
           <Dialog v-model:open="clearOpen">
             <Button variant="outline" size="sm" @click="clearOpen = true">

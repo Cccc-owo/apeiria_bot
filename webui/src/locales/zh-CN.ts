@@ -267,6 +267,7 @@ export default {
   },
   webchat: {
     title: "调试聊天",
+    back: "返回",
     privateChat: "与 Bot 私聊",
     account: "账号",
     addAccount: "添加账号",
