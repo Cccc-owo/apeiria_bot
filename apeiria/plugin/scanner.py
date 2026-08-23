@@ -135,6 +135,79 @@ def read_installed_version(requirement: str) -> str | None:
     return None
 
 
+def framework_version() -> str | None:
+    """The Apeiria framework version, used for built-in plugins that ship with it."""
+    import tomllib
+
+    p = Path("pyproject.toml")
+    if not p.is_file():
+        return None
+    try:
+        data = tomllib.loads(p.read_text(encoding="utf-8"))
+        return data.get("project", {}).get("version")
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def read_local_plugin_version(plugin_path: Path) -> str | None:
+    """Best-effort version for a local (folder) plugin."""
+    pyproject = plugin_path / "pyproject.toml"
+    if pyproject.is_file():
+        import tomllib
+
+        try:
+            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            return data.get("project", {}).get("version")
+        except (OSError, tomllib.TOMLDecodeError):
+            pass
+    init = plugin_path / "__init__.py"
+    if init.is_file():
+        try:
+            text = init.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def resolve_version(
+    *,
+    meta: dict | None,
+    source: str,
+    requirement: str | None = None,
+    module: str | None = None,
+    path: str | None = None,
+) -> str | None:
+    """Resolve a plugin's version by NoneBot spec precedence.
+
+    1. ``PluginMetadata.extra["version"]`` (the plugin author's declared version).
+    2. The installed distribution version (PyPI / dependency plugins).
+    3. The framework version for built-in plugins.
+    4. A local plugin's own declared version, if any.
+    """
+    declared = (meta or {}).get("version")
+    if declared:
+        return str(declared)
+
+    if source in ("pypi", "dependency"):
+        for candidate in (requirement, module):
+            if candidate:
+                result = read_installed_version(candidate)
+                if result:
+                    return result
+        return None
+
+    if source == "builtin":
+        return framework_version()
+
+    if source == "local":
+        return read_local_plugin_version(Path(path)) if path else None
+
+    return None
+
+
 def local_plugin_module_name(plugin_dir: Path) -> str | None:
     """Return a valid import module name for a local plugin directory.
 

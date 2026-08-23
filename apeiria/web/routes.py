@@ -21,6 +21,7 @@ from apeiria.plugin.manager import _read_plugins_yaml, set_plugin_state
 from apeiria.plugin.scanner import (
     _requirement_base_name,
     read_installed_version,
+    resolve_version,
     scan_plugins,
 )
 from apeiria.web import pypi
@@ -124,6 +125,7 @@ async def api_plugins_list() -> JSONResponse:
             "type": meta.type,
             "homepage": meta.homepage,
             "supported_adapters": sorted(adapters) if adapters else None,
+            "version": (meta.extra or {}).get("version"),
         }
 
     dep_graph_obj = get_cached_graph(loaded_plugins)
@@ -159,7 +161,12 @@ async def api_plugins_list() -> JSONResponse:
                 "supported_adapters": meta.get("supported_adapters"),
                 "can_disable": False,
                 "can_uninstall": False,
-                "installed_version": None,
+                "installed_version": resolve_version(
+                    meta=meta,
+                    source="dependency",
+                    requirement=plugin.name,
+                    module=plugin.module_name,
+                ),
                 "depends_on": sorted(dep_graph_obj.graph.get(plugin.name, set())),
                 "depended_by": sorted(dep_graph_obj.reverse.get(plugin.name, set())),
             }

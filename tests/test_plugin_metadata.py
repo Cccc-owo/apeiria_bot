@@ -140,3 +140,39 @@ def test_merge_matches_pypi_requirement_with_version_specifier() -> None:
     result = merge_plugin_metadata(manifests, metadata_map)
 
     assert result[0]["display_name"] == "服务器状态"
+
+
+def test_resolve_version_precedence(monkeypatch) -> None:
+    from apeiria.plugin import scanner
+
+    def fake_framework() -> str | None:
+        return "0.1.0"
+
+    def fake_local(_path) -> str | None:
+        return None
+
+    monkeypatch.setattr(scanner, "framework_version", fake_framework)
+    monkeypatch.setattr(scanner, "read_local_plugin_version", fake_local)
+
+    # 1. PluginMetadata.extra["version"] wins over everything.
+    assert (
+        scanner.resolve_version(
+            meta={"version": "9.9.9"}, source="dependency", requirement="x"
+        )
+        == "9.9.9"
+    )
+
+    # 2. Dependency falls back to the installed distribution version.
+    monkeypatch.setattr(
+        scanner, "read_installed_version", lambda req: "0.62.0" if req == "x" else None
+    )
+    assert (
+        scanner.resolve_version(meta={}, source="dependency", requirement="x")
+        == "0.62.0"
+    )
+
+    # 3. Builtin uses the framework version.
+    assert scanner.resolve_version(meta={}, source="builtin") == "0.1.0"
+
+    # 4. Local without declared version -> None.
+    assert scanner.resolve_version(meta={}, source="local", path="/tmp/plugin") is None

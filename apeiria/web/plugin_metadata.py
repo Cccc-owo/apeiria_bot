@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from apeiria.plugin.scanner import (
     manifest_module_candidate,
-    read_installed_version,
+    resolve_version,
 )
 
 if TYPE_CHECKING:
@@ -45,9 +45,17 @@ def merge_plugin_metadata(
                 "supported_adapters": meta.get("supported_adapters"),
                 "can_disable": True,
                 "can_uninstall": manifest.source in ("local", "pypi"),
-                "installed_version": read_installed_version(manifest.path_or_module)
-                if manifest.source == "pypi"
-                else None,
+                "installed_version": resolve_version(
+                    meta=meta,
+                    source=manifest.source,
+                    requirement=manifest.path_or_module
+                    if manifest.source == "pypi"
+                    else None,
+                    module=module,
+                    path=manifest.path_or_module
+                    if manifest.source == "local"
+                    else None,
+                ),
                 "depends_on": sorted(dep_graph.get(name, set())) if dep_graph else [],
                 "depended_by": sorted(dep_reverse.get(name, set()))
                 if dep_reverse
