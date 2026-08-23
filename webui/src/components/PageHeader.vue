@@ -10,7 +10,10 @@ defineProps<{ title: string; subtitle?: string }>();
         {{ subtitle }}
       </p>
     </div>
-    <div v-if="$slots.actions" class="shrink-0">
+    <div
+      v-if="$slots.actions"
+      class="flex shrink-0 items-center gap-2"
+    >
       <slot name="actions" />
     </div>
   </div>

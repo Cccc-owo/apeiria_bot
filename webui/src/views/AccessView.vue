@@ -198,16 +198,14 @@ const pluginComboboxOpen = ref(false);
   <div class="flex flex-col gap-6 p-6">
     <PageHeader :title="t('access.title')" :subtitle="t('access.subtitle')">
       <template #actions>
-        <div class="flex gap-2">
-          <Button @click="previewOpen = true" variant="outline">
-            <Search class="size-4" />
-            {{ t("access.preview") }}
-          </Button>
-          <Button @click="openCreate">
-            <Plus class="size-4" />
-            {{ t("access.addRule") }}
-          </Button>
-        </div>
+        <Button @click="previewOpen = true" variant="outline">
+          <Search class="size-4" />
+          {{ t("access.preview") }}
+        </Button>
+        <Button @click="openCreate">
+          <Plus class="size-4" />
+          {{ t("access.addRule") }}
+        </Button>
       </template>
     </PageHeader>
 
