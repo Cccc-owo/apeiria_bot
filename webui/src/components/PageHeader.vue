@@ -3,17 +3,16 @@ defineProps<{ title: string; subtitle?: string }>();
 </script>
 
 <template>
-  <div class="mb-6 flex items-start justify-between gap-4">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight">{{ title }}</h1>
-      <p v-if="subtitle" class="mt-1 text-sm text-muted-foreground">
-        {{ subtitle }}
-      </p>
-    </div>
-    <div
-      v-if="$slots.actions"
-      class="flex shrink-0 items-center gap-2"
-    >
+  <!-- Option 2 (MUI-style): the page title lives in the top app bar, so the
+       content header only carries the subtitle + primary actions. -->
+  <div
+    v-if="subtitle || $slots.actions"
+    class="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+  >
+    <p v-if="subtitle" class="min-w-0 text-sm text-muted-foreground">
+      {{ subtitle }}
+    </p>
+    <div v-if="$slots.actions" class="flex shrink-0 items-center gap-2">
       <slot name="actions" />
     </div>
   </div>
